@@ -1,0 +1,70 @@
+<Simulation>
+
+  <Include href="../Includes/NaoV6H25.rsi2"/>
+  <Include href="../Includes/Ball2016SPL.rsi2"/>
+  <Include href="../Includes/Field2020SPL.rsi2"/>
+
+  <Scene name="RoboCup" controller="SimulatedNao" stepLength="0.012" color="rgb(65%, 65%, 70%)" ERP="0.8" CFM="0.001" contactSoftERP="0.2" contactSoftCFM="0.005">
+    <Light z="9m" ambientColor="rgb(50%, 50%, 50%)"/>
+
+    <Compound name="teamColors">
+      <Appearance name="green"/>
+      <Appearance name="red"/>
+    </Compound>
+
+    <Compound name="robots">
+
+      <!-- team 1 - RoboEireann attackers, 3 players -->
+
+    <Body ref="Nao" name="robot1">
+      <Translation x="3.9" y="0" z="320mm"/>
+      <Rotation z="180degree"/>
+      <Set name="NaoColor" value="green"/>
+    </Body>
+    <Body ref="Nao" name="robot2">
+      <Translation x="0" y="-2" z="320mm"/>
+      <Rotation z="180degree"/>
+      <Set name="NaoColor" value="green"/>
+    </Body>
+    <Body ref="Nao" name="robot3">
+      <Translation x="0" y="2" z="320mm"/>
+      <Rotation z="180degree"/>
+      <Set name="NaoColor" value="green"/>
+    </Body>
+
+
+      <!-- team 2 - reds -->
+
+    <Body ref="Nao" name="robot21">
+      <Translation x="-4.5" y="0" z="320mm"/>
+      <Rotation z="0degree"/>
+      <Set name="NaoColor" value="red"/>
+    </Body>
+    <Body ref="Nao" name="robot22">
+      <Translation x="-2.85" y="-1.6" z="320mm"/>
+      <Rotation z="0degree"/>
+      <Set name="NaoColor" value="red"/>
+    </Body>
+    <Body ref="Nao" name="robot23">
+      <Translation x="0" y="0" z="320mm"/>
+      <Rotation z="0degree"/>
+      <Set name="NaoColor" value="red"/>
+    </Body>
+
+    </Compound>
+
+    <Compound name="extras">
+    </Compound>
+
+    <!-- ball on attackers pen spot -->
+
+    <Compound name="balls">
+      <Body ref="ball">
+        <Translation x="3.2" z="1m"/>
+      </Body>
+    </Compound>
+
+    <Compound ref="field"/>
+
+  </Scene>
+</Simulation>

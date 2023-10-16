@@ -1,0 +1,39 @@
+dr annotation
+
+set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 2; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+
+echo -- switch to SET state
+echo set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 2; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+echo -- switch to PLAYING state
+echo set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 3; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+
+# NOTE: for these plots to line up the number of elements in the samples plot
+# and monobuffer plots has got be equal to the number of elements in the other
+# plots multiplied by fftStep (currently 128).
+# E.g. if the subtracted plot has 250 elements then the samples and monobuffer plots
+# need to have 250*128 = 32000 elements
+
+echo Plotting Samples
+vp samples 88200 -1.05 1.05
+vpd samples module:WhistleDetectorRE2023:samples0 red
+vpd samples module:WhistleDetectorRE2023:samples1 green
+vpd samples module:WhistleDetectorRE2023:samples2 blue
+vpd samples module:WhistleDetectorRE2023:samples3 orange
+
+echo Plotting power
+vp power 1000 -2 2
+vpd power module:WhistleDetectorRE2023:audioPower red
+
+echo Plotting monoBuffer
+vp monoBuffer 88200 -1.05 1.05
+vpd monoBuffer module:WhistleDetectorRE2023:monoBuffer red
+
+echo Plotting whistleConfidence
+vp whistleConfidence 250 -0.05 1.05
+vpd whistleConfidence module:WhistleDetectorRE2023:whistleConfidence red
+vpd whistleConfidence module:WhistleDetectorRE2023:bestWhistleConfidence blue
+vpd whistleConfidence module:WhistleDetectorRE2023:whistleConfidenceThresh orange
+vpd whistleConfidence module:WhistleDetectorRE2023:upperWhistleConfidenceThresh green
+
+
+get parameters:WhistleDetectorRE2023

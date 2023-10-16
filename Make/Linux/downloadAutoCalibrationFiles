@@ -1,0 +1,58 @@
+#!/bin/bash
+#downloads all log files from the robot
+
+BASEPATH=$(cd "$(dirname "$(which "$0")")" && pwd)
+
+usage()
+{
+  echo "usage: copyAutoCalibration [-h | --help] <robotName>"
+  echo ""
+  echo " -h or --help   display this usage"
+  echo ""
+  echo "  NOTE: <address> must be a robot name and not an IP address."
+  echo "        A robot name with no suffix resolves to the robot\'s LAN IP address."
+  echo "        A robot name with a .wlan or .wifi suffix resolves to the robot\'s WLAN IP address."
+  echo ""
+  echo "  examples:"
+  echo "    Make/Linux/copyAutoCalibration robby"
+  echo "    Make/Linux/copyAutoCalibration robby.wifi"
+  exit 1
+}
+
+#Variables
+ROBOT_CONFIGPATH="/home/nao/Config/Robots"
+KEYSOURCE="${BASEPATH}/../../Install/Keys/id_rsa_nao"
+KEYFILE=/tmp/id_rsa_nao
+cp -n "${KEYSOURCE}" ${KEYFILE}
+SSHOPTIONS="-c aes128-ctr -i ${KEYFILE} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
+
+
+chmod 600 $keyFile
+
+if [ $# -lt 1 ]
+then
+  usage
+elif [ "$1" = "-h" ]
+then
+  usage
+elif [ "$1" = "--help" ]
+then
+  usage
+elif [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+then
+  usage
+fi
+
+IP=`${BASEPATH}/../Common/resolveIp $1`
+NAME=`echo $1 | sed "s%\.\(wlan\|wifi\)$%%"`
+
+echo "downloading autocalibraton files from robot '$NAME' with address $IP"
+#exit 0
+
+LOCAL_CONFIGPATH="${BASEPATH}/../../Config/Robots"
+
+scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/$NAME/cameraCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/$NAME/"
+scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/Body/footSoleRotationCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/Body/"
+scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/Body/imuCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/Body/"
+
+echo done

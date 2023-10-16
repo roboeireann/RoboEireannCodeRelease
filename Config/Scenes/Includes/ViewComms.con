@@ -1,0 +1,10 @@
+vd representation:OwnTeamInfo 
+vd representation:OpponentTeamInfo 
+vd representation:GameInfo 
+vd representation:ExtendedGameInfo 
+vd representation:FrameInfo 
+
+vd representation:TeamData
+vd representation:TeamBehaviorStatus
+vd representation:BHumanMessageOutputGenerator
+vd representation:MessageDesirability

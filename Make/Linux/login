@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# can specify a numeric ip or robot name from Config/Robots directory
+# Adding ".wifi" or ".wlan" to the robot name will use the wifi address
+# instead of the default lan address
+
+
+cd "$(dirname "$(which "$0")")"
+
+IP=$1
+
+if [ "$1" = "-b" ]; then
+  # called from bush
+  shift
+  clear
+else
+  IP=`../Common/resolveIp $1`
+  echo "sc Remote $IP" >../../Config/Scenes/Includes/connect.con
+fi
+echo "Connecting to $IP"
+cp -n ../../Install/Keys/id_rsa_nao /tmp/id_rsa_nao
+chmod 600 /tmp/id_rsa_nao
+ssh -i /tmp/id_rsa_nao -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet nao@$1
+if [ $? = 255 ]; then
+  echo "Error: Cannot connect to $IP" >&2
+fi

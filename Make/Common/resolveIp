@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Convert a robot name to a numeric IP address
+# If a name is passed in and not found, try to use it directly as the IP addr
+
+
+usage()
+{
+  echo "usage: nameToIp <robotName>"
+  echo "  <robotName> a robot name (or numeric IP address to be passed through unchanged)"
+  exit 1
+}
+
+
+[[ $# -ne 1 ]] && usage
+NAME_OR_IP=$1
+
+
+# numeric IP?
+if [[ $NAME_OR_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "$NAME_OR_IP"
+  exit 0
+fi
+
+# assume it is a robot name
+
+NAME=`echo $NAME_OR_IP | sed "s%\.\(wlan\|wifi\)$%%"`
+
+# echo "name is $NAME"
+
+PROJ_DIR="$(cd "$(dirname "$(which "$0")")/../.."; pwd)"
+
+if [ -d "$PROJ_DIR/Config/Robots/$NAME" ]; then
+  # echo "$NAME found"
+
+  # are we looking up the wifi addr
+  if [[ $NAME_OR_IP =~ \.(wlan|wifi)$ ]]; then
+    # echo "$NAME_OR_IP looking up wifi addr"
+    cat "$PROJ_DIR/Config/Robots/$NAME/network.cfg" | grep -e ^wlan | sed "s%^wlan = \"\(.*\)\";.*%\1%"
+  else
+    # echo "$NAME_OR_IP looking up lan addr"
+    cat "$PROJ_DIR/Config/Robots/$NAME/network.cfg" | grep -e ^lan | sed "s%^lan = \"\(.*\)\";.*%\1%"
+  fi
+else
+  # no such directory - just try the supplied name as an IP addr
+  echo $NAME_OR_IP
+fi
+
+# cat Config/Robots/bailey/network.cfg | grep -e ^lan | sed "s%^lan = \"\(.*\)\";%\1%"

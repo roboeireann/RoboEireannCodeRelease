@@ -1,0 +1,36 @@
+# Move robots in 3v2 game to ready (kickoff positions)
+
+# move simRobot x_mm y_mm z_mm, z_mm=320 for standing robot
+#               rotx_deg=0 roty_deg=0 rotz=180 to face goal
+# Notes:
+# - positive x points to home goal, negative x is closer to opponent goal
+# - robot pos to front of foot is 114 mm
+# - robot pos to back of foot is 48 mm
+
+# select our simulated robot
+# and move it to its walk-in position on the sideline
+
+# Move RoboEireann (4 robots) to ready/kickoff positions
+
+robot robot2
+mv 3200 2400 330 0 0 180
+
+robot robot3
+mv 2500 -1500 330 0 0 180
+
+robot robot4
+mv 2500 1500 330 0 0 180
+
+robot robot5
+mv 500 0 330 0 0 180
+
+# Move other team (2 robots) to ready/kickoff positions
+
+# goalie
+robot robot21
+mv -4500 0 330 0 0 0
+
+# defense team striker
+robot robot25
+mv -950 0 330 0 0 0
+

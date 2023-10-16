@@ -1,0 +1,55 @@
+# Set the robots up as if a basic game was in progress.
+# Each team will have one or two robots in the opposition half and
+# a couple of defensive players in place
+
+# move simRobot x_mm y_mm z_mm, z_mm=320 for standing robot
+#               rotx_deg=0 roty_deg=0 rotz=180 to face goal
+# Notes:
+# In SimRobot coordinates
+# - positive x points to home goal, negative x is closer to opponent goal
+# - positive y is far side of the field
+# - robot pos to front of foot is 114 mm
+# - robot pos to back of foot is 48 mm
+#
+# In SPL coordinates (used for robot pose)
+# - positive x is towards opponent goal, and positive y is towards near (left)
+#   side of the pitch, rotation-z 0 is towards opponent
+
+### GREEN TEAM --------------------------------------------------------------
+
+robot robot1
+mv 4500 0 320 0 0 180
+set selfLocator:overridePose valid = true; pose = { rotation = 0deg; translation = { x = -4500; y = 0; }; }; 
+
+robot robot2
+mv 3900 1000 320 0 0 180
+set selfLocator:overridePose valid = true; pose = { rotation = 0deg; translation = { x = -3900; y = -1000; }; }; 
+
+
+### RED TEAM ----------------------------------------------------------------
+
+
+
+### Enemy Robots
+
+# Enemy Goalie
+#robot robot21
+#mv -4500 0 320 0 0 45
+
+### Ally Robots
+
+# Ally striker and supporter
+#robot robot4
+#mv -1600 1400 330 0 0 90 
+
+#robot robot5
+#mv -1000 2700 330 0 0 135 
+
+### Objects
+
+# Set the positions for the dummies
+#mvo RoboCup.extras.robot32 -3080 950 320 0 0 315
+#mvo RoboCup.extras.robot33 -3450 1250 320 0 0 315
+
+# move the ball
+#mvo RoboCup.balls.ball -1400 2950 1000 0 0 135 

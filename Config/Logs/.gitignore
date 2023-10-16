@@ -1,0 +1,3 @@
+# Ignore all the files and subdirectories (containing log files) in here
+*
+!.gitignore

@@ -1,0 +1,15 @@
+# EE308 passing challenge
+
+# moveobject dummyrobot x_mm y_mm z_mm, z_mm=320 for standing robot
+# Notes:
+# - positive x points to home goal, negative x is closer to opponent goal
+# - robot pos to front of foot is 114 mm
+# - robot pos to back of foot is 48 mm
+
+# Move both robots out of the way
+
+mvo RoboCup.extras.robot21 -1500 -3400 320 0 0 90
+mvo RoboCup.extras.robot22 -2000 -3400 320 0 0 90
+mvo RoboCup.extras.robot23 -2500 -3400 320 0 0 90
+mvo RoboCup.extras.robot24 -3000 -3400 320 0 0 90
+mvo RoboCup.extras.robot25 -3500 -3400 320 0 0 90

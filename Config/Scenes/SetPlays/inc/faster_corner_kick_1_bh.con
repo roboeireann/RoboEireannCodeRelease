@@ -1,0 +1,58 @@
+# move the ball
+mvo RoboCup.balls.ball -4500 3000 500 0 0 0
+
+# green/white team positions - coords relative to defending half
+
+robot robot1
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -4300; y = 0; }; }; 
+robot robot2
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -2600; y = 100; }; }; 
+robot robot3
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -600; y = -300; }; }; 
+robot robot4
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 10deg; translation = { x = 3800; y = -2000; }; }; 
+robot robot5
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = -60deg; translation = { x = 2000; y = 600; }; }; 
+
+echo -- if you need to change robots 1 to 5
+echo robot robot1
+echo set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -4300; y = 0; }; }; 
+echo robot robot2
+echo set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -2600; y = 100; }; }; 
+echo robot robot3
+echo set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -600; y = -300; }; }; 
+echo robot robot4
+echo set selfLocator:overridePose defendingHalf = left; pose = { rotation = 10deg; translation = { x = 3800; y = -2000; }; }; 
+echo robot robot5
+echo set selfLocator:overridePose defendingHalf = left; pose = { rotation = -90deg; translation = { x = 2000; y = 600; }; }; 
+
+
+# red/blue team positions
+robot robot21
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -4300; y = 0; }; }; 
+robot robot22
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 110deg; translation = { x = -4000; y = 1500; }; }; 
+robot robot23
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 90deg; translation = { x = -3600; y = -500; }; }; 
+robot robot24
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 40deg; translation = { x = -2800; y = 1000; }; }; 
+robot robot25
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -1000; y = 0; }; }; 
+
+echo -- if you need to set robots21 to 25
+echo robot robot21
+echo set selfLocator:overridePose defendingHalf = right; pose = { rotation = 180deg; translation = { x = -4300; y = 0; }; }; 
+echo robot robot22
+echo set selfLocator:overridePose defendingHalf = right; pose = { rotation = -70deg; translation = { x = -4000; y = 1500; }; }; 
+echo robot robot23
+echo set selfLocator:overridePose defendingHalf = right; pose = { rotation = -90deg; translation = { x = -3600; y = -500; }; }; 
+echo robot robot24
+echo set selfLocator:overridePose defendingHalf = right; pose = { rotation = 40deg; translation = { x = -2800; y = 1000; }; }; 
+echo robot robot25
+echo set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -1000; y = 0; }; }; 
+
+
+# Set GameState
+echo
+gc playing
+gc cornerKickForFirstTeam

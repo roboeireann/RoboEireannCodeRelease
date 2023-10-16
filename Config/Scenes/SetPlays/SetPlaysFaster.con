@@ -1,0 +1,21 @@
+call Includes/RE_settings
+
+call Includes/PerceptOracle
+call Includes/5vs5
+
+robot robot1
+
+echo -- choose one of the following scripts to test a set play behaviour
+echo -- (Scripts with bh suffix are somewhat based on scenes from BH2022 code release)
+echo
+echo call SetPlays/inc/faster_corner_kick_1_bh
+echo call SetPlays/inc/faster_corner_kick_2
+echo
+echo call SetPlays/inc/faster_kick_in_own_half_bh
+echo call SetPlays/inc/faster_kick_in_opponent_half_bh
+echo call SetPlays/inc/faster_kick_in_side
+echo
+echo call SetPlays/inc/faster_goal_kick
+echo
+echo call SetPlays/inc/faster_foul_pushing_free_kick
+echo call SetPlays/inc/faster_foul_penalty_kick

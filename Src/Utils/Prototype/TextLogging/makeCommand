@@ -1,0 +1,1 @@
+clang++ -g -I Src/ -I Util/fmt/include/ Src/Utils/Prototype/TextLogging/MainFile.cpp Build/Linux/CMake/Develop/libfmt.a

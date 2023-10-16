@@ -1,0 +1,41 @@
+# test that more than 3 robots from the attacking team can be in the goal
+# area but that only 3 (or fewer) robots from the defending team can be in the 
+# goal area at a time. We'll try to encourage a 4th defending robot into the
+# goal area by judicious ball placement when the simulation starts.
+
+# attacking team
+
+robot robot1
+pr requestForPickup
+
+robot robot2
+mv -4000 -1000 330 0 0 -45
+robot robot3
+mv -4000 -500 330 0 0 -45
+robot robot4
+mv -4000 0 330 0 0 -45
+robot robot5
+mv -4000 500 330 0 0 -45
+
+
+# defending team: red/blue team positions
+robot robot21
+mv -4500 -200 330 0 0 0
+robot robot22
+mv -4300 -900 330 0 0 -45
+robot robot23
+mv -4300 -400 330 0 0 -45
+
+# 4th robot to be tempted into the goal area
+robot robot24
+mv -4100 1300 330 0 0 -90
+
+mvo RoboCup.balls.ball -4100 950 1000 0 0 0
+
+echo
+echo gc playing
+
+
+
+
+

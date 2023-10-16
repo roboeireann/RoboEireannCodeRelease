@@ -1,0 +1,25 @@
+cs RC2023DynamicBallHandling team1
+cs RC2023DynamicBallHandlingDefender team2
+
+call Includes/PerceptOracle
+
+ar penalizeIllegalPosition off
+ar penalizeIllegalPositionInSet off
+ar placeBall off
+ar switchToSet off
+ar switchToPlaying off
+
+
+robot all
+dr annotation
+vd representation:TeamBehaviorStatus
+vd representation:TeamData 
+
+robot robot3
+echo -- execute one of the setups before executing set 1 sec, playing
+echo call RC2023/inc/dynamicballhandling_initial_1
+echo call RC2023/inc/dynamicballhandling_initial_2
+echo call RC2023/inc/dynamicballhandling_initial_3
+echo gc set
+echo gc playing
+

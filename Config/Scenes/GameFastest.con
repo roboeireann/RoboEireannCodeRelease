@@ -1,0 +1,4 @@
+call Includes/RE_settings
+
+call Includes/Fast
+call Includes/5vs5

@@ -1,0 +1,37 @@
+# Test that more than 3 robots from each team are allowed in a single
+# penalty area at the same time
+
+# green/white team positions - all coords relative to defending half
+
+robot robot1
+pr requestForPickup
+
+robot robot2
+mv -3600 -900 330 0 0 180
+robot robot3
+mv -3600 -300 330 0 0 180
+robot robot4
+mv -3600 300 330 0 0 180
+robot robot5
+mv -3600 900 330 0 0 180
+
+
+# red/blue team positions
+robot robot21
+mv -4500 0 330 0 0 0
+robot robot22
+mv -3000 -900 330 0 0 180
+robot robot23
+mv -3000 -300 330 0 0 180
+robot robot24
+mv -3000 300 330 0 0 180
+robot robot25
+mv -3000 900 330 0 0 180
+
+echo gc playing
+
+
+mvo RoboCup.balls.ball 0 0 0 0 0 0
+
+
+

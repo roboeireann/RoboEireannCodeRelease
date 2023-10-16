@@ -1,0 +1,21 @@
+mr RobotPose OdometryOnlySelfLocator Cognition
+get module:OdometryOnlySelfLocator:basePose
+set module:OdometryOnlySelfLocator:basePose rotation = 0deg; translation = { x = 0; y = 0; };
+dr module:OdometryOnlySelfLocator:resetReferenceOdometry 
+vd representation:MotionRequest 
+vd representation:RobotPose
+
+echo
+echo Make the MotionRequest and RobotPose data views visible
+echo Place the robot on the center spot facing the goal
+echo Use the motionRequest to walk forward, sideways, or turn
+echo Measure how far it actually moved compared with the odometry based robotPose
+echo
+echo to measure a different direction or measure again, reset the pose back to 
+echo the center using the following:
+echo
+echo dr module:OdometryOnlySelfLocator:resetReferenceOdometry 
+echo
+echo Record the actual measures vs the predictions
+echo Then calculate the appropriate odometryScale manually afterwards
+echo

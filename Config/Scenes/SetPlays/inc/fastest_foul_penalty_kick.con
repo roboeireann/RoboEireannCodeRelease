@@ -1,0 +1,43 @@
+# Set the robots for a pushing free kick (inside penalty area)
+
+# green/white team positions - all coords relative to defending half
+
+robot robot1 robot2 robot3
+pr requestForPickup
+
+robot robot4
+mv -3100 900 330 0 0 135
+# robot 5 should fall
+robot robot5
+mv -3300 1700 330 30 0 225 
+
+
+# red/blue team positions
+robot robot21
+mv -4500 0 330 0 0 0
+robot robot22
+mv -3000 -200 330 0 0 45
+# should collide with robot5 from behind
+robot robot23
+mv -3900 1500 330 0 0 180
+robot robot24
+mv -2900 100 330 0 0 15
+robot robot25
+pr requestForPickup
+
+# Set GameState
+echo -- after playing and then penaltyKickForFirstTeam, the GC should enter state=READY, substate=SET_PLAY_PENALTY_KICK
+echo -- After 30 secs, the state should auto change to SET, but you can switch early if you wish.
+echo -- Once in the SET state, the ball should be automatically placed
+echo -- Once back in the PLAYING state, the penalty kicker should shoot
+echo gc playing
+echo gc penaltyKickForFirstTeam
+echo gc set
+echo gc playing
+
+
+# another bug - the ball does not seem to be moved automatically to the penalty spot
+# mvo RoboCup.balls.ball -3200 0 1000 0 0 0
+
+
+

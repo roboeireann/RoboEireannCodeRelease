@@ -1,0 +1,15 @@
+set(FMTLIB_ROOT_DIR "${PROJECTROOT_PREFIX}/Util/fmt")
+
+file(GLOB_RECURSE FMTLIB_SOURCES "${FMTLIB_ROOT_DIR}/src/*.cc" "${FMTLIB_ROOT_DIR}/include/*.h")
+
+add_library(fmt STATIC EXCLUDE_FROM_ALL ${FMTLIB_SOURCES})
+
+set_property(TARGET fmt PROPERTY ARCHIVE_OUTPUT_DIRECTORY "${FMTLIB_OUTPUT_DIR}")
+set_property(TARGET fmt PROPERTY FOLDER Libs)
+if(BUILD_DESKTOP)
+  set_property(TARGET fmt PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
+
+target_include_directories(fmt SYSTEM PUBLIC "${FMTLIB_ROOT_DIR}/include")
+
+source_group(TREE "${FMTLIB_ROOT_DIR}" FILES ${FMTLIB_SOURCES})

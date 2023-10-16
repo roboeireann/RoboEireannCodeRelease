@@ -1,0 +1,43 @@
+TFlite v2.8.2 as there seemed to be a problem with the C build in later versions
+
+# On Linux (ubuntu 18.04 development PC):
+
+    git clone https://github.com/tensorflow/tensorflow.git tensorflow_src
+    mkdir tflite_build_pc_clang
+    cd tflite_build_pc_clang
+
+to make the C api
+
+    cmake -S ../tensorflow_src/tensorflow/lite/c -DTFLITE_C_BUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    cmake --build . -j
+
+to combine the library and all dependencies
+
+    # in the tflite_build_pc_clang directory
+    find . -name '*.a' - print > combine_libs.mri
+
+    # edit so that combine_libs.mri looks like
+    create libtflite_c_all_deps.a
+    addlib ./tensorflow-lite/libtensorflow-lite.a
+    addlib ./pthreadpool/libpthreadpool.a
+    ...etc...
+    addlib ./_deps/farmhash-build/libfarmhash.a
+    addlib ./_deps/xnnpack-build/libXNNPACK.a
+    save
+    end
+
+    # combine using ar
+    ar -M < combine_libs.mri
+
+
+
+# On the Nao V6 (running ubuntu 20.04 based image)
+
+    git clone https://github.com/tensorflow/tensorflow.git tensorflow_src
+    mkdir tflite_build_2.8.2_c
+    cd tflite_build_2.8.2_c
+
+    cmake -S ../tensorflow_src/tensorflow/lite/c -DTFLITE_C_BUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    cmake --build .
+    
+combine the library and all dependencies exactly the same as for the linux platform

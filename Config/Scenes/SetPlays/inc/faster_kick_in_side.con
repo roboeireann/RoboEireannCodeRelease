@@ -1,0 +1,44 @@
+# Set the robots in a kick in from the side state for 2v3 scenario
+
+# move simRobot x_mm y_mm z_mm, z_mm=320 for standing robot
+#               rotx_deg=0 roty_deg=0 rotz=180 to face goal
+# Notes:
+# - positive x points to home goal, negative x is closer to opponent goal
+# - robot pos to front of foot is 114 mm
+# - robot pos to back of foot is 48 mm
+
+### Enemy Robots
+
+# green/white team positions - coords relative to defending half
+
+robot robot1
+pr requestForPickup
+robot robot2
+pr requestForPickup
+robot robot3
+pr requestForPickup
+robot robot4
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = -90deg; translation = { x = 1600; y = -1400; }; }; 
+robot robot5
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = -45deg; translation = { x = 1000; y = -2700; }; }; 
+
+
+# red/blue team positions
+robot robot21
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 15deg; translation = { x = -4500; y = 0; }; }; 
+robot robot22
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 45deg; translation = { x = -3080; y = 950; }; }; 
+robot robot23
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 45deg; translation = { x = -3450; y = 1250; }; }; 
+robot robot24
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 15deg; translation = { x = -1700; y = 2900; }; }; 
+robot robot25
+pr requestForPickup
+
+# move the ball
+mvo RoboCup.balls.ball -1400 3000 1000 0 0 135
+
+# Set GameState
+gc playing
+gc kickInForFirstTeam
+

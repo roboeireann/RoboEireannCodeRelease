@@ -1,0 +1,15 @@
+call Includes/RE_settings
+
+call Includes/Fast
+
+
+robot all
+dr annotation
+vd representation:TeamBehaviorStatus
+vd representation:TeamData 
+
+echo call RE/inc/ready_4v2
+echo gc ready
+echo gc set
+echo gc playing
+

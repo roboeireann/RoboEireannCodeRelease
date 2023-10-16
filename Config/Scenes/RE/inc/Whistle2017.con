@@ -1,0 +1,55 @@
+dr annotation
+
+set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 2; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+
+echo -- switch to SET state
+echo set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 2; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+echo -- switch to PLAYING state
+echo set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 3; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+
+# NOTE: for these plots to line up the number of elements in the samples plot
+# and monobuffer plots has got be equal to the number of elements in the other
+# plots multiplied by fftAdvance (currently 128).
+# E.g. if the subtracted plot has 250 elements then the samples and monobuffer plots
+# need to have 250*128 = 32000 elements
+
+echo Plotting Samples
+vp samples 32000 -1.05 1.05
+vpd samples module:WhistleDetectorRE2017:samples0 red
+vpd samples module:WhistleDetectorRE2017:samples1 green
+vpd samples module:WhistleDetectorRE2017:samples2 blue
+vpd samples module:WhistleDetectorRE2017:samples3 orange
+
+echo Plotting monoBuffer
+vp monoBuffer 32000 -1.05 1.05
+vpd monoBuffer module:WhistleDetectorRE2017:monoBuffer red
+
+echo Plotting maxConfidence
+vp maxConfidence 250 -0.05 1.05
+vpd maxConfidence module:WhistleDetectorRE2017:maxConfidence red
+
+echo Plotting Debug Plots
+vp debug 250 -1.05 1.05
+vpd debug module:WhistleDetectorRE2017:debug0 red
+vpd debug module:WhistleDetectorRE2017:debug1 green
+
+vp signal 250 -0.02 0.30
+vpd signal module:WhistleDetectorRE2017:sumMagnitudeSpectrum gray
+vpd signal module:WhistleDetectorRE2017:sumMonoSignalMagSmoothed blue
+
+vp subtracted 250 -0.02 0.30
+vpd subtracted module:WhistleDetectorRE2017:sumSubtractedSpectrum gray
+vpd subtracted module:WhistleDetectorRE2017:sumMonoSubtractedMagSmoothed blue
+vpd subtracted module:WhistleDetectorRE2017:sumNoiseMagSmoothed green
+vpd subtracted module:WhistleDetectorRE2017:whistleBandPower red
+
+vp whistle 250 -0.05 1.05
+vpd whistle module:WhistleDetectorRE2017:sufficientSamples green
+vpd whistle module:WhistleDetectorRE2017:whistleDetected red
+vpd whistle module:WhistleDetectorRE2017:whistleConfidence blue
+
+
+get parameters:WhistleDetectorRE2017
+
+echo Generating Spectrograms
+vi module:WhistleDetectorRE2017:magnitudeSpectrum Cognition magnitudeSpectrum

@@ -1,0 +1,42 @@
+# Set the robots for a pushing free kick (outside penalty area)
+
+# green/white team positions - all coords relative to defending half
+
+robot robot1
+pr requestForPickup
+robot robot2
+pr requestForPickup
+robot robot3
+pr requestForPickup
+robot robot4
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = -30deg; translation = { x = 1000; y = -1700; }; }; 
+robot robot5
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 30deg; translation = { x = 1300; y = -2200; }; }; 
+
+
+# red/blue team positions
+robot robot21
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -4500; y = 0; }; }; 
+robot robot22
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 45deg; translation = { x = -3000; y = 600; }; }; 
+# should collide with robot5 from behind
+robot robot23
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 180deg; translation = { x = -1150; y = 2200; }; }; 
+robot robot24
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 15deg; translation = { x = -1800; y = 2100; }; }; 
+robot robot25
+pr requestForPickup
+
+# move the ball
+mvo RoboCup.balls.ball -1500 2000 1000 0 0 0
+
+# Set GameState
+gc playing
+
+robot robot23
+# pr playerPushing doesn't seem to work while fallen but doesn't get up either, 
+# request for pickup doesn't seem to either for some reason???
+pr requestForPickup
+
+gc pushingFreeKickForFirstTeam
+

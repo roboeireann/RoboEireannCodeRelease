@@ -1,0 +1,15 @@
+# Move one robot (robot4) to its standard sideline position
+# so that it can walk in to kickoff
+
+# move simulatedRobot x_mm y_mm z_mm, z_mm=320 for standing robot
+#               rotx_deg=0 roty_deg=0 rotz=180 to face goal
+# Notes:
+# - positive x points to home goal, negative x is closer to opponent goal
+# - robot pos to front of foot is 114 mm
+# - robot pos to back of foot is 48 mm
+
+# select our simulated robot
+# and move it to its walk-in position on the sideline
+
+robot robot4
+mv 750 1710 320 0 0 -90

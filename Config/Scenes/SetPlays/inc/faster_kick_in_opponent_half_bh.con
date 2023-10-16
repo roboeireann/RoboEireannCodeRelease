@@ -1,0 +1,32 @@
+# green/white team positions - coords relative to defending half
+
+robot robot1
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -4300; y = 0; }; }; 
+robot robot2
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -2700; y = -1000; }; }; 
+robot robot3
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = 800; y = -2500; }; }; 
+robot robot4
+pr requestForPickUp
+robot robot5
+pr requestForPickUp
+
+
+# red/blue team positions
+robot robot21
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -4300; y = 0; }; }; 
+robot robot22
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -2300; y = -1100; }; }; 
+robot robot23
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = 2200; y = 500; }; }; 
+robot robot24
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -300; y = -300; }; }; 
+robot robot25
+set selfLocator:overridePose defendingHalf = right; pose = { rotation = 0deg; translation = { x = -800; y = -2000; }; }; 
+
+# move the ball
+mvo RoboCup.balls.ball -2000 3000 500 0 0 0
+
+# Set GameState
+gc playing
+gc kickInForFirstTeam

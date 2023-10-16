@@ -1,0 +1,11 @@
+call Includes/RE_settings
+
+call Includes/PerceptOracle
+call Includes/5vs5
+
+robot robot1
+
+echo -- choose one of the following scripts to test a kick off behaviour
+echo
+echo call KickOff/inc/kickOffAttack
+echo call KickOff/inc/kickOffDefend

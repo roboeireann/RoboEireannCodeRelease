@@ -1,0 +1,30 @@
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+# press any key to activate the joystick
+jc press 1 call Includes/Joystick
+jc press 2 call Includes/Joystick
+jc press 3 call Includes/Joystick
+jc press 4 call Includes/Joystick
+
+gc gamePenaltyShootout
+
+robot robot1
+
+echo -- Switch to set state (`gc set`) before choosing any robots.
+echo -- Green/white has Kick initially. The robot numbers are robot1,robot2, robot21, robot22
+echo -- Choose one player from each team to participate in the penalty:
+echo --   Select a player by doubleclicking it. Then type `pr none` to unpenalize it.
+echo -- Finally execute `gc playing` to execute the penalty.
+echo -- After the penalty has concluded, the red/blue team takes the next one.
+echo -- Start from the first line above to select players etc. again.
+echo -- (Note: each penalty shot goes to a different goal for some reason.)
+echo
+echo gc set
+echo
+echo
+echo
+echo
+echo gc playing

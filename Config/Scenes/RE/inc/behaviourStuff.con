@@ -1,0 +1,9 @@
+robot all
+dr annotation
+vd representation:TeamBehaviorStatus
+vd representation:TeamData 
+
+call RE/ready_3v2
+echo gc ready
+echo gc set
+echo gc playing

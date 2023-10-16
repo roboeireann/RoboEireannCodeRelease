@@ -1,0 +1,4 @@
+echo -- you can optionally call the following to reposition robots
+echo call RE/large_field_inactives_to_side
+echo call RE/large_field_robot4_to_kickoff_walkin
+echo call RE/large_field_robot4_to_penalty_walkin

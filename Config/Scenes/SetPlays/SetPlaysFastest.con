@@ -1,0 +1,11 @@
+call Includes/RE_settings
+
+call Includes/Fast
+call Includes/5vs5
+
+robot robot1
+
+echo -- choose one of the following scripts to test a set play behaviour
+echo -- (Scripts with bh suffix are somewhat based on scenes from BH2022 code release)
+echo
+echo call SetPlays/inc/fastest_foul_penalty_kick

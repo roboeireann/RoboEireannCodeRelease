@@ -1,0 +1,6 @@
+cl MULabMedField2020
+
+call Includes/RE_settings
+call Includes/PerceptOracle
+
+dr debugDrawing3d:representation:RobotPose
