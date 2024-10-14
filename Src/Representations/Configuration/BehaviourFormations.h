@@ -9,9 +9,15 @@
 #pragma once
 
 #include "Representations/BehaviorControl/PlayerRole.h"
-#include "Tools/Streams/AutoStreamable.h"
 #include "Tools/Math/Pose2f.h"
+#include "Tools/Range.h"
+
+#include "Tools/Streams/AutoStreamable.h"
+#include "Tools/Streams/Enum.h"
+#include "Tools/Streams/EnumIndexedArray.h"
+
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 // Note: in the following all positions/poses refer to field coordinates
@@ -35,7 +41,7 @@ STREAMABLE(BehaviourFormations,
 
   STREAMABLE(PositionConstraints,
   {,
-    // (std::optional<PlayerRole::RoleType>)() selectByRole, // when selecting by nearest point
+    // (std::optional<PlayerRole::Type>)() selectByRole, // when selecting by nearest point
     // Note: optional specified as empty array in .cfg file if not present, or array with one element if present
 
     (Rangef) ballXRange,
@@ -69,3 +75,4 @@ STREAMABLE(BehaviourFormations,
   // (std::vector<Formation>) formations, /* access by formation name via getFormation */
   // (std::vector<TacticFormation>) tacticFormations,
 });
+

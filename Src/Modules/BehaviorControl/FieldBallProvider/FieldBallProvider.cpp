@@ -30,6 +30,7 @@ void FieldBallProvider::update(FieldBall& fieldBall)
   fieldBall.timeSinceBallWasSeen = theFrameInfo.getTimeSince(theBallModel.timeWhenLastSeen);
   fieldBall.timeSinceBallDisappeared = theFrameInfo.getTimeSince(theBallModel.timeWhenDisappeared);
   fieldBall.timeSinceTeamBallWasValid = theFrameInfo.getTimeSince(theTeamBallModel.timeWhenLastValid);
+  fieldBall.isTeamBallValid = theTeamBallModel.isValid;
 
   checkIfBallIsRollingTowardsAGoal(fieldBall);
   checkIfBallIsPassingOwnYAxis(fieldBall);
@@ -57,7 +58,7 @@ void FieldBallProvider::checkIfBallIsRollingTowardsAGoal(FieldBall& fieldBall)
 void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
 {
   fieldBall.intersectionPositionWithOwnYAxis = Vector2f::Zero();
-  fieldBall.timeUntilIntersectsOwnYAxis = std::numeric_limits<float>::max();
+  fieldBall.secsUntilIntersectsOwnYAxis = std::numeric_limits<float>::max();
 
   const Vector2f& ballPosRel = theBallModel.estimate.position;
   const Vector2f& ballVelRel = theBallModel.estimate.velocity;
@@ -74,7 +75,7 @@ void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
     if(distanceToIntersection < distanceToEndPosition)
     {
       fieldBall.intersectionPositionWithOwnYAxis = intersection;
-      fieldBall.timeUntilIntersectsOwnYAxis = BallPhysics::timeForDistance(ballVelRel, distanceToIntersection, theBallSpecification.friction);
+      fieldBall.secsUntilIntersectsOwnYAxis = BallPhysics::timeForDistance(ballVelRel, distanceToIntersection, theBallSpecification.friction);
     }
   }
 }
@@ -83,7 +84,7 @@ void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
 void FieldBallProvider::checkIfBallIsPassingOwnXAxis(FieldBall& fieldBall)
 {
   fieldBall.intersectionPositionWithOwnXAxis = Vector2f(200000.f, 200000.f); // larger than any field size (even future)
-  fieldBall.timeUntilIntersectsOwnXAxis = std::numeric_limits<float>::max();
+  fieldBall.secsUntilIntersectsOwnXAxis = std::numeric_limits<float>::max();
 
   const Vector2f& ballPosRel = theBallModel.estimate.position;
   const Vector2f& ballVelRel = theBallModel.estimate.velocity;
@@ -104,7 +105,7 @@ void FieldBallProvider::checkIfBallIsPassingOwnXAxis(FieldBall& fieldBall)
     if (distanceToIntersection < distanceToEndPosition)
     {
       fieldBall.intersectionPositionWithOwnXAxis = intersection;
-      fieldBall.timeUntilIntersectsOwnXAxis =
+      fieldBall.secsUntilIntersectsOwnXAxis =
           BallPhysics::timeForDistance(ballVelRel, distanceToIntersection, theBallSpecification.friction);
     }
   }

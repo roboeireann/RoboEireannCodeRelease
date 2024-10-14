@@ -5,7 +5,7 @@ st on
 
 # Only a single robot displays game state
 dr debugDrawing3d:representation:GameInfo
-dr debugDrawing3d:representation:TeamInfo
+dr debugDrawing3d:representation:GameInfo:scores
 
 # In case we have more than a single robot
 robot all
@@ -51,7 +51,7 @@ mr PenaltyMarkPercept OracledPerceptsProvider Upper
 # Representations not required anymore
 mr AutoExposureWeightTable off
 mr BallSpots off
-mr CameraImage off
+# mr CameraImage off
 mr CameraIntrinsics off
 mr CNSImage off
 mr CNSPenaltyMarkRegions off
@@ -74,9 +74,10 @@ mr ScanGrid off
 mr CameraStatus default
 mr FieldFeatureOverview default
 mr RobotHealth default
+mr CameraImage default
 
 call Includes/GameStates
 call Includes/DebugResponses
 
 dr debugDrawing3d:representation:RobotPose
-dr debugDrawing3d:representation:RobotInfo
+dr debugDrawing3d:representation:GameInfo:player

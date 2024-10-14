@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Streams/AutoStreamable.h"
 
-STREAMABLE(Whistle, COMMA public BHumanCompressedMessageParticle<Whistle>
+STREAMABLE(Whistle,
 {,
   (float)(0)         confidenceOfLastWhistleDetection, /**< Confidence based on hearing capability. */
   (unsigned char)(0) channelsUsedForWhistleDetection,  /**< Number of channels the robot used to listen. */
   (unsigned int)(0)  lastTimeWhistleDetected,          /**< Timestamp */
+  (bool)(false)      whistleDetected,                  /**< Whether the whistle was detected. */
 });

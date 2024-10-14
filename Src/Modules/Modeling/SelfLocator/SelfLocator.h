@@ -10,8 +10,7 @@
 
 #include "UKFRobotPoseHypothesis.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
-#include "Representations/Communication/TeamInfo.h"
+
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
@@ -45,11 +44,9 @@ MODULE(SelfLocator,
   REQUIRES(ExtendedGameInfo),
   REQUIRES(Odometer),
   REQUIRES(OdometryData),
-  REQUIRES(OwnTeamInfo),
   REQUIRES(FallDownState),
   REQUIRES(GameInfo),
   REQUIRES(GyroState),
-  REQUIRES(RobotInfo),
   REQUIRES(CirclePercept),
   REQUIRES(FieldDimensions),
   REQUIRES(FieldFeatureOverview),

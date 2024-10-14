@@ -54,7 +54,7 @@ void MotionRequest::draw() const
         CROSS("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), 50, 0, Drawings::solidPen, ColorRGBA(0xcd, 0, 0));
         Vector2f rotation(500.f, 0.f);
         rotation.rotate(targetDirection);
-        ARROW("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), ballEstimate.position.x() + rotation.x(), ballEstimate.position.y() + rotation.y(), 0, Drawings::solidPen, ColorRGBA(0xcd, 0, 0, 127));
+        LINE("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), ballEstimate.position.x() + rotation.x() * 1000, ballEstimate.position.y() * rotation.y() + 1000, 10, Drawings::dashedPen, ColorRGBA::cyan);
         drawObstacleAvoidance();
         break;
       }

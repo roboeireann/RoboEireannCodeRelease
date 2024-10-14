@@ -8,14 +8,13 @@
 
 #include "Representations/BehaviorControl/Skills.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Tools/BehaviorControl/Framework/Card/Card.h"
 #include "Tools/BehaviorControl/Framework/Card/Dealer.h"
 
 CARD(CalibrationCard,
 {,
   REQUIRES(GameInfo),
-  REQUIRES(RobotInfo),
   LOADS_PARAMETERS(
   {,
     (DeckOfCards<CardRegistry>) calibrationPhase,
@@ -26,12 +25,12 @@ class CalibrationCard : public CalibrationCardBase
 {
   bool preconditions() const override
   {
-    return theRobotInfo.mode == RobotInfo::calibration;
+    return theGameInfo.playerMode == GameInfo::calibration;
   }
 
   bool postconditions() const override
   {
-    return theRobotInfo.mode != RobotInfo::calibration;
+    return theGameInfo.playerMode != GameInfo::calibration;
   }
 
   void execute() override

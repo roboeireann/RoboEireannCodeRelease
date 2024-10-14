@@ -9,19 +9,13 @@
 #pragma once
 
 #include "Representations/Infrastructure/FrameInfo.h"
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Math/Eigen.h"
 #include "Tools/Module/Blackboard.h"
 #include "Tools/Streams/AutoStreamable.h"
 #include <vector>
 
-STREAMABLE(FieldCoverage, COMMA public BHumanMessageParticle<idFieldCoverage>
+STREAMABLE(FieldCoverage,
 {
-  /** BHumanMessageParticle functions */
-  void operator>>(BHumanMessage& m) const override;
-  void operator<<(const BHumanMessage& m) override;
-  bool handleArbitraryMessage(InMessage& m, const std::function<unsigned(unsigned)>& toLocalTimestamp) override;
-
   STREAMABLE(GridLine,
   {,
     (int) y,

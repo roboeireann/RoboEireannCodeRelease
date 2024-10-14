@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Math/Eigen.h"
 #include "Tools/Streams/AutoStreamable.h"
 
@@ -32,12 +31,8 @@ STREAMABLE(BallState,
  *
  * Contains all current knowledge about the ball.
  */
-STREAMABLE(BallModel, /* COMMA public BHumanMessageParticle<idBallModel> */
+STREAMABLE(BallModel,
 {
-  /** BHumanMessageParticle functions */
-  /* void operator>>(BHumanMessage& m) const override; */
-  /* void operator<<(const BHumanMessage& m) override; */
-
   /** Verifies that the ball model contains valid values. */
   void verify() const;
   /** Draws the estimate on the field */
@@ -92,12 +87,8 @@ STREAMABLE(BallModel3D,
 
 // Version of ball model for compressed team data
 
-STREAMABLE(BallModelSimplified, COMMA public BHumanMessageParticle<idBallModel>
+STREAMABLE(BallModelSimplified,
 {
-  /** BHumanMessageParticle functions */
-  void operator>>(BHumanMessage& m) const override;
-  void operator<<(const BHumanMessage& m) override;
-
   void toBallModel(BallModel& ballModel);
   void fromBallModel(const BallModel& ballModel);
   ,

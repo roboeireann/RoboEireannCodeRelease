@@ -14,12 +14,13 @@
 class RobotNumber
 {
 public:
-  static const int numSubstitutePlayersPerTeam = 1;  
-  static const int numPlayersPerTeam = 20;//7 + numSubstitutePlayersPerTeam; // incl keeper
-  static const int numFieldPlayersPerTeam = numPlayersPerTeam - 1 - numSubstitutePlayersPerTeam;
-  static const int numRobots = numPlayersPerTeam * 2; // 2 teams
+  static constexpr int numSubstitutePlayersPerTeam = 1;  
+  static constexpr int numPlayersPerTeam = 8;//7 + numSubstitutePlayersPerTeam; // incl keeper
+  static constexpr int numActivePlayersPerTeam = numPlayersPerTeam - numSubstitutePlayersPerTeam;
+  static constexpr int numFieldPlayersPerTeam = numActivePlayersPerTeam - 1;
+  static constexpr int numRobots = numPlayersPerTeam * 2; // 2 teams
 
-  static const int team2Offset = 20;
+  static constexpr int team2Offset = 20;
 
   static void validateSceneNumber(int sceneNumber)
   {
@@ -83,7 +84,7 @@ public:
    */
   static int getSceneNumberFromIndex(int index)
   {
-    int sceneNumber = (index < numPlayersPerTeam) ? index + 1 : team2Offset + index + 1;
+    int sceneNumber = (index < numPlayersPerTeam) ? index + 1 : index + 1 + team2Offset - numPlayersPerTeam;
 
     return sceneNumber;
   }

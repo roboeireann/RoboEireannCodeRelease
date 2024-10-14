@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Controller/SimulatedRobot.h"
+#include "Controller/RobotNumber.h"
 #include "Representations/Configuration/JointCalibration.h"
 #include "Representations/Configuration/RobotDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -38,7 +39,7 @@ protected:
   void getPose3f(const SimRobot::Object* obj, Pose3f& pose) const override;
 
 private:
-  static SimRobotCore2::SensorPort* activeCameras[12]; /**< An array of all activated cameras */
+  static SimRobotCore2::SensorPort* activeCameras[RobotNumber::numActivePlayersPerTeam*2]; /**< An array of all activated cameras */
   static unsigned activeCameraCount; /**< Total count of constructed cameras */
   unsigned activeCameraIndex; /**< Index of this robot in the \c activeCameras array */
 

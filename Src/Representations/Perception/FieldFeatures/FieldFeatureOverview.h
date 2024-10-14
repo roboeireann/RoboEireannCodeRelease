@@ -7,15 +7,10 @@
 #pragma once
 
 #include "FieldFeature.h"
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Streams/EnumIndexedArray.h"
 
-STREAMABLE(FieldFeatureOverview, COMMA public PureBHumanArbitraryMessageParticle<idFieldFeatureOverview>
+STREAMABLE(FieldFeatureOverview,
 {
-  /** BHumanMessageParticle functions */
-  void operator>>(BHumanMessage& m) const override;
-  bool handleArbitraryMessage(InMessage& m, const std::function<unsigned(unsigned)>& toLocalTimestamp) override;
-
   ENUM(Feature,
   {,
     penaltyArea,

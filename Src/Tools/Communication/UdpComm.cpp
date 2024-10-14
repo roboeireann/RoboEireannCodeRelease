@@ -24,7 +24,7 @@
 #include "Platform/BHAssert.h"
 #include "Tools/TextLogging.h"
 
-DECL_TLOGGER(tlogger, "UdpComm", TextLogging::DEBUG);
+DECL_TLOGGER(tlogger, "UdpComm", TextLogging::INFO);
 
 UdpComm::UdpComm()
 {

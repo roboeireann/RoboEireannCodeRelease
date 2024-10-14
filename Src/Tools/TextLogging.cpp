@@ -35,6 +35,13 @@ TextLogger& TextLogging::get(const std::string& name, Level level)
     return logger;
 }
 
+TextLogger& TextLogging::get()
+{
+    static TextLogger& logger = get("Default");
+    return logger;
+}
+
+
 
 TextLogger& TextLogging::registerLogger(const std::string& name)
 {

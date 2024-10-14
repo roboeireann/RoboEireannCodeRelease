@@ -128,4 +128,5 @@ public:
 
 private:
   static std::list<std::string> getConfigDirs();
+  static bool repeatedFile(const std::string& name);
 };

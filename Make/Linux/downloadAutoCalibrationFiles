@@ -51,6 +51,9 @@ echo "downloading autocalibraton files from robot '$NAME' with address $IP"
 
 LOCAL_CONFIGPATH="${BASEPATH}/../../Config/Robots"
 
+mkdir -p "$LOCAL_CONFIGPATH/$NAME/$NAME/"
+mkdir -p "$LOCAL_CONFIGPATH/$NAME/Body/"
+
 scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/$NAME/cameraCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/$NAME/"
 scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/Body/footSoleRotationCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/Body/"
 scp $sshoptions -p nao@$IP:$ROBOT_CONFIGPATH/$NAME/Body/imuCalibration.cfg "$LOCAL_CONFIGPATH/$NAME/Body/"

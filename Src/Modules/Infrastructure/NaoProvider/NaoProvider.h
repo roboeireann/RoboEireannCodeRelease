@@ -42,7 +42,7 @@ MODULE(NaoProvider,
 #ifdef TARGET_ROBOT
 
 class NaoProvider : public NaoProviderBase
-{
+{  
   static constexpr size_t numOfCPUCores = 4; /**< The number of CPU cores. */
 
   static thread_local NaoProvider* theInstance; /**< The only instance of this module. */
@@ -83,6 +83,9 @@ class NaoProvider : public NaoProviderBase
   unsigned timeWhenBatteryLevelWritten = 0; /**< The last time the battery level was written to a file. */
   unsigned timeWhenCPUTemperatureRead = 0; /**< The last time the CPU temperature was read. */
   int cpuTemperatureFiles[numOfCPUCores]; /**< The file descriptors where the CPU core temperatures can be read from. */
+
+  unsigned countdownToShutdown = 0;
+
 
   /**
    * This method is called when the representation provided needs to be updated.

@@ -103,14 +103,14 @@ void FilteredCurrentProvider::checkMotorMalfunction(FilteredCurrent& theFiltered
           if(i >= Joints::firstArmJoint && i < Joints::firstLegJoint)
           {
             SystemCall::say(fmt::format("Arm damaged {}. Please check {}.",
-                                        theRobotInfo.getRobotAndColourString(),
+                                        theGameInfo.getPlayerNumberAndColorString(),
                                         Joints::jointLongNames[i])); //probably only playing while doing get ups
           }
           else
           {
             SystemCall::playSound("sirene.wav");
             SystemCall::say(fmt::format("Motor malfunction {}! Please check {}.",
-                                        theRobotInfo.getRobotAndColourString(),
+                                        theGameInfo.getPlayerNumberAndColorString(),
                                         Joints::jointLongNames[i]));
             if(!theGyroOffset.bodyDisconnect)
               theFilteredCurrent.legMotorMalfunction = true;

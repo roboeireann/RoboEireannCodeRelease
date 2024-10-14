@@ -175,7 +175,7 @@ void ArmContactModelProvider::update(ArmContactModel& model)
      theFallDownState.state == FallDownState::fallen ||
      (theMotionInfo.executedPhase != MotionPhase::stand && theMotionInfo.executedPhase != MotionPhase::walk) ||
      !theGroundContactState.contact ||
-     theRobotInfo.penalty != PENALTY_NONE)
+     theGameInfo.isPenalized())
   {
     reset(model);
     return;

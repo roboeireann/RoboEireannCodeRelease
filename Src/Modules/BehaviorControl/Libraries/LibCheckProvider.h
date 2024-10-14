@@ -13,7 +13,7 @@
 #include "Representations/BehaviorControl/ActivationGraph.h"
 #include "Representations/BehaviorControl/Libraries/LibCheck.h"
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/MotionControl/MotionRequest.h"
 #include "Tools/Module/Module.h"
@@ -22,7 +22,7 @@ MODULE(LibCheckProvider,
 {,
   USES(ActivationGraph),
   REQUIRES(FrameInfo),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   USES(TeamActivationGraph),
   USES(TeamBehaviorStatus),
   PROVIDES(LibCheck),

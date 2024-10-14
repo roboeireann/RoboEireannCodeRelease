@@ -12,6 +12,8 @@
 
 #include "Tools/TextLogging.h"
 
+#include <unordered_set>
+
 #include <cstdarg>
 #include <cstdio>
 
@@ -47,7 +49,12 @@ File::File(const std::string& name, const char* mode, bool tryAlternatives)
 
   if (stream == nullptr)
   {
-    TLOGW(tlogger, "{} not found", name);
+    if (tlogger.isEnabled(TextLogging::WARNING))
+    {
+      if (!repeatedFile(name))
+        TLOGW(tlogger, "{} not found", name);
+    }
+
     if (tlogger.isEnabled(TextLogging::DEBUG))
     {
       for (auto& nm : names)
@@ -57,8 +64,11 @@ File::File(const std::string& name, const char* mode, bool tryAlternatives)
       }
     }
   }
-  else
-    TLOGI(tlogger, "{} found at {}", name, fullName);
+  else if (tlogger.isEnabled(TextLogging::INFO))
+  {
+    if (!repeatedFile(fullName))
+      TLOGI(tlogger, "{} found at {}", name, fullName);
+  }
 }
 
 File::~File()
@@ -160,6 +170,33 @@ std::list<std::string> File::getConfigDirs()
   std::list<std::string> dirs;
   const std::string configDir = std::string(getBHDir()) + "/Config/";
 #ifndef TARGET_TOOL
+  // The search paths in search order are:
+  //
+  // - Config/Robots/someHead/someBody/
+  // - Config/Robots/someHead/Head/
+  // - Config/Robots/someBody/Body/
+  //
+  // - Config/Scenarios/someScenario/Locations/someLocation/Sim *** (someScenario can be Default)
+  // - Config/Scenarios/someScenario/Locations/someLocation/        (someScenario can be Default)
+  //
+  // - Config/Scenarios/Default/Locations/someLocation/Sim *** (if scenario was not Default, we search here also - more or less equivalent to Config/Locations...)
+  // - Config/Scenarios/Default/Locations/someLocation/        (if scenario was not Default...)
+  //
+  // - Config/Locations/someLocation/Sim ***
+  // - Config/Locations/someLocation/
+  //
+  // - Config/Scenarios/someScenario/
+  //
+  // - Config/Robots/Default/
+  //
+  // - Config/Locations/Default/Sim ***
+  // - Config/Locations/Default
+  //
+  // - Config/Scenarios/Default
+  // - Config
+  //
+  // *** indicates paths that are only searched in SimRobot and not on the robot itself
+  
   if (Global::settingsExist())
   {
     dirs.push_back(configDir + "Robots/" + Global::getSettings().headName + "/" + Global::getSettings().bodyName + "/");
@@ -168,21 +205,52 @@ std::list<std::string> File::getConfigDirs()
 
     // allow the specific combination of scenario and location to get some customisation
     // unless both are Default
-    if ((Global::getSettings().scenario != "Default") || (Global::getSettings().location != "Default"))
-      dirs.push_back(configDir + "Scenarios/" + Global::getSettings().scenario + "/Locations/" + Global::getSettings().location + "/");
+    if (Global::getSettings().location != "Default")
+    {
+#ifdef TARGET_SIM
+      dirs.push_back(configDir + "Scenarios/" + Global::getSettings().scenario + 
+                     "/Locations/" + Global::getSettings().location + "/Sim/");
+#endif
+      dirs.push_back(configDir + "Scenarios/" + Global::getSettings().scenario + 
+                     "/Locations/" + Global::getSettings().location + "/");
+
+      if (Global::getSettings().scenario != "Default") // if our actual scenario was not default, make sure we fall back to checking default also
+      {
+#ifdef TARGET_SIM
+        dirs.push_back(configDir + "Scenarios/Default/Locations/" + Global::getSettings().location + "/Sim/");
+#endif
+        dirs.push_back(configDir + "Scenarios/Default/Locations/" + Global::getSettings().location + "/");
+      }
+    }
 
     if (Global::getSettings().location != "Default")
+    {
+#ifdef TARGET_SIM
+      dirs.push_back(configDir + "Locations/" + Global::getSettings().location + "/Sim/");
+#endif
       dirs.push_back(configDir + "Locations/" + Global::getSettings().location + "/");
+    }
+
     if (Global::getSettings().scenario != "Default")
       dirs.push_back(configDir + "Scenarios/" + Global::getSettings().scenario + "/");
 
     dirs.push_back(configDir + "Robots/Default/");
+#ifdef TARGET_SIM
+    dirs.push_back(configDir + "Locations/Default/Sim/");
+#endif
     dirs.push_back(configDir + "Locations/Default/");
     dirs.push_back(configDir + "Scenarios/Default/");
   }
 #endif
   dirs.push_back(configDir);
   return dirs;
+}
+
+bool File::repeatedFile(const std::string& name)
+{
+  static std::unordered_set<std::string> files;
+
+  return !files.insert(name).second; // second is true if item inserted which means it is not a repeat
 }
 
 std::string File::getRobotHeadBodyPath()

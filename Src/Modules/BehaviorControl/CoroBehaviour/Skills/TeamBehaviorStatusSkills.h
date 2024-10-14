@@ -104,7 +104,7 @@ namespace CoroBehaviour
      */
     TimeToReachBall calcTimeToReachBallPosition()
     {
-      if (theRobotInfo.isPenalized())
+      if (theGameInfo.isPenalized())
         return TimeToReachBall(); // max values
 
       unsigned timeToBallPosMs = getTimeToBallPositionMs();
@@ -122,7 +122,7 @@ namespace CoroBehaviour
 
     const Teammate* selectCaptainTeammate()
     {
-      int captain = !theRobotInfo.isPenalized() ? theRobotInfo.number : 0; // initial guess is that the current robot is captain
+      int captain = !theGameInfo.isPenalized() ? theGameInfo.playerNumber : 0; // initial guess is that the current robot is captain
       const Teammate* captainTeammate = nullptr;
 
       // search for a better captain (which will select the goalie if available)
@@ -153,7 +153,7 @@ namespace CoroBehaviour
     READS(LibCheck);
     READS(FieldBall);
     READS(WalkingEngineOutput);
-    READS(RobotInfo);
+    READS(GameInfo);
     READS(TeamData);
     READS(FrameInfo);
     READS(RobotPose);

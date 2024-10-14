@@ -10,7 +10,7 @@
  */
 
 #include "ObstaclesFieldPercept.h"
-#include "Representations/Communication/TeamInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
@@ -33,10 +33,10 @@ void ObstaclesFieldPercept::draw() const
   const ColorRGBA teamColors[] =
   {
     ColorRGBA::white,
-    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("OwnTeamInfo") ?
-        static_cast<const OwnTeamInfo&>(Blackboard::getInstance()["OwnTeamInfo"]).fieldPlayerColor : TEAM_GREEN),
-    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("OpponentTeamInfo") ?
-         static_cast<const OpponentTeamInfo&>(Blackboard::getInstance()["OpponentTeamInfo"]).fieldPlayerColor : TEAM_RED)
+    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
+        static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor : TEAM_GREEN),
+    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
+         static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).opponentTeam().fieldPlayerColor : TEAM_RED)
   };
 
   // Draw robots in field view:

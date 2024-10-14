@@ -12,7 +12,7 @@
 #include "ObstacleHypothesis.h"
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -49,7 +49,6 @@ MODULE(ObstacleModelProvider,
   REQUIRES(MotionInfo),
   REQUIRES(ObstaclesFieldPercept),
   REQUIRES(Odometer),
-  REQUIRES(RobotInfo),
   REQUIRES(RobotModel),
   REQUIRES(RobotPose),
   REQUIRES(TeamData),

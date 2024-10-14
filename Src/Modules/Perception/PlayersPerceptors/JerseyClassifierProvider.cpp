@@ -103,8 +103,8 @@ void JerseyClassifierProvider::detectJersey(const ObstaclesImagePercept::Obstacl
 
       // The maximum brightness is needed to determine black, white and gray relative to it.
       unsigned char maxBrightness = 0;
-      uint8_t ownColor = theOwnTeamInfo.fieldPlayerColor;
-      uint8_t opponentColor = theOpponentTeamInfo.fieldPlayerColor;
+      uint8_t ownColor = theGameInfo.ourTeam().fieldPlayerColor;
+      uint8_t opponentColor = theGameInfo.opponentTeam().fieldPlayerColor;
       // TODO / FIXME - do we need to deal with goalkeeper colour also here?
       if(ownColor == TEAM_BLACK || opponentColor == TEAM_BLACK ||
          ownColor == TEAM_GRAY || opponentColor == TEAM_GRAY ||
@@ -123,13 +123,13 @@ void JerseyClassifierProvider::detectJersey(const ObstaclesImagePercept::Obstacl
       // TODO / FIXME - goalkeeperColor also??
       // Get pixel classifier
       const std::function<bool(int, int)> &isOwnFieldPlayer =
-          getPixelClassifier(theOwnTeamInfo.fieldPlayerColor, theOpponentTeamInfo.fieldPlayerColor, maxBrightness);
+          getPixelClassifier(theGameInfo.ourTeam().fieldPlayerColor, theGameInfo.opponentTeam().fieldPlayerColor, maxBrightness);
       const std::function<bool(int, int)> &isOwnGoalPlayer =
-          getPixelClassifier(theOwnTeamInfo.goalkeeperColor, theOpponentTeamInfo.goalkeeperColor, maxBrightness);
+          getPixelClassifier(theGameInfo.ourTeam().goalkeeperColor, theGameInfo.opponentTeam().goalkeeperColor, maxBrightness);
       const std::function<bool(int, int)> &isOpponentFieldPlayer =
-          getPixelClassifier(theOpponentTeamInfo.fieldPlayerColor, theOwnTeamInfo.fieldPlayerColor, maxBrightness);
+          getPixelClassifier(theGameInfo.opponentTeam().fieldPlayerColor, theGameInfo.ourTeam().fieldPlayerColor, maxBrightness);
       const std::function<bool(int, int)> &isOpponentGoalPlayer =
-          getPixelClassifier(theOpponentTeamInfo.goalkeeperColor, theOwnTeamInfo.goalkeeperColor, maxBrightness);
+          getPixelClassifier(theGameInfo.opponentTeam().goalkeeperColor, theGameInfo.ourTeam().goalkeeperColor, maxBrightness);
 
       float ownPixels = 0;
       float opponentPixels = 0;
@@ -170,8 +170,8 @@ void JerseyClassifierProvider::detectJersey(const ObstaclesImagePercept::Obstacl
 
       // TODO / FIXME - goalkeeperColor also??
       // threshold to counter white robot parts or green field background being classified as opponent jersey
-      if ((theOpponentTeamInfo.fieldPlayerColor == TEAM_WHITE || theOpponentTeamInfo.fieldPlayerColor == TEAM_GREEN) &&
-          theOwnTeamInfo.fieldPlayerColor != TEAM_WHITE && theOwnTeamInfo.fieldPlayerColor != TEAM_GREEN)
+      if ((theGameInfo.opponentTeam().fieldPlayerColor == TEAM_WHITE || theGameInfo.opponentTeam().fieldPlayerColor == TEAM_GREEN) &&
+          theGameInfo.ourTeam().fieldPlayerColor != TEAM_WHITE && theGameInfo.ourTeam().fieldPlayerColor != TEAM_GREEN)
       {
         const float threshold = 1.5f * ownPixels + (examinedPixels) / 5;
         opponentPixels = opponentPixels <= threshold ? 0 : opponentPixels - threshold;

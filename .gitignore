@@ -1,6 +1,7 @@
 .*
 !.gitignore
 !.editorconfig
+!.clang-format
 *~
 \#*\#
 .\#
@@ -34,3 +35,6 @@ Thumbs.db
 /Util/Buildchain/macOS/lib
 /Util/Buildchain/Linux/bin/ccache
 /Util/WSL
+/Util/AbstractSim2023/.venv
+*/__pycache__/*
+*/.DS_Store

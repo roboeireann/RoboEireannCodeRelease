@@ -47,6 +47,7 @@ static void roboeireannStart(const Settings& settings)
 static void roboeireannStop()
 {
   TLOGI(tlogger, "Roboeireann: Stop.");
+
   robot->announceStop();
   robot->stop();
   delete robot;
@@ -57,19 +58,44 @@ static void sighandlerShutdown(int sig)
 {
   if(pthread_self() != mainThread)
   {
-    shutdownNAO = true;
+    // When we detect a long chest button press, the thread on which it is detected raises
+    // SIGINT and will be the thread to initially catch the signal, hence we need to redirect
+    // to the main thread here.
+    TLOGI(tlogger, "Caught termination/interrupt signal ({}) on non-main thread -- redirecting to main thread...",
+          Assert::getSignalName(sig));
+
+    if (sig == SIGUSR1)
+    {
+      TLOGI(tlogger, "Signal is sigUSR1 so prepare to power off the Nao...", Assert::getSignalName(sig));
+      shutdownNAO = true;
+    }
+
     pthread_kill(mainThread, sig);
   }
   else
   {
     if(run)
-      TLOGI(tlogger, "Caught signal {} -- Shutting down...", sig);
+    {
+      TLOGI(tlogger, "Caught (normal) termination/interrupt signal ({}) -- Shutting down executable...", Assert::getSignalName(sig));
+      fflush(NULL); // flush all streams
+    }
     run = false;
   }
 }
 
-static void sighandlerRedirect(int)
+static void sighandlerHardShutdown(int sig)
 {
+  TLOGE(tlogger, "Caught unexpected signal ({}) -- Hard shutdown of executable now!...", Assert::getSignalName(sig));
+  fflush(NULL); // try to flush all streams
+
+  raise(sig); // re-raise the signal for default handling - may dump core
+}
+
+static void sighandlerRedirect(int sig)
+{
+  Thread::sleep(100);
+  TLOGI(tlogger, "sighandlerRedirect, caught {}, set run to false", Assert::getSignalName(sig));
+  fflush(NULL); // try to flush all streams
   run = false;
 }
 
@@ -121,8 +147,59 @@ static std::string getBodyId()
   return bodyId;
 }
 
+
+
+/** write led values to LOLA packet (at offset given by p) */
+static void writeLeds(unsigned char *&p, bool ok)
+{
+  // Switch off all leds, except for the eyes (ok: half-blue, crashed: multicoloured)
+  constexpr int NUM_LED_CATEGORIES                     = 8;
+  static std::string ledCategories[NUM_LED_CATEGORIES] = {"LEye",  "REye",  "LEar",  "REar",
+                                                          "Skull", "Chest", "LFoot", "RFoot"};
+  static size_t ledNumbers[NUM_LED_CATEGORIES] = {24, 24, 10, 10, 12, 3, 3, 3}; // numbers of leds in each category
+  for (int iLedCategory = 0; iLedCategory < NUM_LED_CATEGORIES; ++iLedCategory)
+  {
+    MsgPack::write(ledCategories[iLedCategory], p); // category name
+    MsgPack::writeArrayHeader(ledNumbers[iLedCategory], p); // array header before array values
+
+    // switch off any leds not related to the eyes
+    if (iLedCategory >= 2)
+    {
+      for (size_t j = 0; j < ledNumbers[iLedCategory]; ++j)
+        MsgPack::write(0.f, p);
+    }
+    else if (ok) // eyes and shutdown normal (ctrl-c or systemctl stop)
+    {
+      // Blue and white
+      for (size_t j = 0; j < ledNumbers[iLedCategory]; ++j)
+      {
+        // red leds are 0-7, green are 8-15, and blue are 16-23
+        bool isBlueLedIndex = (j >= 16) && ((j % 2) == 0);
+        bool isCyanIndex    = (j >= 8) && ((j % 2) == 1);
+        MsgPack::write((isBlueLedIndex || isCyanIndex) ? 1.0f : 0.f, p);
+      }
+    }
+    else // eyes and abnormal shutdown (i.e. crash)
+    {
+      // display a very obvious abnormal pattern on the eyes - red, yellow, blue
+      // (yellow means red and green leds on)
+      for (size_t j = 0; j < ledNumbers[iLedCategory]; ++j)
+      {
+        // red leds are 0-7, green are 8-15, and blue are 16-23
+        bool isRed    = (j < 8) && ((j % 4) == 0); // half the leds are red
+        bool isYellow = (j < 16) && ((j % 4) == 2);
+        bool isBlue   = (j >= 16) && ((j % 2) == 1);
+        MsgPack::write((isRed || isYellow || isBlue) ? 1.0f : 0.f, p);
+      }
+    }
+  }
+}
+
+
 static void sitDown(bool ok)
 {
+  TLOGI(tlogger, "sit down the Nao if needed, normalShutdown {}", ok);
+
   static const Angle targetAngles[Joints::numOfJoints - 1] =
   {
     0_deg, 0_deg, // Head
@@ -140,9 +217,9 @@ static void sitDown(bool ok)
   sockaddr_un address;
   address.sun_family = AF_UNIX;
   std::strcpy(address.sun_path, "/tmp/robocup");
-  if(!connect(socket, reinterpret_cast<sockaddr*>(&address), sizeof(address)))
+  if (!connect(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)))
   {
-    unsigned char packet[896];
+    unsigned char packet[1000]; // was 896
     long bytesReceived = recv(socket, reinterpret_cast<char*>(packet), static_cast<int>(sizeof(packet)), 0);
 
     // Determine current angles and whether sitting down is required, i.e. has the hip stiffness?
@@ -166,64 +243,67 @@ static void sitDown(bool ok)
                    [](const std::string&, const unsigned char*) {},
                    [](const std::string&, const unsigned char*, size_t) {});
 
+
     // If sitting down is required, interpolate from start angles to target angles
-    if(sitDownRequired)
+    if (sitDownRequired)
     {
+      TLOGI(tlogger, "...sit down is required");
+
+      int ledsWritten = 0;
       float phase = 0.f;
-      while(phase < 1.f)
+      while (phase < 1.f)
       {
-        unsigned char* p = packet;
-        MsgPack::writeMapHeader(1, p);
+        unsigned char *p = packet;
+
+        // update the LEDs as soon as possible during the shutdown sit down sequence 
+        // so that (human) teammembers know what is happening
+        if (0 == ledsWritten++)
+        {
+          MsgPack::writeMapHeader(9, p); // include LEDs and joints
+          writeLeds(p, ok);
+        }
+        else
+          MsgPack::writeMapHeader(1, p); // joints only
+
+        // write joints
         MsgPack::write("Position", p);
         MsgPack::writeArrayHeader(Joints::numOfJoints - 1, p);
         // The should pitch joints interpolate faster because to avoid collisions of the arms with the legs.
         const float shoulderPitchPhase = std::sqrt(std::min(1.f, phase / 0.6f));
-        for(int i = 0; i < Joints::numOfJoints - 1; ++i)
+        for (int i = 0; i < Joints::numOfJoints - 1; ++i)
         {
-          if(i == 2 || i == 18)
+          if (i == 2 || i == 18)
             MsgPack::write(targetAngles[i] * shoulderPitchPhase + startAngles[i] * (1.f - shoulderPitchPhase), p);
           else
             MsgPack::write(targetAngles[i] * phase + startAngles[i] * (1.f - phase), p);
         }
 
         // Send packet to LoLA
-        send(socket, reinterpret_cast<char*>(packet), static_cast<int>(p - packet), 0);
+        send(socket, reinterpret_cast<char *>(packet), static_cast<int>(p - packet), 0);
 
         // Receive next packet (required for sending again)
-        recv(socket, reinterpret_cast<char*>(packet), static_cast<int>(sizeof(packet)), 0);
+        recv(socket, reinterpret_cast<char *>(packet), static_cast<int>(sizeof(packet)), 0);
 
         phase += Constants::motionCycleTime / 2.f; // 2 seconds
       }
     }
 
     // Switch off stiffness of all joints
-    unsigned char* p = packet;
-    MsgPack::writeMapHeader(9, p);
+    unsigned char *p = packet;
+    MsgPack::writeMapHeader(9, p); // must include stiffness and LEDs
     MsgPack::write("Stiffness", p);
     MsgPack::writeArrayHeader(Joints::numOfJoints - 1, p);
-    for(int i = 0; i < Joints::numOfJoints - 1; ++i)
+    for (int i = 0; i < Joints::numOfJoints - 1; ++i)
       MsgPack::write(0.f, p);
 
-    // Switch off all leds, except for the eyes (ok: blue, crashed: red)
-    static std::string ledCategories[8] = {"LEye", "REye", "LEar", "REar", "Skull", "Chest", "LFoot", "RFoot"};
-    static size_t ledNumbers[8] = {24, 24, 10, 10, 12, 3, 3, 3};
-    for(int i = 0; i < 8; ++i)
-    {
-      MsgPack::write(ledCategories[i], p);
-      MsgPack::writeArrayHeader(ledNumbers[i], p);
-      for(size_t j = 0; j < ledNumbers[i]; ++j)
-      {
-        bool isRed = i < 2 && j < 8;
-        bool isBlue = i < 2 && j >= 16;
-        MsgPack::write(ok && isBlue ? 0.1f : !ok && isRed ? 1.f : 0.f, p);
-      }
-    }
+    writeLeds(p, ok); // to be sure to be sure
 
     // Send packet to LoLA
     send(socket, reinterpret_cast<char*>(packet), static_cast<int>(p - packet), 0);
   }
   close(socket);
 }
+
 
 static std::string getBodyName(const std::string& bodyId)
 {
@@ -257,12 +337,13 @@ int main(int argc, char* argv[])
     setvbuf(stderr, NULL, _IONBF, 0);
 
     mainThread = pthread_self();
-    Thread::nameCurrentThread("Main"); // for text logging output
+    Thread::nameCurrentThread("ParentMain"); // for text logging output
 
     // parse command-line arguments
     bool watchdog = false;
 
     for(int i = 1; i < argc; ++i)
+    {
       if(!strcmp(argv[i], "-w"))
         watchdog = true;
       else
@@ -271,6 +352,9 @@ int main(int argc, char* argv[])
       -w            use a watchdog for crash recovery and creating trace dumps", argv[0]);
         exit(EXIT_FAILURE);
       }
+    }
+
+    TLOGI(tlogger, "Starting up, watchdog={}", watchdog);
 
     // avoid duplicated instances
     int fd = open("/tmp/roboeireann", O_CREAT, 0600);
@@ -293,15 +377,16 @@ int main(int argc, char* argv[])
       for(;;)
       {
         roboeireannPid = fork();
-        if(roboeireannPid == -1)
+        if (roboeireannPid == -1)
           exit(EXIT_FAILURE);
-        else if(roboeireannPid == 0)
+        else if (roboeireannPid == 0)
           break;
 
+        // if we get this far we are the parent (watchdog) version of the process
         int status;
         signal(SIGTERM, sighandlerRedirect);
         signal(SIGINT, sighandlerRedirect);
-        if(waitpid(roboeireannPid, &status, 0) != roboeireannPid)
+        if (waitpid(roboeireannPid, &status, 0) != roboeireannPid)
         {
           exit(EXIT_FAILURE);
         }
@@ -311,8 +396,10 @@ int main(int argc, char* argv[])
         // detect requested or normal exit
         bool normalExit = !run || (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 
+        TLOGI(tlogger, "Child process has exited, normalExit={}, exitStatus={}", normalExit, WEXITSTATUS(status));
+
         // dump trace and assert trace
-        if(!normalExit)
+        if (!normalExit)
         {
           // Wait 100 ms before attempting to sitdown. Otherwise, LoLA might send an invalid packet.
           usleep(100000);
@@ -329,6 +416,7 @@ int main(int argc, char* argv[])
       }
     }
 
+    Thread::nameCurrentThread("Main"); // for text logging output in child (if any)
     BH_TRACE_INIT("main");
 
     // Acquire static data, e.g. about types
@@ -339,6 +427,16 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
 
     // print status information
+    char timebuf[22];
+    time_t timeNow = time(NULL);
+    struct tm * tmNow = localtime(&timeNow);
+    TLOG_VERIFY_ERRNO(tlogger, tmNow != nullptr);
+    TLOG_VERIFY(tlogger, strftime(timebuf, sizeof(timebuf), "%F %H:%M:%S", tmNow) > 0);
+
+    TLOGI(tlogger, "----------------------------------------------------------");
+    TLOGI(tlogger, ">>>>>      Startup time is: {}       <<<<<", timebuf);
+    TLOGI(tlogger, "----------------------------------------------------------");
+
     if(settings.headName == settings.bodyName)
       TLOGI(tlogger, "Hi, I am {}.", settings.headName);
     else
@@ -352,9 +450,29 @@ int main(int argc, char* argv[])
     TLOGI(tlogger, "scenario {}", settings.scenario.c_str());
     TLOGI(tlogger, "magicNumber {}", settings.magicNumber);
 
-    // register signal handler for ctrl+c and termination signal
-    signal(SIGTERM, sighandlerShutdown);
-    signal(SIGINT, sighandlerShutdown);
+    // register signal handler for ctrl+c and termination signal and watchdog timeout
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    // block all other signals while the handler is running
+    sigfillset(&act.sa_mask);
+
+    // graceful shutdown
+    act.sa_handler = sighandlerShutdown;
+    sigaction(SIGINT,  &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGUSR1, &act, NULL);
+
+    // reset the handler to default as soon as we enter the signal handler
+    // (This is only useful for signals which should dump core)
+    act.sa_flags = SA_RESETHAND;
+
+    // hard (non-graceful) shutdown with possible core dump
+    act.sa_handler = sighandlerHardShutdown;
+    sigaction(SIGALRM,  &act, NULL);
+    sigaction(SIGABRT,  &act, NULL);
+    sigaction(SIGSEGV,  &act, NULL);
+    sigaction(SIGFPE,  &act, NULL);
+    sigaction(SIGBUS,  &act, NULL);
 
     roboeireannStart(settings);
 
@@ -366,8 +484,15 @@ int main(int argc, char* argv[])
 
   roboeireannStop();
   sitDown(true);
-  if(shutdownNAO)
+  if (shutdownNAO)
+  {
+    TLOGI(tlogger, "Powering off the Nao now");
+    fflush(NULL);
+
+    Thread::sleep(500);
+
     static_cast<void>(!system("sudo systemctl poweroff &"));
+  }
 
   return EXIT_SUCCESS;
 }

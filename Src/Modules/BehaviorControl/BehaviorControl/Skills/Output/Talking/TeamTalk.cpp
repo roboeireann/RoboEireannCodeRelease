@@ -2,14 +2,16 @@
  * @file TeamTalk.cpp
  *
  * This file implements the implementation of the TeamSay and TeamPlaySound skill.
+ * 
+ * DEPRECATED
  *
  * @author Jan Blumenkamp
  */
 
 #include "Platform/SystemCall.h"
-#include "Representations/BehaviorControl/KickoffState.h"
+// #include "Representations/BehaviorControl/KickoffState.h"
 #include "Representations/BehaviorControl/Skills.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Communication/TeamData.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/TeamTalk.h"
@@ -25,10 +27,10 @@ SKILL_IMPLEMENTATION(TeamTalkImpl,
   IMPLEMENTS(TeamPropagator),
   IMPLEMENTS(TeamSpeaker),
   MODIFIES(TeamTalk),
-  REQUIRES(KickoffState),
+  // REQUIRES(KickoffState),
   REQUIRES(FrameInfo),
   REQUIRES(TeamData),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   REQUIRES(RobotPose),
 });
 
@@ -43,28 +45,28 @@ class TeamTalkImpl : public TeamTalkImplBase
 {
   void execute(const TeamCountdown& s) override
   {
-    if(!(wasDefensiveKickoff = wasDefensiveKickoff || !theKickoffState.allowedToEnterCenterCircle))
+    if(!(wasDefensiveKickoff = wasDefensiveKickoff || theGameInfo.isKickoff()))// not quite right, but unimportant - was !theKickoffState.allowedToEnterCenterCircle))
       return;
 
-    int announcer = theRobotInfo.number;
+    int announcer = theGameInfo.playerNumber;
     Vector2f announcerDis = theRobotPose.translation;
-    for(const auto& teammate : theTeamData.teammates)
-    {
-      if(teammate.status != Teammate::PLAYING)
-        continue;
-      const Vector2f mateDis = teammate.theRobotPose.translation;
-      if(announcerDis.x() <= mateDis.x() - 1000.f || (std::abs(announcerDis.x() - mateDis.x()) < 1000.f && std::abs(announcerDis.y()) > std::abs(mateDis.y())))
-      {
-        announcer = teammate.number;
-        announcerDis = mateDis;
-      }
-    }
+    // for(const auto& teammate : theTeamData.teammates)
+    // {
+    //   if(teammate.status != Teammate::PLAYING)
+    //     continue;
+    //   const Vector2f mateDis = teammate.theRobotPose.translation;
+    //   if(announcerDis.x() <= mateDis.x() - 1000.f || (std::abs(announcerDis.x() - mateDis.x()) < 1000.f && std::abs(announcerDis.y()) > std::abs(mateDis.y())))
+    //   {
+    //     announcer = teammate.number;
+    //     announcerDis = mateDis;
+    //   }
+    // }
 
-    if(announcer != theRobotInfo.number)
+    if(announcer != theGameInfo.playerNumber)
     {
-      for(const auto& teammate : theTeamData.teammates)
-        if(teammate.number == announcer)
-          theTeamPropagatorSkill(teammate.theTeamTalk.say, teammate.theTeamTalk.timestamp);
+      // for(const auto& teammate : theTeamData.teammates)
+      //   if(teammate.number == announcer)
+      //     theTeamPropagatorSkill(teammate.theTeamTalk.say, teammate.theTeamTalk.timestamp);
     }
     else if(!countDownFinished)
     {
@@ -72,7 +74,7 @@ class TeamTalkImpl : public TeamTalkImplBase
       const std::string nextTeamTalk = countdown == 0 ? "Ball in play" : std::to_string(countdown);
       char index = -1;
 
-      if(s.stateTime < 9750 && theKickoffState.allowedToEnterCenterCircle)
+      if(s.stateTime < 9750 && theGameInfo.isKickoff()) // not quite right but unimportant - was theKickoffState.allowedToEnterCenterCircle)
       {
         SystemCall::say("Ball in play");
         theTeamPropagatorSkill(static_cast<char>(availableTeamTalk.size()), 0);

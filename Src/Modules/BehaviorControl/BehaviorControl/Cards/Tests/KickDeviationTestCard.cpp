@@ -9,7 +9,7 @@
 #include "Platform/SystemCall.h"
 #include "Representations/BehaviorControl/FieldBall.h"
 #include "Representations/BehaviorControl/Skills.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Configuration/KickInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/SensorData/KeyStates.h"
@@ -35,7 +35,7 @@ CARD(KickDeviationTestCard,
   REQUIRES(MotionInfo),
   REQUIRES(ObstacleModel),
   REQUIRES(OdometryData),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   LOADS_PARAMETERS(
   {,
     (int) lookAtStartTime,

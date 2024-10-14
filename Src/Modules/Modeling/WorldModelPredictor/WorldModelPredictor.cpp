@@ -49,7 +49,7 @@ void WorldModelPredictor::update(WorldModelPrediction& worldModelPrediction)
   if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT &&
      theFrameInfo.getTimeSince(lastUsedBallModel.timeWhenLastSeen) > 100)
   {
-    const Vector2f knownBallPosition = theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber
+    const Vector2f knownBallPosition = theGameInfo.isOurKick()
       ? Vector2f(theFieldDimensions.xPosOpponentPenaltyMark, 0.f)
       : Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0.f);
     worldModelPrediction.ballPosition = theRobotPose.inversePose * knownBallPosition;

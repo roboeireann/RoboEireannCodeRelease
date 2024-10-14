@@ -5,7 +5,7 @@ st on
 
 # only a single robot displays game state
 dr debugDrawing3d:representation:GameInfo
-dr debugDrawing3d:representation:TeamInfo
+dr debugDrawing3d:representation:GameInfo:scores
 
 # in case we have more than a single robot
 robot all
@@ -28,7 +28,7 @@ mr GroundTruthRobotPose OracledWorldModelProvider Cognition
 mr GroundTruthWorldState LogDataProvider Cognition
 mr ObstacleModel OracledWorldModelProvider Cognition
 mr RobotPose OracledWorldModelProvider Cognition
-mr TeamPlayersModel OracledWorldModelProvider Cognition
+mr TeamPlayersObstacleModel OracledWorldModelProvider Cognition
 mr FrameInfo LogDataProvider Motion
 mr FsrSensorData LogDataProvider Motion
 mr InertialSensorData LogDataProvider Motion
@@ -50,7 +50,7 @@ mr BallPercept off
 mr BallSpots off
 mr BodyContour off
 mr CameraCalibrationStatus off
-mr CameraImage off
+# mr CameraImage off
 mr CameraIntrinsics off
 mr CameraResolutionRequest off
 mr CirclePercept off
@@ -90,8 +90,9 @@ mr FieldFeatureOverview default
 mr ObstaclesFieldPercept default
 # mr RobotHealth default
 mr Whistle default
+mr CameraImage default
 
-dr debugDrawing3d:representation:RobotInfo
+dr debugDrawing3d:representation:GameInfo:player
 
 call Includes/GameStates
 call Includes/DebugResponses

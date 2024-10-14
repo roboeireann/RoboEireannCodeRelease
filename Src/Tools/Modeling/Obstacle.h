@@ -8,7 +8,7 @@ STREAMABLE(Obstacle,
 {
   // Definition of an obstacle
   ENUM(Type, /**< The type of an obstacle. Any changes might have an impact on ObstacleModelProvider.cpp/InternalObstacle.cpp <- probably not */ //TODO: check whether order is important
-  // but TeamPlayersLocator::setType!!!!!!!!!! ~Arne 13.04.2018
+  // but TeamPlayersObstacleModelProvider::setType!!!!!!!!!! ~Arne 13.04.2018
   {,
     goalpost,
     unknown,

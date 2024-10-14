@@ -8,9 +8,8 @@
 #include "GameController.h"
 #include "SimulatedRobot.h"
 
-#include "Modules/Communication/TeamMessageHandler2023b/TeamMessageSocketHandler.h"
+#include "Tools/Communication/TeamMessageSocketHandler.h"
 #include "Tools/Communication/RoboCupGameControlData.h"
-// #include "Tools/Communication/SPLStandardMessageBuffer.h"
 #include "Platform/SystemCall.h"
 
 #include "Platform/BHAssert.h"
@@ -88,7 +87,7 @@ const float GameController::dropHeight = 350.f;
 GameController::GameController()
 {
   gameInfo.packetNumber = 0;
-  gameInfo.playersPerTeam = numPlayersPerTeam;
+  gameInfo.playersPerTeam = RobotNumber::numActivePlayersPerTeam;
   gameInfo.competitionPhase = COMPETITION_PHASE_ROUNDROBIN;
   gameInfo.competitionType = COMPETITION_TYPE_NORMAL;
   gameInfo.gamePhase = GAME_PHASE_NORMAL;
@@ -98,8 +97,13 @@ GameController::GameController()
   gameInfo.kickingTeam = 1;
   gameInfo.secsRemaining = halfTime;
   gameInfo.secondaryTime = 0;
-  for(auto& teamInfo : teamInfos)
-    teamInfo.players[gameInfo.playersPerTeam - 1].penalty = PENALTY_SUBSTITUTE; // TODO RV: assumes just one substitute
+
+  // all players over and above playersPerTeam are subs initially
+  for (int iTeam = 0; iTeam < 2; iTeam++)
+    for (int iPlayer = 0; iPlayer < MAX_NUM_PLAYERS; iPlayer++)
+      gameInfo.teams[iTeam].players[iPlayer].penalty =
+          (iPlayer < gameInfo.playersPerTeam) ? PENALTY_SPL_REQUEST_FOR_PICKUP : PENALTY_SUBSTITUTE;
+
   resetMessageBudgets();
   // Force reloading of the field dimensions (they cannot be loaded here because the file search path is not available yet).
   fieldDimensions.xPosOwnPenaltyMark = 0.f;
@@ -107,11 +111,27 @@ GameController::GameController()
 
 void GameController::registerSimulatedRobot(int robotIndex, SimulatedRobot& simulatedRobot)
 {
-  ASSERT(!robots[robotIndex].simulatedRobot);
+  if (robots[robotIndex].simulatedRobot)
+    TLOGF_ABORT(tlogger, "robot number {} is duplicated in the scene (.ros2 or .rsi2) file",
+                RobotNumber::getSceneNumberFromIndex(robotIndex));
+
   robots[robotIndex].simulatedRobot = &simulatedRobot;
-  robots[robotIndex].info.number = RobotNumber::getPlayerNumberFromIndex(robotIndex);
+  robots[robotIndex].number = RobotNumber::getPlayerNumberFromIndex(robotIndex);
   if (RobotNumber::isSubstituteFromIndex(robotIndex))
-    robots[robotIndex].info.penalty = robots[robotIndex].lastPenalty = PENALTY_SUBSTITUTE;
+    robots[robotIndex].penalty = robots[robotIndex].lastPenalty = PENALTY_SUBSTITUTE;
+  else
+    robots[robotIndex].penalty = robots[robotIndex].lastPenalty = PENALTY_NONE;
+
+  RoboCup::RobotInfo& tr = gameInfo.teams[robotIndex * 2 / numOfRobots].players[robotIndex % (numPlayersPerTeam)];
+  if (robots[robotIndex].penalty != tr.penalty)
+  {
+    tr.penalty = robots[robotIndex].penalty;
+    // TODO - do we need to deal with secsTilUnpenalised also?
+  }
+
+
+  TLOGI(tlogger, "robots[{}] number {}, penalty {}", robotIndex, robots[robotIndex].number, robots[robotIndex].penalty);
+
   if (fieldDimensions.xPosOwnPenaltyMark == 0.f)
     fieldDimensions.load();
 }
@@ -136,6 +156,26 @@ bool GameController::handleStateCommand(const std::string& command, bool fromCon
 
     return true;
   }
+  else if (command == "standby")
+  {
+    if(gameInfo.gamePhase != GAME_PHASE_NORMAL)
+      return false;
+    if (gameInfo.state == STATE_STANDBY)
+      return true;
+
+    // reset everything as if coming from initial    
+    resetPenaltyTimes();
+    timeBeforeCurrentState = 0;
+    timeWhenStateBegan = Time::getCurrentSystemTime();
+    gameInfo.state = STATE_STANDBY;
+    gameInfo.setPlay = SET_PLAY_NONE;
+
+    resetMessageBudgets();
+
+    TLOGI(tlogger, "STANDBY ({})", fromConsole ? "console" : "autoRef");
+
+    return true;
+  }
   else if(command == "ready")
   {
     if(gameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
@@ -143,7 +183,7 @@ bool GameController::handleStateCommand(const std::string& command, bool fromCon
     if(gameInfo.state == STATE_READY)
       return true;
 
-    if(gameInfo.state == STATE_INITIAL)
+    if ((gameInfo.state == STATE_INITIAL) || (gameInfo.state == STATE_STANDBY))
       resetPenaltyTimes();
     else if(gameInfo.state == STATE_PLAYING)
       addTimeInCurrentState();
@@ -262,7 +302,7 @@ bool GameController::handleGoalCommand(const std::string& command, bool fromCons
 
     TLOGI(tlogger, "goal for team 1 ({})", fromConsole ? "console" : "autoRef");
 
-    ++teamInfos[0].score;
+    ++gameInfo.teams[0].score;
     if(gameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
       VERIFY(handleStateCommand("finished"));
     else
@@ -279,7 +319,7 @@ bool GameController::handleGoalCommand(const std::string& command, bool fromCons
 
     TLOGI(tlogger, "goal for team 2 ({})", fromConsole ? "console" : "autoRef");
 
-    ++teamInfos[1].score;
+    ++gameInfo.teams[1].score;
     if(gameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
       VERIFY(handleStateCommand("finished"));
     else
@@ -506,27 +546,28 @@ bool GameController::handleGlobalConsole(In& stream)
 bool GameController::handleRobotCommand(int robot, const std::string& command)
 {
   Robot& r = robots[robot];
-  RoboCup::RobotInfo& tr = teamInfos[robot * 2 / numOfRobots].players[robot % numPlayersPerTeam];
+  RoboCup::RobotInfo& tr = gameInfo.teams[robot * 2 / numOfRobots].players[robot % numPlayersPerTeam];
   FOREACH_ENUM(Penalty, i)
     if(command == TypeRegistry::getEnumName(i))
     {
-      r.info.penalty = i == manual ? PENALTY_MANUAL : (i == substitute ? PENALTY_SUBSTITUTE : static_cast<uint8_t>(i));
-      tr.penalty = r.info.penalty;
+      r.penalty = i == manual ? PENALTY_MANUAL : (i == substitute ? PENALTY_SUBSTITUTE : static_cast<uint8_t>(i));
+      tr.penalty = r.penalty;
       if(i != none)
       {
         r.timeWhenPenalized = Time::getCurrentSystemTime();
-        OUTPUT_TEXT(fmt::format("Robot {} penalized with {}", r.info.getRobotAndColourString(), command));
+        OUTPUT_TEXT(fmt::format("Robot {} {} penalized with {}",
+                                TypeRegistry::getEnumName(Global::getSettings().fieldPlayerColor), r.number, command));
       }
       return true;
     }
-  FOREACH_ENUM(RobotInfo::Mode, i)
-  {
-    if(command == TypeRegistry::getEnumName(i))
-    {
-      r.info.mode = i;
-      return true;
-    }
-  }
+  // FOREACH_ENUM(RobotInfo::Mode, i)
+  // {
+  //   if(command == TypeRegistry::getEnumName(i))
+  //   {
+  //     r.info.mode = i;
+  //     return true;
+  //   }
+  // }
   return false;
 }
 
@@ -562,7 +603,7 @@ void GameController::placeForPenalty(int robot, float x, float y, float rotation
 void GameController::placeGoalie(int robot)
 {
   Robot& r = robots[robot];
-  if(r.info.penalty != PENALTY_NONE)
+  if(r.penalty != PENALTY_NONE)
     return;
   r.manuallyPlaced = true;
   r.lastPose = robot < numPlayersPerTeam ? Pose2f(-pi, fieldDimensions.xPosOpponentGroundLine - safeDistance, 0.f)
@@ -575,7 +616,7 @@ void GameController::placeFromSet(int robot, int minRobot, const Pose2f* poses)
   // of the positions would be chosen by our teammates.
   bool occupied[numOfFieldPlayers] = {false};
   for(int i = minRobot; i < minRobot + numOfFieldPlayers; ++i)
-    if(i != robot && robots[i].simulatedRobot && robots[i].info.penalty == PENALTY_NONE)
+    if(i != robot && robots[i].simulatedRobot && robots[i].penalty == PENALTY_NONE)
     {
       const Robot& r2 = robots[i];
       float minDistanceSqr = std::numeric_limits<float>::max();
@@ -623,7 +664,7 @@ void GameController::placeOffensivePlayers(int minRobot)
   for(int i = minRobot; i < minRobot + numOfFieldPlayers; ++i)
   {
     Robot& r = robots[i];
-    if(r.info.penalty != PENALTY_NONE)
+    if(r.penalty != PENALTY_NONE)
       continue;
     r.manuallyPlaced = true;
     placeFromSet(i, minRobot, poses[i < numPlayersPerTeam ? 1 : 0]);
@@ -652,7 +693,7 @@ void GameController::placeDefensivePlayers(int minRobot)
   for(int i = minRobot; i < minRobot + numOfFieldPlayers; ++i)
   {
     Robot& r = robots[i];
-    if(r.info.penalty != PENALTY_NONE)
+    if(r.penalty != PENALTY_NONE)
       continue;
     r.manuallyPlaced = true;
     placeFromSet(i, minRobot, poses[i < numPlayersPerTeam ? 1 : 0]);
@@ -662,7 +703,7 @@ void GameController::placeDefensivePlayers(int minRobot)
 void GameController::checkIllegalPositionInSet(int robot)
 {
   Robot& r = robots[robot];
-  if(!r.simulatedRobot || r.info.penalty != PENALTY_NONE)
+  if(!r.simulatedRobot || r.penalty != PENALTY_NONE)
     return;
 
   const bool isFirstTeam = robot < numPlayersPerTeam;
@@ -689,7 +730,7 @@ void GameController::checkIllegalPositionInSet(int robot)
     const int base = isFirstTeam ? 0 : numPlayersPerTeam;
     for(int i = base; i < base + numPlayersPerTeam; ++i)
     {
-      if(i == robot || !robots[i].simulatedRobot || robots[i].info.penalty != PENALTY_NONE)
+      if(i == robot || !robots[i].simulatedRobot || robots[i].penalty != PENALTY_NONE)
         continue;
       const float itsDistance2 = (robots[i].lastPose.translation - opponentPenaltyMark).squaredNorm();
       if(itsDistance2 >= sqr(footLength + fieldDimensions.penaltyMarkSize * 0.5f) && (itsDistance2 < myDistance2 || (itsDistance2 == myDistance2 && i < robot)))
@@ -703,9 +744,9 @@ void GameController::checkIllegalPositionInSet(int robot)
       (isKickingTeam ? onOpponentPenaltyMark || (inOpponentPenaltyArea && !closestToOpponentPenaltyMark()) : (isGoalkeeper ? notOnOwnGoalLine : inOwnPenaltyArea)) :
       inOpponentHalf || (!isKickingTeam && inCenterCircle)))
   {
-    RoboCup::RobotInfo& tr = teamInfos[robot * 2 / numOfRobots].players[robot % numPlayersPerTeam];
-    r.info.penalty = PENALTY_SPL_ILLEGAL_POSITION_IN_SET;
-    tr.penalty = r.info.penalty;
+    RoboCup::RobotInfo& tr = gameInfo.teams[robot * 2 / numOfRobots].players[robot % numPlayersPerTeam];
+    r.penalty = PENALTY_SPL_ILLEGAL_POSITION_IN_SET;
+    tr.penalty = r.penalty;
     r.timeWhenPenalized = Time::getCurrentSystemTime();
   }
 }
@@ -750,7 +791,7 @@ void GameController::updateAndReferee()
     for(int i = 0; i < numOfRobots; ++i)
     {
       Robot& r = robots[i];
-      if(r.info.penalty == PENALTY_NONE && r.simulatedRobot)
+      if(r.penalty == PENALTY_NONE && r.simulatedRobot)
       {
         const bool isFirstTeam = i < numPlayersPerTeam;
 
@@ -784,7 +825,7 @@ void GameController::updateAndReferee()
   {
     Robot& r = robots[i];
 
-    if(r.info.penalty == PENALTY_NONE && r.simulatedRobot)
+    if(r.penalty == PENALTY_NONE && r.simulatedRobot)
     {
       auto inCenterCircleBeforeBallIsInPlay = [&]
       {
@@ -891,26 +932,30 @@ void GameController::updateAndReferee()
       }
     }
 
-    if(automatic & bit(placePlayers) && r.info.penalty != PENALTY_NONE && r.lastPenalty == PENALTY_NONE && r.simulatedRobot)
+    if(automatic & bit(placePlayers) && r.penalty != PENALTY_NONE && r.lastPenalty == PENALTY_NONE && r.simulatedRobot)
     {
+      // placeForPenalty(i, fieldDimensions.xPosOpponentPenaltyMark,
+      //                 fieldDimensions.yPosRightFieldBorder + 100.f, -pi_2);
+      float side = r.lastPose.translation.y() > 0 ? -1.f : 1.f;
       placeForPenalty(i, fieldDimensions.xPosOpponentPenaltyMark,
-                      fieldDimensions.yPosRightFieldBorder + 100.f, -pi_2);
+                      (fieldDimensions.yPosRightFieldBorder + 200.f) * side, pi_2 * side);
     }
 
-    if(r.info.penalty != PENALTY_NONE)
+    if(r.penalty != PENALTY_NONE)
     {
-      r.info.secsTillUnpenalised = static_cast<uint8_t>(std::max<int>((r.info.penalty == PENALTY_SPL_ILLEGAL_POSITION_IN_SET ? 15 : 45) - Time::getTimeSince(r.timeWhenPenalized) / 1000, 0));
-      RoboCup::RobotInfo& tr = teamInfos[i * 2 / numOfRobots].players[i % (numPlayersPerTeam)];
-      tr.secsTillUnpenalised = r.info.secsTillUnpenalised;
+      r.secsTillUnpenalised = static_cast<uint8_t>(std::max<int>((r.penalty == PENALTY_SPL_ILLEGAL_POSITION_IN_SET ? 15 : 45) - Time::getTimeSince(r.timeWhenPenalized) / 1000, 0));
+      RoboCup::RobotInfo& tr = gameInfo.teams[i * 2 / numOfRobots].players[i % (numPlayersPerTeam)];
+      tr.secsTillUnpenalised = r.secsTillUnpenalised;
 
-      if(automatic & bit(unpenalize) && r.info.secsTillUnpenalised <= 0 && r.info.penalty != PENALTY_MANUAL && r.info.penalty != PENALTY_SUBSTITUTE)
+      if (automatic & bit(unpenalize) && r.secsTillUnpenalised <= 0 && r.penalty != PENALTY_MANUAL &&
+          r.penalty != PENALTY_SPL_REQUEST_FOR_PICKUP && r.penalty != PENALTY_SUBSTITUTE)
       {
-        r.info.penalty = PENALTY_NONE;
+        r.penalty = PENALTY_NONE;
         tr.penalty = PENALTY_NONE;
       }
     }
 
-    if(automatic & bit(placePlayers) && r.info.penalty == PENALTY_NONE && r.lastPenalty != PENALTY_NONE && r.simulatedRobot)
+    if(automatic & bit(placePlayers) && r.penalty == PENALTY_NONE && r.lastPenalty != PENALTY_NONE && r.simulatedRobot)
     {
       if(gameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
       {
@@ -923,11 +968,12 @@ void GameController::updateAndReferee()
       }
       else
       {
-        Vector2f ballPos;
-        r.simulatedRobot->getAbsoluteBallPosition(ballPos);
-        placeForPenalty(i, fieldDimensions.xPosOpponentPenaltyMark,
-                        ballPos.y() >= 0.f ? fieldDimensions.yPosRightSideline : fieldDimensions.yPosLeftSideline,
-                        ballPos.y() >= 0.f ? pi_2 : -pi_2);
+        // don't change robot placement for return from penalty (2024 onwards)
+        // Vector2f ballPos;
+        // r.simulatedRobot->getAbsoluteBallPosition(ballPos);
+        // placeForPenalty(i, fieldDimensions.xPosOpponentPenaltyMark,
+        //                 ballPos.y() >= 0.f ? fieldDimensions.yPosRightSideline : fieldDimensions.yPosLeftSideline,
+        //                 ballPos.y() >= 0.f ? pi_2 : -pi_2);
       }
     }
 
@@ -941,7 +987,7 @@ void GameController::updateAndReferee()
         SimulatedRobot::moveBall((Vector3f() << r.lastPose * Vector2f(150.f, 0.f), 50.f).finished(), true);
     }
 
-    r.lastPenalty = r.info.penalty;
+    r.lastPenalty = r.penalty;
   }
 
   switch(gameInfo.state)
@@ -1025,12 +1071,12 @@ void GameController::updateAndReferee()
       messageBudgets[team] -= teamMessageCounters[team].messageCount;
       invalidCounts[team] += teamMessageCounters[team].invalidCount;
 
-      teamInfos[team].messageBudget = static_cast<uint16_t>(std::max(0, messageBudgets[team]));
+      gameInfo.teams[team].messageBudget = static_cast<uint16_t>(std::max(0, messageBudgets[team]));
 
       if (teamMessageCounters[team].messageCount || teamMessageCounters[team].invalidCount)
           TLOGD(tlogger, "team {} received new {} (total {}), new invalid {} (total {}), remaining budget {}", team + 1,
                 teamMessageCounters[team].messageCount, initialMessageBudget - messageBudgets[team],
-                teamMessageCounters[team].invalidCount, invalidCounts[team], teamInfos[team].messageBudget);
+                teamMessageCounters[team].invalidCount, invalidCounts[team], gameInfo.teams[team].messageBudget);
     }
   }
 
@@ -1063,7 +1109,7 @@ void GameController::resetMessageBudgets()
     messageBudgets[team] = initialMessageBudget;
     invalidCounts[team] = 0;
 
-    teamInfos[team].messageBudget = static_cast<uint16_t>(initialMessageBudget);
+    gameInfo.teams[team].messageBudget = static_cast<uint16_t>(initialMessageBudget);
   }
 }
 
@@ -1174,19 +1220,7 @@ bool GameController::writeGameInfo(Out& stream, uint8_t& lastGCPacketNumber)
   return true;
 }
 
-void GameController::writeOwnTeamInfo(int robot, Out& stream)
-{
-  SYNC;
-  stream << teamInfos[robot * 2 / numOfRobots];
-}
-
-void GameController::writeOpponentTeamInfo(int robot, Out& stream)
-{
-  SYNC;
-  stream << teamInfos[1 - robot * 2 / numOfRobots];
-}
-
-void GameController::writeRobotInfo(int robot, Out& stream)
+void GameController::checkRobotMovement(int robot)
 {
   SYNC;
   Robot& r = robots[robot];
@@ -1201,7 +1235,6 @@ void GameController::writeRobotInfo(int robot, Out& stream)
     timeWhenLastRobotMoved = Time::getCurrentSystemTime();
     r.lastPose = pose;
   }
-  stream << r.info;
 }
 
 void GameController::addCompletion(std::set<std::string>& completion) const
@@ -1240,23 +1273,23 @@ void GameController::addCompletion(std::set<std::string>& completion) const
     completion.insert(std::string("gc ") + commands[i]);
   FOREACH_ENUM(Penalty, i)
     completion.insert(std::string("pr ") + TypeRegistry::getEnumName(i));
-  FOREACH_ENUM(RobotInfo::Mode, i)
-    completion.insert(std::string("pr ") + TypeRegistry::getEnumName(i));
+  // FOREACH_ENUM(RobotInfo::Mode, i)
+  //   completion.insert(std::string("pr ") + TypeRegistry::getEnumName(i));
 }
 
 void GameController::setTeamInfos(Settings::TeamColor fieldPlayerColor1, Settings::TeamColor goalkeeperColor1,
                                   Settings::TeamColor fieldPlayerColor2, Settings::TeamColor goalkeeperColor2,
                                   int portTeam1, int portTeam2)
 {
-  teamInfos[0].teamNumber = 1;
-  teamInfos[0].fieldPlayerColor = fieldPlayerColor1;
-  teamInfos[0].goalkeeperColor = goalkeeperColor1;
-  teamInfos[0].goalkeeper = 1;
+  gameInfo.teams[0].teamNumber = 1;
+  gameInfo.teams[0].fieldPlayerColor = fieldPlayerColor1;
+  gameInfo.teams[0].goalkeeperColor = goalkeeperColor1;
+  gameInfo.teams[0].goalkeeper = 1;
 
-  teamInfos[1].teamNumber = 2;
-  teamInfos[1].fieldPlayerColor = fieldPlayerColor2;
-  teamInfos[1].goalkeeperColor = goalkeeperColor2;
-  teamInfos[1].goalkeeper = 1;
+  gameInfo.teams[1].teamNumber = 2;
+  gameInfo.teams[1].fieldPlayerColor = fieldPlayerColor2;
+  gameInfo.teams[1].goalkeeperColor = goalkeeperColor2;
+  gameInfo.teams[1].goalkeeper = 1;
 
   resetMessageBudgets();
 

@@ -8,9 +8,9 @@
 #include "RobotPose.h"
 #include "BallModel.h"
 #include "Platform/Time.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Tools/Debugging/DebugDrawings.h"
 #include "Tools/Debugging/DebugDrawings3D.h"
@@ -21,26 +21,6 @@ void RobotPose::onRead()
 {
   inversePose = *this;
   inversePose.invert();
-}
-
-void RobotPose::operator>>(BHumanMessage& m) const
-{
-  Streaming::streamIt(*m.theBHumanStandardMessage.out, "theRobotPose", *this);
-
-  // m.theBSPLStandardMessage.pose[0] = translation.x();
-  // m.theBSPLStandardMessage.pose[1] = translation.y();
-  // m.theBSPLStandardMessage.pose[2] = rotation;
-}
-
-void RobotPose::operator<<(const BHumanMessage& m)
-{
-  Streaming::streamIt(*m.theBHumanStandardMessage.in, "theRobotPose", *this);
-
-  // translation.x() = m.theBSPLStandardMessage.pose[0];
-  // translation.y() = m.theBSPLStandardMessage.pose[1];
-  // rotation = m.theBSPLStandardMessage.pose[2];
-
-  inversePose = static_cast<Pose2f>(*this).inverse();
 }
 
 Pose2f RobotPose::inverse() const
@@ -94,8 +74,8 @@ void RobotPose::draw() const
     ColorRGBA::black
   };
   const ColorRGBA ownTeamColorForDrawing =
-      colors[Blackboard::getInstance().exists("OwnTeamInfo")
-                 ? static_cast<const OwnTeamInfo &>(Blackboard::getInstance()["OwnTeamInfo"]).fieldPlayerColor
+      colors[Blackboard::getInstance().exists("GameInfo")
+                 ? static_cast<const GameInfo &>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor
                  : TEAM_GREEN];
 
   DEBUG_DRAWING("representation:RobotPose", "drawingOnField")

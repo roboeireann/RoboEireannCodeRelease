@@ -28,7 +28,7 @@ STREAMABLE(Pose2f,
   Pose2f& operator*=(const Pose2f& other);
 
   /**
-   * Concatenation of this pose with another pose. The resulting rotation is not normalized!
+   * Concatenation of this pose with another pose. The resulting rotation IS normalized!
    */
   Pose2f operator+(const Pose2f& other) const;
   Pose2f& operator+=(const Pose2f& other);
@@ -76,6 +76,18 @@ STREAMABLE(Pose2f,
   Pose2f dotMirror() const;
 
   bool isFinite() const;
+
+  /// convert point in same "world" coordinate frame as pose to local coords (i.e. pose as coordinate frame origin)
+  Vector2f toLocal(const Vector2f& worldPoint) const { return this->inverse() * worldPoint; }
+  static Vector2f toLocal(const Vector2f& worldPoint, const Pose2f& inversePose) { return inversePose * worldPoint; } // use precalculated inverse
+  /// convert pose in same "world" coordinate frame as pose to local coords (i.e. pose as coordinate frame origin)
+  Pose2f toLocal(const Pose2f& worldPose) const { return this->inverse() + worldPose; }
+  static Pose2f toLocal(const Pose2f& worldPose, const Pose2f& inversePose) { return inversePose + worldPose; } // use precalculated inverse
+  /// convert localPoint (using pose as origin) to world coords (using the same origin as the pose)
+  Vector2f toWorld(const Vector2f& localPoint) const { return (*this) * localPoint; }
+  /// convert localPose (using this pose as origin) to world coords (using the same origin as the this pose)
+  Pose2f toWorld(const Pose2f& localPose) const { return (*this) + localPose; }
+
 
   /**
    * The function creates a random pose.

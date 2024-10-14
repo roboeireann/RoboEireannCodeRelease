@@ -79,13 +79,13 @@ int SystemCall::playSound(const char* name)
   return isMuted ? 0 : SoundPlayer::play(name);
 }
 
-int SystemCall::say(const char* text, float stretchFactor)
+int SystemCall::say(const char* text, float stretchFactor, float pitchFactor, float pitchSdFactor)
 {
 #ifdef TARGET_ROBOT
   TLOGI(tlogger, "Saying {}", text);
 #endif
 #ifdef LINUX
-  return isMuted ? 0 : SoundPlayer::say(text, stretchFactor);
+  return isMuted ? 0 : SoundPlayer::say(text, stretchFactor, pitchFactor, pitchSdFactor);
 #else
   static_cast<void>(stretchFactor);
   return isMuted ? 0 : SoundPlayer::say(text);

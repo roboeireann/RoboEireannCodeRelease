@@ -41,7 +41,7 @@ void GyroOffsetProvider::update(GyroOffset& gyroOffset)
   //I have no idea if this is enough in a case, where the game is already going on but the robot was rebooted.
   if(theGameInfo.state != STATE_INITIAL && wasPlayingOnce)
     return;
-  if(theRobotInfo.penalty == 0 && (theGameInfo.state == STATE_PLAYING || theGameInfo.state == STATE_SET || theGameInfo.state == STATE_READY))
+  if(!theGameInfo.isPenalized() && (theGameInfo.state == STATE_PLAYING || theGameInfo.state == STATE_SET || theGameInfo.state == STATE_READY))
   {
     wasPlayingOnce = true;
     return;
@@ -117,7 +117,7 @@ void GyroOffsetProvider::update(GyroOffset& gyroOffset)
               std::abs(gyroOffset.offset.z().toDegrees()));
           SystemCall::playSound("sirene.wav");
           SystemCall::say(fmt::format("Gyro has Offset {}! The offset is {:.0f} degrees.", 
-                                      theRobotInfo.getRobotAndColourString(),
+                                      theGameInfo.getPlayerNumberAndColorString(),
                                       maxOffset));
           ANNOTATION("GyroOffsetProvider", "Added Offset " << gyroOffset.offset);
           OUTPUT_ERROR("GyroOffsetProvider - Added an Offset for the Gyros."); // Error, so we write it into the log file
@@ -149,7 +149,7 @@ void GyroOffsetProvider::checkBodyDisconnection(GyroOffset& gyroOffset)
     gyroOffset.bodyDisconnect = theFrameInfo.getTimeSince(gyroStuckTimestamp) < bodyDisconnectWaitTime;
     if (wasDisconnected && !gyroOffset.bodyDisconnect) // is it reconnected now?
     {
-      SystemCall::say(fmt::format("Body reconnected {}", theRobotInfo.getRobotAndColourString()));
+      SystemCall::say(fmt::format("Body reconnected {}", theGameInfo.getPlayerNumberAndColorString()));
     }
 
   }
@@ -164,7 +164,7 @@ void GyroOffsetProvider::checkBodyDisconnection(GyroOffset& gyroOffset)
       ANNOTATION("GyroOffsetProvider", 
                  fmt::format("No body connection for {} ms", theFrameInfo.getTimeSince(lastGyroChange)));
       SystemCall::playSound("sirene.wav");
-      SystemCall::say(fmt::format("Body disconnect {}!", theRobotInfo.getRobotAndColourString()));
+      SystemCall::say(fmt::format("Body disconnect {}!", theGameInfo.getPlayerNumberAndColorString()));
       OUTPUT_ERROR("Body Disconnect!");
     }
   }

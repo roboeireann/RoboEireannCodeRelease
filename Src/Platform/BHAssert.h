@@ -57,6 +57,11 @@ public:
    * @param termSignal A signal that was emitted to terminate the roboeireann process
    */
   static void logDump(bool toStderr, int termSignal);
+
+  /**
+   * get the signal name corresponding to a signal number
+   */
+  static const char* getSignalName(int signum);
 #endif // TARGET_ROBOT
 };
 

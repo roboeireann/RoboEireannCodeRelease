@@ -12,9 +12,8 @@
 
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/LEDRequest.h"
 #include "Representations/Infrastructure/SensorData/SystemSensorData.h"
@@ -32,8 +31,6 @@ MODULE(LEDHandler,
   REQUIRES(GameInfo),
   REQUIRES(GroundContactState),
   REQUIRES(JointSensorData),
-  REQUIRES(OwnTeamInfo),
-  REQUIRES(RobotInfo),
   USES(RobotHealth),
   REQUIRES(SystemSensorData),
   REQUIRES(TeamBehaviorStatus),

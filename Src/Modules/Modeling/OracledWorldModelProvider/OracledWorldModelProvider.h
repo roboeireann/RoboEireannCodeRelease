@@ -16,7 +16,7 @@
 #include "Representations/Modeling/ObstacleModel.h"
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/Modeling/TeamBallModel.h"
-#include "Representations/Modeling/TeamPlayersModel.h"
+#include "Representations/Modeling/TeamPlayersObstacleModel.h"
 
 MODULE(OracledWorldModelProvider,
 {,
@@ -27,7 +27,7 @@ MODULE(OracledWorldModelProvider,
   PROVIDES(BallModel3D),
   PROVIDES(GroundTruthBallModel),
   PROVIDES(ObstacleModel),
-  PROVIDES(TeamPlayersModel),
+  PROVIDES(TeamPlayersObstacleModel),
   PROVIDES(RobotPose),
   PROVIDES(GroundTruthRobotPose),
   PROVIDES(TeamBallModel),
@@ -81,9 +81,9 @@ private:
   void update(ObstacleModel& obstacleModel) override;
 
   /** One main function, might be called every cycle
-   * @param teamPlayersModel The data struct to be filled
+   * @param teamPlayersObstacleModel The data struct to be filled
    */
-  void update(TeamPlayersModel& teamPlayersModel) override;
+  void update(TeamPlayersObstacleModel& teamPlayersObstacleModel) override;
 
   /** One main function, might be called every cycle
    * @param robotPose The data struct to be filled

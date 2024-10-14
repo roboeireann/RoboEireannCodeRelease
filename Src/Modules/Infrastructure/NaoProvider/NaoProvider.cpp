@@ -11,15 +11,19 @@
 #include "Platform/File.h"
 #include "Platform/Thread.h"
 #include "Platform/Time.h"
+#include "Platform/SystemCall.h"
 #include "Tools/Communication/MsgPack.h"
 #include "Tools/Global.h"
 #include "Tools/Settings.h"
 #include "Tools/Streams/OutStreams.h"
+#include "Tools/TextLogging.h"
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
 
 MAKE_MODULE(NaoProvider, infrastructure);
+
+DECL_TLOGGER(tlogger, "NaoProvider", TextLogging::INFO);
 
 #ifdef TARGET_ROBOT
 
@@ -313,15 +317,37 @@ void NaoProvider::update(JointSensorData& theJointSensorData)
 
 void NaoProvider::update(KeyStates& theKeyStates)
 {
+  constexpr unsigned MAX_SHUTDOWN_TICKS = 167; // 167 x 83.33ms LOLA periods => approx 2 secs
+  constexpr unsigned MIN_SHUTDOWN_TICKS = 4; // approx 332 ms -- we'll give at least this amount of time for shutdown sound to start
+
   FOREACH_ENUM(KeyStates::Key, key)
     theKeyStates.pressed[key] = MsgPack::readFloat(keys[key]) != 0.f;
 
   if(!theKeyStates.pressed[KeyStates::chest])
     timeWhenChestButtonUnpressed = theFrameInfo.time;
-  else if(timeWhenChestButtonUnpressed && theFrameInfo.getTimeSince(timeWhenChestButtonUnpressed) >= timeChestButtonPressedUntilShutdown)
+  else if (timeWhenChestButtonUnpressed &&
+           (theFrameInfo.getTimeSince(timeWhenChestButtonUnpressed) >= timeChestButtonPressedUntilShutdown) &&
+           (countdownToShutdown == 0))
   {
-    raise(SIGINT);
-    timeWhenChestButtonUnpressed = 0;
+    TLOGW(tlogger, "Chest button pressed for {} ms, initiating Nao shutdown via SIGINT",
+          theFrameInfo.getTimeSince(timeWhenChestButtonUnpressed));
+
+    SystemCall::playSound("beep_beep_low.wav");
+
+    countdownToShutdown = MAX_SHUTDOWN_TICKS; 
+  }
+
+  if (countdownToShutdown)
+  {
+    --countdownToShutdown;
+
+    // has the max shutdown period expired or the shutdown sound has finished playing
+    if ((countdownToShutdown == 0) ||
+        (!SystemCall::soundIsPlaying() && (countdownToShutdown < (MAX_SHUTDOWN_TICKS - MIN_SHUTDOWN_TICKS))))
+    {
+      raise(SIGUSR1);
+      timeWhenChestButtonUnpressed = 0;
+    }
   }
 }
 
@@ -472,32 +498,51 @@ void NaoProvider::sendPacket()
       }
     }
 
-  // blinks
-  bool blinkingOn = (timeWhenPacketReceived / 400 & 1) == 1; // 50% duty cycle, 800 ms period
-  bool fastBlinkingOn = (timeWhenPacketReceived / 80 & 1) == 0; // 50% duty cycle antiphase to normal blink, 160 ms period
-  bool vfastBlinkOn = (timeWhenPacketReceived / 50 & 1) == 0; // only used as part of triple blink
-  bool tripleBlinkOn = vfastBlinkOn && Range<unsigned>(0, 299).isInside(timeWhenPacketReceived % 800); // triple blink from time 0 per 800 ms period
-  bool tripleBlink2On = vfastBlinkOn && Range<unsigned>(400, 699).isInside(timeWhenPacketReceived % 800); // triple blink from time 400 per 800 ms period
-  // fades
-  float fade = 0.5f - 0.5f * std::cos(float(timeWhenPacketReceived % 3000) * pi2 / 3000.f); // 3000ms period, 50% duty
-  // basically set it so the cos function is used to fade the LED for 50% of the time (75% duty) 
-  // and otherwise it reduces to cos(0) which is 1, i.e. full LED power
-  float fade2 = 0.5f + 0.5f * std::cos(float(Rangei(-1500,0).limit(int(timeWhenPacketReceived % 3000)-1500)) * pi2 / 1500.f); // 3000ms period, 75% duty
+    // blinks
+    auto blinkOn = [this](unsigned blinkPeriod, unsigned offset)
+    {
+      return (((timeWhenPacketReceived - offset) / (blinkPeriod / 2)) & 1) == 1;
+    };
 
-  FOREACH_ENUM(LEDRequest::LED, led)
-  {
-    LEDRequest::LEDState state = theLEDRequest.ledStates[led];
-    if (state == LEDRequest::on || 
-        (state == LEDRequest::blinking && blinkingOn) || (state == LEDRequest::blinking2 && !blinkingOn) ||
-        (state == LEDRequest::fastBlinking && fastBlinkingOn) || (state == LEDRequest::fastBlinking2 && !fastBlinkingOn) ||
-        (state == LEDRequest::tripleBlink && tripleBlinkOn) || (state == LEDRequest::tripleBlink2 && tripleBlink2On))
-      MsgPack::writeFloat(theLEDRequest.ledValues[led], leds[led]);
-    else if (state == LEDRequest::fade)
-      MsgPack::writeFloat(theLEDRequest.ledValues[led] * fade, leds[led]);
-    else if (state == LEDRequest::fade2)
-      MsgPack::writeFloat(theLEDRequest.ledValues[led] * fade2, leds[led]);
-    else
-      MsgPack::writeFloat(0.f, leds[led]); // off
+    auto multiBlinkOn = [this](unsigned blinkPeriod, unsigned numBlinks, unsigned overallPeriod, unsigned offset)
+    {
+      bool blinkingOn = (timeWhenPacketReceived / (blinkPeriod/2) & 1) == 1;
+      unsigned dutyPeriod = blinkPeriod * numBlinks;
+
+      return blinkingOn &&
+             Range<unsigned>(0, dutyPeriod - 1).isInside((timeWhenPacketReceived - offset) % overallPeriod);
+    };
+
+    const unsigned NORMAL_PERIOD_MS   = 800;
+    const unsigned SLOW_PERIOD_MS     = 1600;
+    const unsigned MED_PERIOD_MS      = 400;
+    const unsigned FAST_PERIOD_MS     = 200;
+    const unsigned VFAST_PERIOD_MS    = 100;
+
+    float fade = 0.5f - 0.5f * std::cos(float(timeWhenPacketReceived % 3000) * pi2 / 3000.f); // 3000ms period, 50% duty
+    // basically set it so the cos function is used to fade the LED for 50% of the time (75% duty)
+    // and otherwise it reduces to cos(0) which is 1, i.e. full LED power
+    float fade2 = 0.5f + 0.5f * std::cos(float(Rangei(-1500, 0).limit(int(timeWhenPacketReceived % 3000) - 1500)) *
+                                         pi2 / 1500.f); // 3000ms period, 75% duty
+
+    FOREACH_ENUM(LEDRequest::LED, led)
+    {
+      LEDRequest::LEDState state = theLEDRequest.ledStates[led];
+      if (state == LEDRequest::on || (state == LEDRequest::blinking && blinkOn(NORMAL_PERIOD_MS, 0)) ||
+          (state == LEDRequest::blinking2 && blinkOn(NORMAL_PERIOD_MS, 0)) ||
+          (state == LEDRequest::fastBlinking && blinkOn(FAST_PERIOD_MS, FAST_PERIOD_MS/2)) ||
+          (state == LEDRequest::fastBlinking2 && blinkOn(FAST_PERIOD_MS, 0)) ||
+          (state == LEDRequest::slowDoubleBlink && multiBlinkOn(MED_PERIOD_MS, 2, SLOW_PERIOD_MS, 0)) ||
+          (state == LEDRequest::fastDoubleBlink && multiBlinkOn(FAST_PERIOD_MS, 2, NORMAL_PERIOD_MS, 0)) ||
+          (state == LEDRequest::tripleBlink && multiBlinkOn(VFAST_PERIOD_MS, 3, NORMAL_PERIOD_MS, 0)) ||
+          (state == LEDRequest::tripleBlink2 && multiBlinkOn(VFAST_PERIOD_MS, 3, NORMAL_PERIOD_MS, NORMAL_PERIOD_MS/2)))
+        MsgPack::writeFloat(theLEDRequest.ledValues[led], leds[led]);
+      else if (state == LEDRequest::fade)
+        MsgPack::writeFloat(theLEDRequest.ledValues[led] * fade, leds[led]);
+      else if (state == LEDRequest::fade2)
+        MsgPack::writeFloat(theLEDRequest.ledValues[led] * fade2, leds[led]);
+      else
+        MsgPack::writeFloat(0.f, leds[led]); // off
   }
 
   VERIFY(send(socket, reinterpret_cast<char*>(packetToSend), packetToSendSize, 0) == static_cast<ssize_t>(packetToSendSize));

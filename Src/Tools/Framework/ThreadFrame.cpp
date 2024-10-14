@@ -10,7 +10,13 @@
 #include "ThreadFrame.h"
 #include "Tools/Debugging/Debugging.h"
 #include "Tools/Global.h"
+#include "Tools/TextLogging.h"
+#include "Platform/File.h"
+
 #include <asmjit/asmjit.h>
+
+
+DECL_TLOGGER(tlogger, "ThreadFrame", TextLogging::WARNING);
 
 ThreadFrame::ThreadFrame(const Settings& settings, const std::string& robotName) :
   settings(settings),
@@ -39,6 +45,14 @@ ThreadFrame::ThreadFrame(const Settings& settings, const std::string& robotName,
   }
 
   Global::theDebugOut = &this->debugSender->out;
+
+#ifdef TARGET_SIM
+  TLOGI(tlogger, "{} search path:", robotName);
+
+  std::list<std::string> searchPaths = File::getFullNames("fileToFind");
+  for (auto& s : searchPaths)
+    TLOGI(tlogger, "{}   {}", robotName, s);
+#endif
 }
 
 ThreadFrame::~ThreadFrame()

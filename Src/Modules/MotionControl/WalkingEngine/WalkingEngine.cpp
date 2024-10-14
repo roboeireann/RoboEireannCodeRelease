@@ -805,7 +805,8 @@ WalkPhase::WalkPhase(const WalkingEngine& engine, const Pose2f& stepTarget, cons
   if(weightShiftStatus == emergencyStand)
   {
     ANNOTATION("WalkingEngine", "emergencyStand");
-    SystemCall::say("Stand");
+    if (SystemCall::getMode() == SystemCall::physicalRobot)
+      SystemCall::say("Stand");
     forwardStep = 0.f;
     sideStep = 0.f;
     turnStep = 0_deg;

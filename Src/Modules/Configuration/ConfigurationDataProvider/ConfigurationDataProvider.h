@@ -23,6 +23,7 @@
 #include "Representations/Configuration/RelativeFieldColorsParameters.h"
 #include "Representations/Configuration/RobotDimensions.h"
 #include "Representations/Configuration/SetupPoses.h"
+#include "Representations/Configuration/GameConfig.h"
 #include "Representations/Infrastructure/StiffnessData.h"
 #include "Representations/MotionControl/KeyframeMotionParameters.h"
 #include "Representations/MotionControl/WalkModifier.h"
@@ -54,6 +55,7 @@ MODULE(ConfigurationDataProvider,
   PROVIDES(RelativeFieldColorsParameters),
   PROVIDES(RobotDimensions),
   PROVIDES(SetupPoses),
+  PROVIDES(GameConfig),
   PROVIDES(StiffnessSettings),
   PROVIDES(WalkModifier),
 });
@@ -82,6 +84,7 @@ private:
   std::unique_ptr<RelativeFieldColorsParameters> theRelativeFieldColorsParameters;
   std::unique_ptr<RobotDimensions> theRobotDimensions;
   std::unique_ptr<SetupPoses> theSetupPoses;
+  std::unique_ptr<GameConfig> theGameConfig;
   std::unique_ptr<StiffnessSettings> theStiffnessSettings;
   std::unique_ptr<WalkModifier> theWalkModifier;
 
@@ -105,6 +108,7 @@ private:
   void update(RobotDimensions& robotDimensions) override;
   void update(StiffnessSettings& stiffnessSettings) override {update(stiffnessSettings, theStiffnessSettings);}
   void update(SetupPoses& setupPoses) override {update(setupPoses, theSetupPoses);}
+  void update(GameConfig& gameConfig) override {update(gameConfig, theGameConfig);}
   void update(WalkModifier& walkModifier) override {update(walkModifier, theWalkModifier);}
 
   template<typename T> void update(T& representation, std::unique_ptr<T>& theRepresentation)

@@ -155,6 +155,8 @@ STREAMABLE(LEDRequest,
     blinking2, // antiphase to blinking (i.e. on when blinking is off and vice versa)
     fastBlinking,
     fastBlinking2, // antiphase to fastBlinking
+    slowDoubleBlink, // slower double blink and gap
+    fastDoubleBlink, // faster double blink and gap
     tripleBlink, // 3 fast blinks and a gap
     tripleBlink2, // antiphase to tripleBlink
     fade, // 3000 ms period, 50% duty cycle

@@ -43,13 +43,11 @@ namespace CoroBehaviour
       (float)(500.f) supporterHysteresis, ///< supporters must change x-value by this relative to each other to switch index
     });
 
-    READS(RobotInfo);
     READS(TeamData);
     READS(FrameInfo);
     READS(TeamBehaviorStatus);
     READS(RobotPose);
     READS(GameInfo);
-    READS(OwnTeamInfo);
 
     TeamBehaviorStatusSkills teamBehaviourStatusSkills {env};
 
@@ -65,12 +63,12 @@ namespace CoroBehaviour
 
       if (!captainTeammate) // no captain teammate would mean we're the captain
       {
-        if (theRobotInfo.isPenalized()) // we're the captain but also penalized so can't allocate roles
+        if (theGameInfo.isPenalized()) // we're the captain but also penalized so can't allocate roles
           teammateRoles = TeammateRoles();
         else
         {
           // assign roles
-          teammateRoles.captain = theRobotInfo.number;
+          teammateRoles.captain = theGameInfo.playerNumber;
           teammateRoles.timestamp = theFrameInfo.time;
           assignRoles(teammateRoles);
         }
@@ -88,14 +86,14 @@ namespace CoroBehaviour
     // (from some particular robot) is striker or not
     unsigned getTimeWhenReachBall(const TeamBehaviorStatus& teamBehaviourStatus)
     {
-      bool isStriker = teamBehaviourStatus.role.playsTheBall();
+      bool isStriker = teamBehaviourStatus.role.isBallPlayer();
       return isStriker ? teamBehaviourStatus.timeToReachBall.timeWhenReachBallStriker
                        : teamBehaviourStatus.timeToReachBall.timeWhenReachBall;
     }
 
     bool isGoalkeeper(int robotNumber)
     {
-      return robotNumber == 1;
+      return Settings::isGoalkeeper(robotNumber);
     }
 
     /**
@@ -106,10 +104,10 @@ namespace CoroBehaviour
     {
       if (theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
       {
-        if (theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
-          teammateRoles[theRobotInfo.number] = PlayerRole::ballPlayer;
+        if (theGameInfo.isOurKick())
+          teammateRoles[theGameInfo.playerNumber] = PlayerRole::ballPlayer;
         else
-          teammateRoles[theRobotInfo.number] = PlayerRole::goalkeeper;
+          teammateRoles[theGameInfo.playerNumber] = PlayerRole::goalkeeper;
 
         return;
       }
@@ -117,11 +115,11 @@ namespace CoroBehaviour
       // CAUTION: remember that there may be no active teammates so ensure
       // all code works even with no teammates
       
-      teammateRoles[theRobotInfo.number] = PlayerRole::none;
+      teammateRoles[theGameInfo.playerNumber] = PlayerRole::none;
 
       // assign the goalie
-      if (!theRobotInfo.isPenalized() && isGoalkeeper(theRobotInfo.number)) // are we the goalie?
-        teammateRoles[theRobotInfo.number] = PlayerRole::goalkeeper;
+      if (!theGameInfo.isPenalized() && isGoalkeeper(theGameInfo.playerNumber)) // are we the goalie?
+        teammateRoles[theGameInfo.playerNumber] = PlayerRole::goalkeeper;
       else // no, perhaps a teammate is goalie
       {
         for (const Teammate& teammate : theTeamData.teammates)
@@ -129,7 +127,7 @@ namespace CoroBehaviour
           if (!teammate.isPenalized && isGoalkeeper(teammate.number))
           {
             teammateRoles[teammate.number] = PlayerRole::goalkeeper;
-            TLOGD(tlogger(), "robot{}: assignRoles goalkeeper is {}", theRobotInfo.number, teammate.number);
+            TLOGD(tlogger(), "robot{}: assignRoles goalkeeper is {}", theGameInfo.playerNumber, teammate.number);
             break;
           }
         }
@@ -144,8 +142,8 @@ namespace CoroBehaviour
       std::vector<RobotNumberToTime> etaAtBall;
 
       // add the current robot as a potential striker if it is not penalized
-      if (!theRobotInfo.isPenalized()) 
-        etaAtBall.emplace_back(theRobotInfo.number, getTimeWhenReachBall(theTeamBehaviorStatus));
+      if (!theGameInfo.isPenalized()) 
+        etaAtBall.emplace_back(theGameInfo.playerNumber, getTimeWhenReachBall(theTeamBehaviorStatus));
 
       // add other unpenalized robots
       for (const Teammate& teammate : theTeamData.teammates)
@@ -194,8 +192,8 @@ namespace CoroBehaviour
       std::vector<RobotX> robotXValues;
       
       // add the current robot as a supporter if it is not penalized and not a striker or goalie
-      if (!theRobotInfo.isPenalized() && (teammateRoles[theRobotInfo.number] == PlayerRole::none))
-        robotXValues.emplace_back(theRobotInfo.number, theTeamBehaviorStatus.role.supporterIndex(),
+      if (!theGameInfo.isPenalized() && (teammateRoles[theGameInfo.playerNumber] == PlayerRole::none))
+        robotXValues.emplace_back(theGameInfo.playerNumber, theTeamBehaviorStatus.role.supporterIndex(),
                                   theRobotPose.translation.x());
 
       // add other unpenalized robots
@@ -227,7 +225,7 @@ namespace CoroBehaviour
 
       TLOGD(tlogger(), "assignRoles: teammateRole.roles[1] = {}", teammateRoles.roles[1]);
 
-      // ANNOTATION_FMT("assignRoles: captain={}, striker={}, robot1 is {}\n", theRobotInfo.number, strikerNumber, teammateRoles.roles[1]);
+      // CRB_ANNOTATION_FMT("assignRoles: captain={}, striker={}, robot1 is {}\n", theGameInfo.playerNumber, strikerNumber, teammateRoles.roles[1]);
     }
 
     void updatePlayerRole()
@@ -237,13 +235,13 @@ namespace CoroBehaviour
       // we assume that the TeammateRoles have already been updated by the time this runs
       // so we can pull our values from there
 
-      role.role = static_cast<PlayerRole::RoleType>(theTeamBehaviorStatus.teammateRoles[theRobotInfo.number]);
+      role.role = static_cast<PlayerRole::Type>(theTeamBehaviorStatus.teammateRoles[theGameInfo.playerNumber]);
       role.numOfActiveSupporters = 0;
       for (int teammateRole : theTeamBehaviorStatus.teammateRoles.roles)
         if (teammateRole >= PlayerRole::firstSupporterRole)
           ++role.numOfActiveSupporters;
 
-      // ANNOTATION_FMT("playerRole: {}, numActiveSupporters={}\n", role.role, role.numOfActiveSupporters);      
+      // CRB_ANNOTATION_FMT("playerRole: {}, numActiveSupporters={}\n", role.role, role.numOfActiveSupporters);      
 
       teamBehaviourStatusSkills.playerRole(role);
     }    

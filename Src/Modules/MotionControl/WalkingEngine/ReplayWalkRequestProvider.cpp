@@ -16,7 +16,7 @@ void ReplayWalkRequestProvider::update(ReplayWalkRequestGenerator& request)
 {
   MODIFY("module:ReplayWalkRequestProvider:startRecord", recordWalkPhase);
   MODIFY("module:ReplayWalkRequestProvider:initRecord", initRecord);
-  if(theRobotInfo.penalty != PENALTY_NONE)
+  if(theGameInfo.isPenalized())
   {
     indexCurrentWalkRequest = 0;
     const bool thisBumperState = theKeyStates.pressed[KeyStates::lFootLeft] || theKeyStates.pressed[KeyStates::lFootRight];

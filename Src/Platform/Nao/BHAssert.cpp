@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 #include <cstring>
 #include <sstream>
 #include <ctime>
@@ -122,7 +123,7 @@ void Assert::logAdd(int trackId, const char* file, int lineNum, const std::strin
 void Assert::logDump(bool toStderr, int termSignal)
 {
   // This is not written to /home/nao/logging because roboeireann might have crashed due to USB drive disconnection and we still want to have the crash dump.
-  FILE* fp = toStderr ? stderr : fopen("/home/nao/redump.log", "w");
+  FILE* fp = toStderr ? stderr : fopen("/home/nao/redump.trace", "w");
   if(!fp)
     return;
   setvbuf(fp, nullptr, _IONBF, 0);
@@ -156,7 +157,17 @@ void Assert::logDump(bool toStderr, int termSignal)
   }
 #endif // NDEBUG
 
-  const char* termSignalNames[] =
+  fprintf(fp, "----\n");
+  fprintf(fp, "%s\n", getSignalName(termSignal));
+
+  if(fp != stderr)
+    fclose(fp);
+}
+
+
+const char* Assert::getSignalName(int signum)
+{
+  const char* signalNames[] =
   {
     "",
     "sigHUP",
@@ -176,13 +187,19 @@ void Assert::logDump(bool toStderr, int termSignal)
     "sigTERM"
   };
 
-  fprintf(fp, "----\n");
-  const char* termSignalName = termSignal < 0 || termSignal >= int(sizeof(termSignalNames) / sizeof(*termSignalNames)) ? "" : termSignalNames[termSignal];
-  if(*termSignalName)
-    fprintf(fp, "%s\n", termSignalName);
+  if (0 <= signum && signum < int(sizeof(signalNames) / sizeof(*signalNames)))
+    return signalNames[signum];
   else
-    fprintf(fp, "term signal %d\n", termSignal);
+  {
+    switch (signum)
+    {
+    case SIGUSR1:
+      return "sigUSR1";
 
-  if(fp != stderr)
-    fclose(fp);
+    default:
+      static char buf[20];
+      sprintf(buf, "signal %d", signum);
+      return buf;
+    }
+  }
 }

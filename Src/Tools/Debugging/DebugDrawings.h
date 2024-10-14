@@ -482,7 +482,7 @@ inline const char* DrawingManager::getTypeName(char id) const
   while(false)
 
 /**
- * A macro that sends a cross
+ * A macro that sends a cross (actually an x-mark)
  * @param x,y The center of the cross
  * @param size Half of the height of the rectangle enclosing the cross
  * @param id A drawing id
@@ -498,6 +498,47 @@ inline const char* DrawingManager::getTypeName(char id) const
       LINE(id, (x)+size, (y)-size, (x)-size, (y)+size, penWidth, penStyle, penColor); \
     } \
   while(false)
+
+/**
+ * A macro that sends a vertical/horizontal cross (like a plus sign)
+ * @param x,y The center of the marker
+ * @param size Half of the height of the rectangle enclosing the marker
+ * @param id A drawing id
+ * @param penWidth The line width of the rectangle
+ * @param penStyle The line style, e.g. dotted
+ * @param penColor The color
+ */
+#define VERT_CROSS(id, x, y, size, penWidth, penStyle, penColor) \
+  do \
+    COMPLEX_DRAWING(id) \
+    { \
+      LINE(id, (x)+size, (y), (x)-size, (y), penWidth, penStyle, penColor); \
+      LINE(id, (x), (y)-size, (x), (y)+size, penWidth, penStyle, penColor); \
+    } \
+  while(false)
+
+/**
+ * A macro that sends a target (circle with inner cross/plus marker)
+ * @param id A drawing id
+ * @param x,y The center of the marker
+ * @param size Half of the height of the rectangle enclosing the marker
+ * @param penWidth The line width of the rectangle
+ * @param penStyle The line style, e.g. dotted
+ * @param penColor The color
+ * @param isDiagonal true if a diagonal cross, false if a vertical cross (plus sign)
+ */
+#define TARGET(id, x, y, size, penWidth, penStyle, penColor, isDiagonal) \
+  do \
+    COMPLEX_DRAWING(id) \
+    { \
+      CIRCLE(id, x, y, radius, penWidth, penStyle, penColor, Drawings::noBrush, ColorRGBA::black); \
+      if (isDiagonal) \
+        CROSS(id, x, y, size, penWidth, penStyle, penColor); \
+      else \
+        VERT_CROSS(id, x, y, size, penWidth, penStyle, penColor); \
+    } \
+  while(false)
+
 
 /**
  * A macro that sends a text
@@ -805,6 +846,8 @@ inline const char* DrawingManager::getTypeName(char id) const
 #define RECTANGLE(id, x1, y1, x2, y2, penWidth, penStyle, penColor) static_cast<void>(0)
 #define FILLED_RECTANGLE(id, x1, y1, x2, y2, penWidth, penStyle, penColor, brushStyle, brushColor) static_cast<void>(0)
 #define CROSS(id, x, y, size, penWidth, penStyle, penColor) static_cast<void>(0)
+#define VERT_CROSS(id, x, y, size, penWidth, penStyle, penColor) static_cast<void>(0)
+#define TARGET(id, x, y, size, penWidth, penStyle, penColor, isDiagonal) static_cast<void>(0)
 #define DRAW_TEXT(id, x, y, fontSize, color, txt) static_cast<void>(0)
 #define SPOT(id, x1, y1, x2, y2, action) static_cast<void>(0)
 #define TIP(id, x, y, radius, text) static_cast<void>(0)

@@ -1,0 +1,5 @@
+#call RL2024/inc/RL_settings
+cs RL2024
+
+call Includes/1vsInactives
+call Includes/PerceptOracle

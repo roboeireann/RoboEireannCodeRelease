@@ -113,7 +113,7 @@ class InterceptBallImpl : public InterceptBallImplBase
       transition
       {
         if(!(theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto targetStand;
 
         const float positionIntersectionYAxis = theFieldBall.intersectionPositionWithOwnYAxis.y();
@@ -186,7 +186,7 @@ class InterceptBallImpl : public InterceptBallImplBase
       transition
       {
         if(!(theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto targetStand;
 
         ASSERT(p.interceptionMethods != 0);
@@ -260,7 +260,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -180.f, 180.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action
@@ -278,7 +278,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -250.f, 250.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action
@@ -296,7 +296,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -250.f, 250.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action
@@ -406,7 +406,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -180.f, 180.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action
@@ -423,7 +423,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -250.f, 250.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action
@@ -440,7 +440,7 @@ class InterceptBallImpl : public InterceptBallImplBase
         if(p.allowGetUp && state_time > 2000 &&
            !(between<float>(theFieldBall.intersectionPositionWithOwnYAxis.y(), -250.f, 250.f) &&
              theFieldBall.ballWasSeen(300) &&
-             between<float>(theFieldBall.timeUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
+             between<float>(theFieldBall.secsUntilIntersectsOwnYAxis, 0.1f, 3.5f)))
           goto getUp;
       }
       action

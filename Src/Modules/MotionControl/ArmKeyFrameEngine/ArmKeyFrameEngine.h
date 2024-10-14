@@ -1,7 +1,8 @@
 #pragma once
 
 #include "ArmKeyFrameMotion.h"
-#include "Representations/Communication/RobotInfo.h"
+
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/JointAngles.h"
 #include "Representations/Infrastructure/StiffnessData.h"
 #include "Representations/MotionControl/ArmKeyFrameGenerator.h"
@@ -12,7 +13,7 @@
 MODULE(ArmKeyFrameEngine,
 {,
   REQUIRES(JointAngles),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   REQUIRES(StiffnessSettings),
   PROVIDES(ArmKeyFrameGenerator),
   LOADS_PARAMETERS(

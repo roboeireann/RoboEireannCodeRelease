@@ -35,7 +35,8 @@ namespace CoroBehaviour
       {
         // commonSkills.activityStatus(BehaviorStatus::lookAroundAfterPenalty);
         lookLeftAndRightTask(startLeft);
-        commonSkills.stand();
+        // commonSkills.stand();
+        motionSkills.walkAtRelativeSpeed(Pose2f(0.f, 0.5f, 0.f));
 
         if (theExtendedGameInfo.timeSinceLastPenaltyEnded >=
              ((theRobotPose.quality != RobotPose::poor) ? params.minDuration : params.maxDuration))
@@ -58,6 +59,7 @@ namespace CoroBehaviour
     READS(RobotPose);
 
     CommonSkills commonSkills  {env};
+    MotionSkills motionSkills {env};
     LookLeftAndRightTask lookLeftAndRightTask  {env};
   };
 

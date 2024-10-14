@@ -155,6 +155,7 @@ public:
   {
     // coro_line_ = 0;
     mResumePoint = nullptr;
+    mLoopsSinceResume = 0;
     mRunCount = 0;
     mCoroState = RESET;
 
@@ -204,8 +205,12 @@ public: // this section should ideally be PRIVATE/PROTECTED but must be public f
 
     mCoroState = RUNNING;
 
+    mLoopsSinceResume = 0;
+
     return mResumePoint; // point to resume or nullptr if starting at the top
   }
+
+  inline unsigned internalIncrementLoopsSinceResume() { return ++mLoopsSinceResume; }
 
   void internalSetCheckpoint(const std::string &name, int line = 0)
   {
@@ -218,11 +223,14 @@ public: // this section should ideally be PRIVATE/PROTECTED but must be public f
     mCheckpointLine = line;
   }
 
+
+
 private:
   CoroEnv &mEnv;
   void *mResumePoint = nullptr; // ptr to a locally scoped label
   CoroState mCoroState = RESET;
-  unsigned int mRunCount = 0;
+  unsigned int mLoopsSinceResume; // number of loops since last YIELD etc - if more than 2 it's a bug
+  unsigned int mRunCount = 0; // number of times this coro has run since last reset
   CoroTime mCoroPrevRunTime = 1;   // the timestamp when this coro was last run
   CoroTime mCoroBeginTime = 0;      // the timestamp when this coro last started (after reset)
   CoroTime mCheckpointTime = 0; // the timestamp when this coro last checkpointed
@@ -348,6 +356,8 @@ public:
 #define CR_LOOP()           CR_BEGIN(); while (true)
 
 // all following macros are only legal after CR_BEGIN/CR_LOOP
+
+#define CR_END_OF_LOOP_CHECK()  ASSERT(internalIncrementLoopsSinceResume() < 2)
 
 /**
  * mark a checkpoint in the behaviour (recorded as a state in the activation graph).

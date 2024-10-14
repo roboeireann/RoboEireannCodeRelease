@@ -16,6 +16,8 @@
 #include "Tools/Math/Geometry.h"
 #include "Tools/Streams/EnumIndexedArray.h"
 
+#include <unordered_map>
+
 STREAMABLE(SimpleFieldDimensions,
 {,
   (float) xPosOpponentFieldBorder,
@@ -219,6 +221,12 @@ public:
    * Draws the goal frame.
    */
   void drawGoalFrame() const;
+
+
+  /**
+   * add symbols to a map so they can be used in other config files
+   */
+  void populateSymbols(std::unordered_map<std::string, float>& symbols) const;
 
 protected:
   /**

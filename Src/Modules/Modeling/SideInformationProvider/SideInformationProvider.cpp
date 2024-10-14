@@ -43,7 +43,7 @@ void SideInformationProvider::update(SideInformation& sideInformation)
     agreemates.clear();
 
   // Only compute/update internal representation when we are actually playing.
-  if(theGameInfo.state == STATE_PLAYING && theRobotInfo.penalty == PENALTY_NONE)
+  if(theGameInfo.state == STATE_PLAYING && !theGameInfo.isPenalized())
   {
     // Update the structures that contain information about agreed and disagreed ball perceptions
     findAgreemates();
@@ -71,7 +71,7 @@ void SideInformationProvider::setMirrorFlagOfRepresentation(SideInformation& sid
   sideInformation.mirror = false;
 
   // Goalie does not do this flipping stuff
-  if(theRobotInfo.isGoalkeeper() && deactivateGoalieFlipping && theGameInfo.state == STATE_PLAYING)
+  if(theGameInfo.isGoalkeeper() && deactivateGoalieFlipping && theGameInfo.state == STATE_PLAYING)
     return;
 
   // Find all my dis-/agreemates:
@@ -275,7 +275,7 @@ void SideInformationProvider::computeBasicOwnSideInformation(SideInformation& si
     if(theExtendedGameInfo.gameStateLastFrame == STATE_INITIAL && theGameInfo.state == STATE_READY)
     {
       distanceWalkedAtKnownPosition = theOdometer.distanceWalked;
-      largestXPossibleAtKnownPosition = theSetupPoses.getPoseOfRobot(theOwnTeamInfo.getSubstitutedPlayerNumber(theRobotInfo.number)).position.x();
+      largestXPossibleAtKnownPosition = theSetupPoses.getPoseOfRobot(theGameInfo.ourTeam().getSubstitutedPlayerNumber(theGameInfo.playerNumber)).position.x();
     }
     else if(theExtendedGameInfo.returnFromManualPenalty)
     {
@@ -292,9 +292,9 @@ void SideInformationProvider::computeBasicOwnSideInformation(SideInformation& si
       distanceWalkedAtKnownPosition = theOdometer.distanceWalked;
       if(theExtendedGameInfo.manuallyPlaced)
       {
-        if(theRobotInfo.isGoalkeeper())
+        if(theGameInfo.isGoalkeeper())
           largestXPossibleAtKnownPosition = theFieldDimensions.xPosOwnGroundLine + 52.f;
-        else if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+        else if(theGameInfo.isOurKick())
           largestXPossibleAtKnownPosition = -theFieldDimensions.centerCircleRadius - awayFromLineDistance;
         else
           largestXPossibleAtKnownPosition = theFieldDimensions.xPosOwnPenaltyArea + 127.f;
@@ -306,13 +306,13 @@ void SideInformationProvider::computeBasicOwnSideInformation(SideInformation& si
   else if(theExtendedGameInfo.gameStateLastFrame == STATE_SET)
   {
     distanceWalkedAtKnownPosition = theOdometer.distanceWalked;
-    if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+    if(theGameInfo.isOurKick())
       largestXPossibleAtKnownPosition = theFieldDimensions.xPosPenaltyStrikerStartPosition;
     else
       largestXPossibleAtKnownPosition = theFieldDimensions.xPosOwnGroundLine;
   }
 
-  if(theStaticInitialPose.isActive && theRobotInfo.penalty == PENALTY_NONE
+  if(theStaticInitialPose.isActive && !theGameInfo.isPenalized()
      && (theExtendedGameInfo.penaltyLastFrame == PENALTY_SPL_PLAYER_PUSHING || theExtendedGameInfo.penaltyLastFrame == PENALTY_MANUAL))
     largestXPossibleAtKnownPosition = theStaticInitialPose.staticPoseOnField.translation.x();
 

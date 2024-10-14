@@ -8,7 +8,8 @@
 #pragma once
 
 #include "Platform/SystemCall.h"
-#include "Representations/Communication/RobotInfo.h"
+
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Sensing/GyroOffset.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/JointRequest.h"
@@ -26,7 +27,7 @@ MODULE(FilteredCurrentProvider,
   REQUIRES(FrameInfo),
   REQUIRES(GroundContactState),
   REQUIRES(GyroOffset),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   USES(JointRequest),
   REQUIRES(JointSensorData),
   PROVIDES(FilteredCurrent),

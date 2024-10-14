@@ -23,7 +23,7 @@
 #include "Tools/Streams/InStreams.h"
 #include <SimRobotCore2.h>
 
-SimRobotCore2::SensorPort* SimulatedRobot3D::activeCameras[12] = {nullptr};
+SimRobotCore2::SensorPort* SimulatedRobot3D::activeCameras[] = {nullptr};
 unsigned SimulatedRobot3D::activeCameraCount = 0;
 
 SimulatedRobot3D::SimulatedRobot3D(SimRobot::Object* robot) :

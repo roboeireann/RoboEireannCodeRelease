@@ -61,8 +61,11 @@ public:
    * @param text The string to be synthesized and played
    * @return The amount of elements in the play sound queue.
    */
-  static int say(const char* text, float speed = 1.f);
-  static int say(const std::string &text, float speed = 1.f) { return say(text.c_str(), speed); }
+  static int say(const char* text, float speed = 1.f, float pitchFactor = 1.f, float pitchSdFactor = 1.f);
+  static int say(const std::string &text, float speed = 1.f, float pitchFactor = 1.f, float pitchSdFactor = 1.f)
+  {
+    return say(text.c_str(), speed, pitchFactor, pitchSdFactor);
+  }
 
   /**
    * Is the sound player currently playing a file?

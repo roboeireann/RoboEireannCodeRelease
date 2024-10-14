@@ -10,7 +10,6 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
@@ -31,7 +30,6 @@ MODULE(WorldModelPredictor,
   REQUIRES(GameInfo),
   REQUIRES(Odometer),
   REQUIRES(OdometryData),
-  REQUIRES(OwnTeamInfo),
   PROVIDES(WorldModelPrediction),
 });
 

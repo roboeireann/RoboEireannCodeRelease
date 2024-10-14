@@ -1,4 +1,4 @@
-mr RawGameInfo LogDataProvider Cognition
+mr ReceivedGameControlData LogDataProvider Cognition
 mr Whistle WhistleDetectorRE2023 Cognition
 
 vd representation:RawGameInfo 

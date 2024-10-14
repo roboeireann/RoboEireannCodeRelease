@@ -7,7 +7,6 @@
 
 #include "Tools/Module/Module.h"
 
-#include "Representations/Communication/BHumanMessage.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
@@ -26,7 +25,6 @@ MODULE(FieldCoverageProvider,
   REQUIRES(FrameInfo),
   REQUIRES(ObstacleModel),
   REQUIRES(RobotPose),
-  // REQUIRES(BHumanMessageOutputGenerator),
 
   PROVIDES_WITHOUT_MODIFY(FieldCoverage),
 

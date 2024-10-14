@@ -6,11 +6,18 @@
  * For more intelligent walking, see the GotoSkills instead.
  *
  * @author: Rudi Villing
+ * @author: Andy Lee Mitchell
+ * @author: Aidan Colgan
  */
 
 #pragma once
 
 #include "Modules/BehaviorControl/CoroBehaviour/CoroBehaviourCommon.h"
+#include "Tools/Hysteresis.h"
+#include "Tools/Streams/Enum.h"
+
+#include "Tools/TextLogging.h"
+#include "Tools/FmtCommonTypes.h"
 
 namespace CoroBehaviour
 {
@@ -49,7 +56,7 @@ namespace CoroBehaviour
       theLibCheck.inc(LibCheck::motionRequest);
 
       return theMotionInfo.executedPhase == MotionPhase::stand;
-    }
+    }    
 
     bool walkAtAbsoluteSpeed(const Pose2f &speed)
     {
@@ -163,6 +170,17 @@ namespace CoroBehaviour
       return theMotionInfo.isMotion(MotionPhase::getUp);
     }
 
+    // isStanding
+    // isWalking
+    // isKicking
+    //
+    // use theMotionInfo.isMotion MotionPhase::stand or MotionPhase::walk 
+    // or use theMotionInfo.isKicking
+
+    bool isStanding() const { return theMotionInfo.isMotion(MotionPhase::stand); }
+    bool isWalking() const { return theMotionInfo.isMotion(MotionPhase::walk); }
+
+
   private:
     BehaviourEnv& env;
 
@@ -172,6 +190,14 @@ namespace CoroBehaviour
     MODIFIES(MotionRequest);
   };
 
+  ENUM(Avoidance,
+  {,
+    AVOIDANCE_NONE, // rough and no obstacle avoidance
+    AVOIDANCE_ROUGH, // rough and libwalk avoidance
+    AVOIDANCE_AUTO, // not rough, path planner or libwalk as needed
+  });
+
+
   // ------------------------------------------------------------------------
   // resumable tasks to wrap functions above
   // ------------------------------------------------------------------------
@@ -180,25 +206,146 @@ namespace CoroBehaviour
   {
     CRBEHAVIOUR_INIT(WalkToPoseTask) {}
 
-    void operator()(const Pose2f &target, const Pose2f &speed,
-                    const MotionRequest::ObstacleAvoidance &obstacleAvoidance, bool keepTargetRotation,
-                    float positionThreshold, Angle angleThreshold = 180_deg)
+    void operator()(const Pose2f &target, float speed, Avoidance avoidance = AVOIDANCE_AUTO,
+                    bool keepTargetRotation = false, bool standAtTarget = true,
+                    Rangef positionThreshold = {20.f, 100.f}, Rangea angleThreshold = {3_deg, 10_deg})
     {
+      const Pose2f speedPose = Pose2f(speed, speed, speed);
+      const float targetDistance = target.translation.norm();
+      const bool autoAvoidance = (avoidance == AVOIDANCE_AUTO); 
+
+      const bool footContact = (autoAvoidance &&
+                                (theFrameInfo.getTimeSince(theFootBumperState.status[Legs::left].lastContact) < 400 ||
+                                 theFrameInfo.getTimeSince(theFootBumperState.status[Legs::right].lastContact) < 400));
+      const bool leftArmContact =
+          (autoAvoidance && (theFrameInfo.getTimeSince(theArmContactModel.status[Arms::left].timeOfLastContact) < 800));
+      const bool rightArmContact =
+          (autoAvoidance && (theFrameInfo.getTimeSince(theArmContactModel.status[Arms::right].timeOfLastContact) < 800));
+
+      const bool obstacleContacted = footContact || leftArmContact || rightArmContact;
+
+      const bool outsideOuterTargetThreshold =
+          (targetDistance > positionThreshold.max) && (fabs(target.rotation) > angleThreshold.max);
+      const bool insideInnerTargetThreshold =
+          (targetDistance < positionThreshold.min) && (fabs(target.rotation) < angleThreshold.min);
+
+      activePathPlannerComparator.update(targetDistance);
+      const bool walkFarNeeded = autoAvoidance && activePathPlannerComparator.state;
+
+
       CRBEHAVIOUR_LOOP()
       {
-        motionSkills.walkToPose(target, speed, obstacleAvoidance, keepTargetRotation);
-
-        if ((target.translation.squaredNorm() < sqr(positionThreshold)) && (fabs(target.rotation) < angleThreshold))
-          CR_EXIT_SUCCESS();
-        else
+        while (walkFarNeeded && !obstacleContacted)
+        {
+          CR_CHECKPOINT(walkFar);
+          motionSkills.walkToPose(target, speedPose, getFarAvoidance(target, speedPose), keepTargetRotation);
           CR_YIELD();
+        }
+
+        while (!walkFarNeeded && !insideInnerTargetThreshold && !obstacleContacted)
+        {
+          CR_CHECKPOINT(walkNear);
+          motionSkills.walkToPose(target, speedPose, getNearAvoidance(target, avoidance), keepTargetRotation);
+          CR_YIELD();
+        }
+
+        // by definition insideTargetInnerThreshold implies !walkFarNeeded, so no need to check explicitly
+        if (insideInnerTargetThreshold && !obstacleContacted)
+        {
+          CR_CHECKPOINT(reachingDestination);
+          while (!outsideOuterTargetThreshold && !obstacleContacted)
+          {
+            // Note that the robot may already be standing in the right place, in which case we can just stand and exit
+            if (standAtTarget && (motionSkills.isStanding() || (getCheckpointDuration() > 500)))
+            {
+              motionSkills.stand();
+              CR_EXIT_SUCCESS();
+            }
+            else
+            {
+              motionSkills.walkToPose(target, speedPose, getNearAvoidance(target, avoidance), keepTargetRotation);
+              if (getCheckpointDuration() > 500) // this handles the case where standAtTarget is false, but we've reached the target
+                CR_EXIT_SUCCESS();
+              else
+                CR_YIELD();
+            }            
+          }
+        }
+
+        if (footContact)
+        {
+          CR_CHECKPOINT(footContactBackUp);
+          while (getCheckpointDuration() < (autoAvoidance ? params.avoidanceTime : params.avoidanceTimeRough))
+          {
+            motionSkills.walkAtRelativeSpeed(Pose2f(0.f, -1.f, 0.f)); // backwards based on robot orientation
+            CR_YIELD();
+          }
+        }
+        else if (leftArmContact)
+        {
+          CR_CHECKPOINT(leftContactMoveRight);
+          while (getCheckpointDuration() < (autoAvoidance ? params.avoidanceTime : params.avoidanceTimeRough))
+          {
+            motionSkills.walkAtRelativeSpeed(Pose2f(0.f, 0.f, -1.f)); // right based on robot orientation
+            CR_YIELD();
+          }
+        }
+        else if (rightArmContact)
+        {
+          CR_CHECKPOINT(righContactMoveLeft);
+          while (getCheckpointDuration() < (autoAvoidance ? params.avoidanceTime : params.avoidanceTimeRough))
+          {
+            motionSkills.walkAtRelativeSpeed(Pose2f(0.f, 0.f, 1.f)); // left based on robot orientation
+            CR_YIELD();
+          }
+        }
+
+        // TLOGI(
+        //     tlogger,
+        //     "walkFarNeeded={}, insideInner={}, outsideOuter={}, obstacleContacted={} (foot={}, leftA={}, "
+        //     "rightA={})",
+        //     walkFarNeeded, insideInnerTargetThreshold, outsideOuterTargetThreshold, obstacleContacted,
+        //     footContact, leftArmContact, rightArmContact);
+        CR_END_OF_LOOP_CHECK(); // ensure at least one of the steps above has executed and yielded
       }
     }
 
   private:
+    TextLogger tlogger = TextLogging::get("WalkToPoseTask");
+
+    DEFINES_PARAMS(WalkToPoseTask, 
+    {,
+      /// Hysteresis: use pathPlanner when further than upper and LibWalk when closer than lower
+      (HystThresholdsf)(900.f, 1000.f) activePathPlannerThresholds,  
+      (unsigned)(1000) avoidanceTimeRough,
+      (unsigned)(3000) avoidanceTime,
+    });
+
+    READS(RobotPose);
+    READS(PathPlanner);
+    READS(LibWalk);
+    READS(ArmContactModel);
+    READS(FrameInfo);
+    READS(FootBumperState);
+
     MotionSkills motionSkills  {env};
+
+    Comparatorf activePathPlannerComparator {params.activePathPlannerThresholds,false,true};
+
+    MotionRequest::ObstacleAvoidance getFarAvoidance(const Pose2f &target, const Pose2f& speed)
+    {
+      return thePathPlanner.plan(theRobotPose.toFieldCoordinates(target), speed);
+    }
+
+    MotionRequest::ObstacleAvoidance getNearAvoidance(const Pose2f &target, Avoidance avoidance)
+    {
+      return theLibWalk.calcObstacleAvoidance(target, /* rough: */ avoidance != AVOIDANCE_AUTO,
+                                              /* disableObstacleAvoidance */ avoidance == AVOIDANCE_NONE);
+    }
   };
 
+
+  
 
   CRBEHAVIOUR(WalkToPoseAutoAvoidanceTask)
   {
@@ -210,6 +357,11 @@ namespace CoroBehaviour
       CRBEHAVIOUR_LOOP()
       {
         motionSkills.walkToPose(target, speed, getObstacleAvoidance(target, speed), keepTargetRotation);
+        ACTGRAPH_FMT("target: {}", target);
+        ACTGRAPH_FMT("robotPoseField: {}", theRobotPose);
+        //AC-Extra info for debugging
+        //addActivationGraphOutput(fmt::format("target.translation.squaredNorm() ={},sqr(positionThreshold) = {}",target.translation.squaredNorm(), sqr(positionThreshold)));
+        //addActivationGraphOutput(fmt::format("fabs(target.rotation) = {},angleThreshold = {}",fabs(target.rotation),angleThreshold));
 
         if ((target.translation.squaredNorm() < sqr(positionThreshold)) && (fabs(target.rotation) < angleThreshold))
           CR_EXIT_SUCCESS();
@@ -228,8 +380,90 @@ namespace CoroBehaviour
     READS(RobotPose);
     READS(PathPlanner);
     READS(LibWalk);
+    READS(FieldDimensions);
 
     MotionSkills motionSkills  {env};
+    HeadSkills headSkills {env};
+
+
+    bool usingPathPlanner = false;
+
+
+
+
+    MotionRequest::ObstacleAvoidance getObstacleAvoidance(const Pose2f &target, const Pose2f& speed)
+    {
+      float targetDistance = target.translation.norm();
+
+      if (targetDistance >= params.pathPlannerDistanceStart)
+        usingPathPlanner = true;
+      else if (targetDistance <= params.pathPlannerDistanceStop)
+        usingPathPlanner = false;
+      // otherwise leave usingPathPlanner as is to give a little bit of hysteresis for switching between the two
+
+      return usingPathPlanner
+                 ? thePathPlanner.plan(theRobotPose.toFieldCoordinates(target), speed)
+                 : theLibWalk.calcObstacleAvoidance(target, /* rough: */ true, /* disableObstacleAvoidance */ false);
+    }
+
+
+  };
+
+
+
+//WalkToPoseAutoAvoidanceLookAroundTask
+/**
+ * Based on WalkToPoseAutoAvoidanceTask
+ * Look Left and Right (Wide) whilst walking
+ * 
+*/
+
+
+
+  CRBEHAVIOUR(WalkToPoseAutoAvoidanceLookAroundTask)
+  {
+    CRBEHAVIOUR_INIT(WalkToPoseAutoAvoidanceLookAroundTask) {}
+
+    void operator()(const Pose2f &target, const Pose2f &speed,
+                  float positionThreshold = 100.f, Angle angleThreshold = 10_deg)
+    {
+      CRBEHAVIOUR_LOOP()
+      {
+
+        CR_CHECKPOINT(walk_to_tactic_pose);
+          //Set Head motion to look around as backing up to see beside it
+
+          lookLeftAndRightTask();
+          //Add Debugging Info for SimRobot
+          ACTGRAPH_FMT("target = {}", target);
+          ACTGRAPH_FMT("fabs rotation diff = {}", FmtAngle(std::fabs(target.rotation) - std::fabs(theRobotPose.rotation)));
+          ACTGRAPH_FMT("fabs(theRobotPose.rotation) = {}", FmtAngle(std::fabs(theRobotPose.rotation)));
+
+          motionSkills.walkToPose(target, speed, getObstacleAvoidance(target, speed),/*keepTargetRotation ->*/ true);
+
+          if ((target.translation.squaredNorm() < sqr(positionThreshold)) && (std::fabs(target.rotation) < angleThreshold))
+            CR_EXIT_SUCCESS();
+          else
+            CR_YIELD();
+
+      }
+    }
+
+  private:
+    DEFINES_PARAMS(WalkToPoseAutoAvoidanceLookAroundTask, 
+    {,
+      (float)(1000.f) pathPlannerDistanceStart, /**< Hysteresis: If the target is further away than this distance, the path planner is used. */
+      (float)(900.f) pathPlannerDistanceStop, /**< If the target is closer than this distance, LibWalk is used. */
+      (float)(10000.f) frontWalkDurationMs, /**< How long to walk without checking behind-NEEDS TUNING*/
+      (float)(1600.f) checkBackDurationMs, /**< How long to spend looking behind -NEEDS TUNING*/ 
+      (float)(400.f) checkBehindThreshold, /**< How close to tacticPose before stop looking behind*/ 
+    });
+    READS(RobotPose);
+    READS(PathPlanner);
+    READS(LibWalk);
+
+    MotionSkills motionSkills  {env};
+    LookLeftAndRightTask lookLeftAndRightTask {env};
 
     bool usingPathPlanner = false;
 
@@ -248,7 +482,6 @@ namespace CoroBehaviour
                  : theLibWalk.calcObstacleAvoidance(target, /* rough: */ true, /* disableObstacleAvoidance */ false);
     }
   };
-
 
 
   CRBEHAVIOUR(WalkToPoseNoAvoidanceTask)
@@ -338,6 +571,61 @@ namespace CoroBehaviour
 
   // ==========================================================================
 
+  CRBEHAVIOUR(DribbleTask)
+  {
+    CRBEHAVIOUR_INIT(DribbleTask) {}
+
+    /**
+     * Dribble the ball.
+     * @param targetDirection The (robot-relative) direction in which the ball should go
+     * @param alignPrecisely Whether the robot should align more precisely than usual
+     * @param kickPower The amount of power (in [0, 1]) that the kick should use
+     * @param speed The walking speed as ratio of the maximum speed in [0, 1]
+     * @param obstacleAvoidance The obstacle avoidance request
+     * @param preStepAllowed Is a prestep for the InWalkKick allowed?
+     * @param turnKickAllowed Does the forward kick not need to align with the kick direction?
+     * @param directionPrecision The allowed deviation of the direction in which the ball should go. If default, the
+     * WalkToBallAndKickEngine uses its own precision.
+     */
+    void operator()(Angle targetDirection, bool alignPrecisely, float kickPower,
+                    const Pose2f &speed, const MotionRequest::ObstacleAvoidance &obstacleAvoidance,
+                    bool preStepAllowed = true, bool turnKickAllowed = true,
+                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg))
+    {
+      CRBEHAVIOUR_BEGIN();
+
+      // lastKickTimestamp = theMotionInfo.lastKickTimestamp;
+
+      while (true)
+      {
+        theMotionRequest.motion = MotionRequest::dribble;
+        theMotionRequest.walkSpeed = speed;
+        theMotionRequest.obstacleAvoidance = obstacleAvoidance;
+        theMotionRequest.targetDirection = targetDirection;
+        theMotionRequest.directionPrecision = directionPrecision;
+        theMotionRequest.alignPrecisely = alignPrecisely;
+        theMotionRequest.kickPower = kickPower;
+        theMotionRequest.turnKickAllowed = turnKickAllowed;
+        theMotionRequest.preStepAllowed = preStepAllowed;
+        theLibCheck.inc(LibCheck::motionRequest);
+
+        if (theMotionInfo.executedPhase == MotionPhase::walk)
+          CR_EXIT_SUCCESS();
+        else
+          CR_YIELD();
+      }
+    }
+
+  private:
+    // unsigned lastKickTimestamp; ///< used to track when a kick has actually been performed
+
+    READS(MotionInfo);
+    READS(LibCheck);
+    MODIFIES(MotionRequest);
+  };
+
+  // ==========================================================================
+
   CRBEHAVIOUR(TurnDirectionOdometryTask)
   {
     CRBEHAVIOUR_INIT(TurnDirectionOdometryTask) {}
@@ -402,11 +690,11 @@ namespace CoroBehaviour
 
       motionSkills.walkToPose(target, Pose2f(1.0f, 1.0f, 1.0f), obstacleAvoidance, false); // FIXME replace with walkToPointSkill
 
-      addActivationGraphOutput(fmt::format("start {:.1f}_deg, odo {:.1f}_deg, unwrapped {:.1f}",
-                                           startRotation.toDegrees(), theOdometryData.rotation.toDegrees(),
-                                           unwrappedOdometryRotation.toDegrees()));
-      addActivationGraphOutput(fmt::format("remaining {:.1f}_deg, next {:.1f}_deg", rotationRemaining.toDegrees(),
-                                           nextRotation.toDegrees()));
+      ACTGRAPH_FMT("start {}, odo {}, unwrapped {}",
+                                           startRotation.fmt(), theOdometryData.rotation.fmt(),
+                                           unwrappedOdometryRotation.fmt());
+      ACTGRAPH_FMT("remaining {}, next {}", rotationRemaining.fmt(),
+                                           nextRotation.fmt());
 
       return std::abs(rotationRemaining) < tolerance;
     }

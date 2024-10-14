@@ -1,0 +1,30 @@
+call Includes/RE_settings_7v7
+
+call Includes/PerceptOracle
+call Includes/7v7
+
+robot all
+dr debugDrawing3d:representation:SentTeamMessage2024 
+dr debugDrawing3d:module:TeamBehaviourModule2024:playerRole
+
+# our team only
+robot robot1 robot2 robot3 robot4 robot5 robot6 robot7
+vfd worldState behaviour:TeamCoordination:formation
+vfd worldState representation:TeamBallModel
+
+vd representation:GameInfo 
+vd representation:ExtendedGameInfo 
+vd representation:MessageDesirability 
+vd representation:TeamData
+vd representation:SentTeamMessage2024
+vd representation:ActiveTactic
+
+robot robot1
+echo vfd worldState halfMeterGrid
+echo dr debugDrawing3d:halfMeterGrid
+
+echo --
+echo gc standby
+echo robot robot4
+echo dr module:ReadyGestureDetector:signalReady
+echo --

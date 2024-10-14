@@ -1,8 +1,0 @@
-mr RawGameInfo LogDataProvider Cognition
-mr Whistle WhistleDetectorRE2017 Cognition
-
-vd representation:RawGameInfo 
-vd representation:GameInfo 
-vd representation:Whistle
-
-call RE/Whistle2017

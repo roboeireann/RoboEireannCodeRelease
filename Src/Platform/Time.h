@@ -31,8 +31,10 @@ public:
   /** returns the deltaTime since aTime*/
   static int getTimeSince(unsigned aTime);
 
-  /** returns the deltaTime since some reference time */
-  static int getTimeSince(unsigned aTime, unsigned reference);
+  /** returns the deltaTime between some referenceTime and timeToCheck;
+   * negative means before reference, positive means after it.
+   */
+  static int getTimeBetween(unsigned referenceTime, unsigned timeToCheck);
 
   /** returns the real time since aTime*/
   static int getRealTimeSince(unsigned aTime);
@@ -59,9 +61,9 @@ inline unsigned long long Time::getSystemTimeBase()
   return base;
 }
 
-inline int Time::getTimeSince(unsigned aTime, unsigned reference)
+inline int Time::getTimeBetween(unsigned referenceTime, unsigned timeToCheck)
 {
-  return static_cast<int>(reference - aTime);
+  return static_cast<int>(timeToCheck - referenceTime);
 }
 
 inline int Time::getTimeSince(unsigned aTime)

@@ -11,8 +11,7 @@
 #include "Representations/BehaviorControl/BehaviorStatus.h"
 #include "Representations/Communication/GameInfo.h"
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/CameraCalibration.h"
 #include "Representations/Configuration/FootOffset.h"
 #include "Representations/Configuration/FootSoleRotationCalibration.h"
@@ -38,7 +37,7 @@
 #include "Representations/Modeling/SelfLocalizationHypotheses.h"
 #include "Representations/Modeling/SideInformation.h"
 #include "Representations/Modeling/TeamBallModel.h"
-#include "Representations/Modeling/TeamPlayersModel.h"
+#include "Representations/Modeling/TeamPlayersObstacleModel.h"
 #include "Representations/Modeling/Whistle.h"
 #include "Representations/MotionControl/ArmMotionRequest.h"
 #include "Representations/MotionControl/MotionInfo.h"
@@ -132,18 +131,15 @@ MODULE(LogDataProvider,
   PROVIDES(ObstaclesImagePercept),
   PROVIDES(Odometer),
   PROVIDES(OdometryData),
-  PROVIDES(OpponentTeamInfo),
-  PROVIDES(OwnTeamInfo),
   PROVIDES(PenaltyMarkPercept),
-  PROVIDES(RawGameInfo),
+  PROVIDES(ReceivedGameControlData),
   PROVIDES(RobotHealth),
-  PROVIDES(RobotInfo),
   PROVIDES(RobotPose),
   PROVIDES(SelfLocalizationHypotheses),
   PROVIDES(SideInformation),
   PROVIDES(TeamBallModel),
   PROVIDES(TeamData),
-  PROVIDES(TeamPlayersModel),
+  PROVIDES(TeamPlayersObstacleModel),
   PROVIDES(WalkStepData),
   PROVIDES(WalkingEngineOutput),
   PROVIDES(WalkLearner),
@@ -214,18 +210,15 @@ private:
   void update(ObstaclesImagePercept&) override {}
   void update(Odometer&) override {}
   void update(OdometryData&) override {}
-  void update(OpponentTeamInfo&) override {}
-  void update(OwnTeamInfo&) override {}
   void update(PenaltyMarkPercept&) override {}
-  void update(RawGameInfo&) override {}
+  void update(ReceivedGameControlData&) override {}
   void update(RobotHealth&) override {}
-  void update(RobotInfo&) override {}
   void update(RobotPose&) override {}
   void update(SelfLocalizationHypotheses&) override {}
   void update(SideInformation&) override {}
   void update(TeamBallModel&) override {}
   void update(TeamData&) override {}
-  void update(TeamPlayersModel&) override {}
+  void update(TeamPlayersObstacleModel&) override {}
   void update(WalkStepData&) override {}
   void update(WalkingEngineOutput&) override {}
   void update(WalkLearner&) override {}

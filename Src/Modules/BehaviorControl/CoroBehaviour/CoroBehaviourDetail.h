@@ -78,6 +78,7 @@ namespace CoroBehaviour
 
     void addActivationGraphOutput(const std::string& parameters)
     {
+      beginActivationGraphScope();
       theActivationGraph.graph[activationGraphIndex].parameters.push_back(parameters);
     }
 
@@ -86,16 +87,26 @@ namespace CoroBehaviour
     size_t activationGraphIndex;
 
     ActivationGraph& theActivationGraph { env.theActivationGraph };
+    bool activationGraphScopeActive = false;
 
     friend class CoroBehaviourScope;
 
+    void beginActivationGraphScope()
+    {
+      if (!activationGraphScopeActive)
+      {
+        activationGraphIndex = theActivationGraph.graph.size();
+        ++theActivationGraph.currentDepth; // increase depth counter for activation graph
+        theActivationGraph.graph.emplace_back(getName(), theActivationGraph.currentDepth, "", getCoroDuration(), 0,
+                                              std::vector<std::string>());
+
+        activationGraphScopeActive = true;
+      }
+    }
+
     void beginScope()
     {
-      activationGraphIndex = theActivationGraph.graph.size();
-      ++theActivationGraph.currentDepth; // increase depth counter for activation graph
-      theActivationGraph.graph.emplace_back(getName(), theActivationGraph.currentDepth, "", getCoroDuration(), 0,
-                                            std::vector<std::string>());
-
+      beginActivationGraphScope();
       modifyParameters();
     }
 
@@ -105,6 +116,8 @@ namespace CoroBehaviour
       theActivationGraph.graph[activationGraphIndex].stateTime = getCheckpointDuration();
 
       --theActivationGraph.currentDepth; // decrease depth counter for activation graph
+
+      activationGraphScopeActive = false;
     }
   };
 
@@ -362,7 +375,15 @@ namespace CoroBehaviour
     using loads_params_semicolon_helper = Params
 
 
-#define ANNOTATION_FMT(...) annotation(fmt::format(__VA_ARGS__))
+// ---------------------------------------------------------------------------
+// helpers for formatted annotations and activationGraph output
+// ---------------------------------------------------------------------------
+
+// Annotation behaviour format
+#define CRB_ANNOTATION_FMT(...) annotation(fmt::format(__VA_ARGS__))
+
+#define ACTGRAPH_FMT(...) addActivationGraphOutput(fmt::format(__VA_ARGS__))
+
 
 
 

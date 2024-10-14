@@ -1,0 +1,43 @@
+<Simulation>
+
+    <!-- Cat texture off the internet. Did not check licensing -->
+    <Surface name="cat_texture" diffuseTexture="biban.jpg" diffuseColor="rgb(100%, 100%, 100%)"/>
+
+    <Material name="plastic">
+        <Friction material="fieldCarpet" value="0.5"/>
+        <RollingFriction material="fieldCarpet" value="0.5"/>
+    </Material>
+
+    <Body name = "box">
+        <ComplexAppearance>
+            <Vertices>
+                <!-- FOR SQUARE -->
+                -1.0 0.0 -1.0
+                1.0 0.0 -1.0
+                1.0 0.0 1.0
+                -1.0 0.0 1.0
+            </Vertices>
+            <TexCoords>
+                0 0
+                0 1
+                1 1
+                1 0
+            </TexCoords>
+            <Quads>
+            0 1 2 3
+            3 2 1 0
+            </Quads>
+            <Surface ref="cat_texture"/>
+        </ComplexAppearance>
+        <BoxGeometry width="0.5m" height="1.8m" depth="0.5m">
+            <Material ref="plastic"/>
+        </BoxGeometry>
+        <BoxMass value="0.045" width="0.5m" height="0.5m" depth="0.5m"/>
+    </Body>
+</Simulation>
+
+                <!-- FOR TALL -->
+                <!---0.25 0 -1.01 -->
+                <!--0.25 0 -1.01 -->
+                <!--0.25 0 0.8  -->
+                <!---0.25 0 0.8 -->

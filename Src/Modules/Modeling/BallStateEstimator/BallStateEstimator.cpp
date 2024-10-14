@@ -69,10 +69,10 @@ void BallStateEstimator::update(BallModel& ballModel)
   }
   // *** Shortcut for a a very fast reaction in a penalty shootout!
   if((theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT ||
-    (theGameInfo.setPlay == SET_PLAY_PENALTY_KICK && theRobotInfo.isGoalkeeper())) &&
-    theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber)
+    (theGameInfo.setPlay == SET_PLAY_PENALTY_KICK && theGameInfo.isGoalkeeper())) &&
+    !theGameInfo.isOurKick())
   {
-    if(theGameInfo.state == STATE_PLAYING && theRobotInfo.penalty == PENALTY_NONE && (theExtendedGameInfo.timeSincePlayingStarted < 2000.f || theExtendedGameInfo.timeSinceLastPenaltyEnded < 2000.f))
+    if(theGameInfo.state == STATE_PLAYING && !theGameInfo.isPenalized() && (theExtendedGameInfo.timeSincePlayingStarted < 2000.f || theExtendedGameInfo.timeSinceLastPenaltyEnded < 2000.f))
       return; // Nothing to do at this point of time
     if(computeBallModelForPenaltyShootout(ballModel))
     {
@@ -380,7 +380,7 @@ void BallStateEstimator::generateModel(BallModel& ballModel)
 bool BallStateEstimator::computeBallModelForPenaltyShootout(BallModel& ballModel)
 {
   if(!theFilteredBallPercepts.percepts.empty() &&
-     theGameInfo.state == STATE_PLAYING && theRobotInfo.penalty == PENALTY_NONE &&
+     theGameInfo.state == STATE_PLAYING && !theGameInfo.isPenalized() &&
      theMotionInfo.executedPhase == MotionPhase::keyframeMotion)
   {
     const Vector2f relativeBall        = theFilteredBallPercepts.percepts[0].positionOnField;
@@ -415,7 +415,7 @@ bool BallStateEstimator::computeBallModelForPenaltyShootout(BallModel& ballModel
       return true;
     }
   }
-  else if(theGameInfo.state != STATE_PLAYING || theRobotInfo.penalty != PENALTY_NONE)
+  else if(theGameInfo.state != STATE_PLAYING || theGameInfo.isPenalized())
   {
     penaltyBallPositions.clear();
     penaltyBallModelingStartTime = 0;

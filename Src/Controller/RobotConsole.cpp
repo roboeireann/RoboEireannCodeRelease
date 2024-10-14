@@ -574,12 +574,12 @@ bool RobotConsole::handleMessage(InMessage& message)
       --waitingFor[idRobotname];
       return true;
     }
-    case idRobotInfo:
-    {
-      message.bin >> robotInfo;
-      --waitingFor[idRobotInfo];
-      return true;
-    }
+    // case idRobotInfo:
+    // {
+    //   message.bin >> robotInfo;
+    //   --waitingFor[idRobotInfo];
+    //   return true;
+    // }
     case idRobotDimensions:
       message.bin >> robotDimensions;
       return true;
@@ -762,14 +762,14 @@ bool RobotConsole::poll(MessageID id)
         waitingFor[id] = 1;  // Motion will answer
         break;
       }
-      case idRobotInfo:
-      {
-        SYNC;
-        debugSender->out.bin << DebugRequest("module:GameDataProvider:robotInfo", true);
-        debugSender->out.finishMessage(idDebugRequest);
-        waitingFor[id] = 1;  // Cognition will answer
-        break;
-      }
+      // case idRobotInfo:
+      // {
+      //   SYNC;
+      //   debugSender->out.bin << DebugRequest("module:ReceivedGameControlDataProvider:robotInfo", true);
+      //   debugSender->out.finishMessage(idDebugRequest);
+      //   waitingFor[id] = 1;  // Cognition will answer
+      //   break;
+      // }
       default:
         ASSERT(false);
     }
@@ -892,7 +892,8 @@ bool RobotConsole::handleConsoleLine(const std::string& line)
     result = repoll(stream);
   }
   else if(command == "pr" && mode == SystemCall::simulatedRobot)
-    result = ctrl->gameController.handleRobotConsole(std::atoi(robotName.substr(5).c_str()) - 1, stream);
+    // result = ctrl->gameController.handleRobotConsole(std::atoi(robotName.substr(5).c_str()) - 1, stream);
+    result = ctrl->gameController.handleRobotConsole(RobotNumber::getRobotIndexFromScene(std::atoi(robotName.substr(5).c_str())), stream);
   else if(command == "save")
   {
     PREREQUISITE(idModuleTable);
@@ -1187,14 +1188,17 @@ bool RobotConsole::log(In& stream)
         size_t filenameIndex = logFile.find_last_of("\\/") + 1;
         name = logFile.substr(0, filenameIndex);
         // If the file name is empty, extract that part from the log file name
-        LoggingTools::parseName(logFile.substr(filenameIndex), nullptr, nullptr, nullptr, nullptr, nullptr, filename.empty() ? &filename : nullptr, nullptr, &suffix);
+        LoggingTools::parseName(logFile.substr(filenameIndex), nullptr, nullptr, nullptr, nullptr, nullptr,
+                                filename.empty() ? &filename : nullptr, nullptr, &suffix);
       }
 
       // If the filename is still empty, we cannot construct a valid name
       if(filename.empty())
         return false;
 
-      name += LoggingTools::createName(path, Global::getSettings().headName, Global::getSettings().bodyName, Global::getSettings().scenario, Global::getSettings().location, filename, Global::getSettings().playerNumber, suffix);
+      name += LoggingTools::createName(path, Global::getSettings().headName, Global::getSettings().bodyName,
+                                       Global::getSettings().scenario, Global::getSettings().location, filename,
+                                       Global::getSettings().playerNumber, suffix);
       name += ".log";
     }
 

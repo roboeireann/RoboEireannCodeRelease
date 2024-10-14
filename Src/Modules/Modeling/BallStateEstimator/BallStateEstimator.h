@@ -22,8 +22,7 @@
 
 #include "BallStateEstimateFilters.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
-#include "Representations/Communication/TeamInfo.h"
+
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -56,8 +55,6 @@ MODULE(BallStateEstimator,
   REQUIRES(ImageCoordinateSystem),
   REQUIRES(MotionInfo),
   REQUIRES(Odometer),
-  REQUIRES(OwnTeamInfo),
-  REQUIRES(RobotInfo),
   REQUIRES(WorldModelPrediction),
   USES(ExtendedGameInfo),
   PROVIDES(BallModel),

@@ -8,6 +8,8 @@
 #include "AnnotationManager.h"
 #include "Debugging.h"
 
+#include "fmt/core.h"
+
 /**
  * A macro for sending annotation messages.
  *
@@ -28,3 +30,12 @@
     Global::getAnnotationManager().getOut().out.finishMessage(idAnnotation); \
   } \
   while(false)
+
+/**
+ * A macro for sending annotation messages with fmtlib style formatting
+ * 
+ * usage:
+ * 
+ *   ANNOTATON_FMT("someName", "someFormatString {}", argsToSubstituteIntoFormatString...);
+ */
+#define ANNOTATION_FMT(name, ...)  ANNOTATION(name, fmt::format(__VA_ARGS__))

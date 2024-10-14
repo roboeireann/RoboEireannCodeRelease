@@ -22,7 +22,6 @@
 
 #include "Representations/Communication/GameInfo.h"
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -54,7 +53,6 @@ MODULE(BallPerceptFilter,
   REQUIRES(MotionInfo),
   REQUIRES(Odometer),
   REQUIRES(OdometryData),
-  REQUIRES(OwnTeamInfo),
   REQUIRES(TeamData),
   REQUIRES(WorldModelPrediction),
   USES(RobotPose),

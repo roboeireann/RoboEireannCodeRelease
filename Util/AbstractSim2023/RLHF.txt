@@ -1,0 +1,52 @@
+# insert into training loop line #289(as of the version used in requirements.txt)
+# <venv>/lib/python3.9/site-packages/stable_baselines3/common/on_policy_algorithm.py
+# interrupt every 20 iterations to check for reward function updates
+if os.environ['RLHF'] == 'enabled':
+    if iteration % 20 == 0 and iteration != 0:
+        print("Checking for reward function updates")
+        quit = False
+        it = 0
+        obs = self.env.reset() # reset environment
+        # visualise rollouts of current model
+        while it < 1500:
+            action = self.predict(obs, deterministic = True) # compute next action
+            obs, reward, done, _ = self.env.step(action[0]) # compute positions of agents and state of environment
+            self.env.envs[0].render() # render environment
+            it = it +1
+
+        while True:
+            if quit: # if true return to training cycle
+                print("Continuing training")
+                break
+            # check for reward function updates
+            reward_function_update = input("Would you like to update the reward function? (y/n): ")
+            print("Current reward function")
+            with open('reward.py', 'r') as f:
+                print(f.read())
+            if reward_function_update == "y":
+                # print editables
+                while True:
+                    print("Edit reward.py to update reward function parameters")
+                    parameter = input("Enter 'c' to continue training, 'r' to replay rollouts:\nIf you are happy to continue training without supervision, enter 'q':")
+                    if parameter == 'c':
+                        quit = True
+                        break
+                    if parameter == 'r':
+                        it = 0
+                        obs = self.env.reset()
+                        while it < 1000:
+                            action = self.predict(obs, deterministic = True) # compute next action
+                            obs, reward, done, _ = self.env.step(action[0]) # compute positions of agents and state of environment
+                            self.env.envs[0].render() # render environment
+                            it = it +1
+                        continue
+                    if parameter == 'q':
+                        os.environ["RLHF"] = "disabled" # disable interrupts
+                        quit = True
+                        break
+
+            elif reward_function_update == "n":
+                print("Continuing training")
+                break
+            else:
+                print("Invalid input. Please enter 'y' or 'n'")

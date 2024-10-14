@@ -11,7 +11,8 @@
 
 #include "Tools/Module/Module.h"
 #include "Representations/Configuration/StaticInitialPose.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
+
 
 STREAMABLE(PoseVariation,
 {,
@@ -20,7 +21,7 @@ STREAMABLE(PoseVariation,
 
 MODULE(StaticInitialPoseProvider,
 {,
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   PROVIDES(StaticInitialPose),
   LOADS_PARAMETERS(
   {,

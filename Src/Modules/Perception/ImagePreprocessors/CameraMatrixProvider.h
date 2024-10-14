@@ -6,9 +6,10 @@
 
 #pragma once
 
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/CameraCalibration.h"
 #include "Representations/Configuration/FieldDimensions.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/SensorData/JointSensorData.h"
@@ -31,7 +32,7 @@ MODULE(CameraMatrixProvider,
   REQUIRES(MotionInfo),
   REQUIRES(RobotCameraMatrix),
   REQUIRES(RobotModel),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   REQUIRES(TorsoMatrix),
   REQUIRES(RobotPose), // for debug drawing
   PROVIDES(CameraMatrix),

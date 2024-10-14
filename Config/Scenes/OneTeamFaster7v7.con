@@ -1,0 +1,29 @@
+cs 7v7
+
+call Includes/PerceptOracle
+# call Includes/7v7 - just joysticks and doesn't work for one team
+
+robot all
+
+# tmp
+dr debugDrawing3d:representation:SentTeamMessage2024 
+dr debugDrawing3d:module:TeamBehaviourModule2024:playerRole
+
+# robot robot1 robot5 - continue with robot all
+vfd worldState behaviour:TeamCoordination:formation
+vfd worldState representation:TeamBallModel
+vfd worldState module:TeammatesLocator 
+
+vd representation:GameInfo 
+vd representation:MessageDesirability 
+vd representation:TeamData
+vd representation:ActiveTactic
+vd representation:TeammatesLocationModel 
+
+robot robot1
+echo -- robot1 currently selected
+echo vfd worldState halfMeterGrid
+echo dr debugDrawing3d:halfMeterGrid
+echo --
+echo gc ready
+echo call Includes/set_our_kickoff_positions_oneteam7v7

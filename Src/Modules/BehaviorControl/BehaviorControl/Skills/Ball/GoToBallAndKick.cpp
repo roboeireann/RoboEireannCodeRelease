@@ -11,7 +11,7 @@
 #include "Representations/BehaviorControl/Libraries/LibWalk.h"
 #include "Representations/BehaviorControl/PathPlanner.h"
 #include "Representations/BehaviorControl/Skills.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/MotionControl/MotionInfo.h"
 #include "Representations/MotionControl/OdometryData.h"
@@ -32,7 +32,7 @@ SKILL_IMPLEMENTATION(GoToBallAndKickImpl,
   REQUIRES(MotionInfo),
   REQUIRES(OdometryData),
   REQUIRES(PathPlanner),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   REQUIRES(RobotPose),
   MODIFIES(BehaviorStatus),
   DEFINES_PARAMETERS(
@@ -66,7 +66,7 @@ class GoToBallAndKickImpl : public GoToBallAndKickImplBase
           else
             goto done;
         }
-        else if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theRobotInfo.isGoalkeeper())
+        else if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theGameInfo.isGoalkeeper())
           goto walkToBallIgnoreObstacles;
         else if(kickPose.translation.norm() < switchToLibWalkDistance)
           goto walkToBallCloseRange;
@@ -96,7 +96,7 @@ class GoToBallAndKickImpl : public GoToBallAndKickImplBase
           else
             goto done;
         }
-        else if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theRobotInfo.isGoalkeeper())
+        else if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theGameInfo.isGoalkeeper())
           goto walkToBallIgnoreObstacles;
         else if(kickPose.translation.norm() > switchToPathPlannerDistance)
           goto walkToBallFarRange;
@@ -128,7 +128,7 @@ class GoToBallAndKickImpl : public GoToBallAndKickImplBase
         }
         else if(kickPose.translation.norm() > switchToPathPlannerDistance)
           goto walkToBallFarRange;
-        else if(kickPose.translation.norm() > goalkeeperDoNotIgnoreObstaclesDistance || !theRobotInfo.isGoalkeeper())
+        else if(kickPose.translation.norm() > goalkeeperDoNotIgnoreObstaclesDistance || !theGameInfo.isGoalkeeper())
           goto walkToBallCloseRange;
       }
 
@@ -148,7 +148,7 @@ class GoToBallAndKickImpl : public GoToBallAndKickImplBase
       {
         if(theTurnAngleSkill.isDone() || theFieldBall.ballWasSeen(state_time - 300))
         {
-          if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theRobotInfo.isGoalkeeper())
+          if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theGameInfo.isGoalkeeper())
             goto walkToBallFarRange;
           else if(kickPose.translation.norm() < switchToLibWalkDistance)
             goto walkToBallCloseRange;
@@ -168,7 +168,7 @@ class GoToBallAndKickImpl : public GoToBallAndKickImplBase
     {
       transition
       {
-        if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theRobotInfo.isGoalkeeper())
+        if(kickPose.translation.norm() < goalkeeperIgnoreObstaclesDistance && theGameInfo.isGoalkeeper())
           goto walkToBallFarRange;
         else if(kickPose.translation.norm() < switchToLibWalkDistance)
           goto walkToBallCloseRange;

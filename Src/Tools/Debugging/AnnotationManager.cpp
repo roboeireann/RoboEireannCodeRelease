@@ -26,13 +26,13 @@ void AnnotationManager::signalThreadStart()
     if(gameInfo.state != lastGameState)
     {
       addAnnotation();
-      outData.out.text << "GameState" << gameInfo.getStateAsString() << " state.";
+      outData.out.text << "GameState" << gameInfo.getStateString() << " state.";
       outData.out.finishMessage(idAnnotation);
     }
     else if(gameInfo.setPlay != lastSetPlay && gameInfo.setPlay != SET_PLAY_NONE)
     {
       addAnnotation();
-      outData.out.text << "GameState" << gameInfo.getStateAsString() << " for team " << gameInfo.kickingTeam << ".";
+      outData.out.text << "GameState" << gameInfo.getStateString() << " for team " << gameInfo.kickingTeam << ".";
       outData.out.finishMessage(idAnnotation);
     }
     lastGameState = gameInfo.state;

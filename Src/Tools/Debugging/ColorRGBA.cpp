@@ -62,6 +62,31 @@ ColorRGBA ColorRGBA::blend(const ColorRGBA& other) const
          );
 }
 
+ColorRGBA ColorRGBA::alpha(float floatAlpha) const
+{
+  ASSERT(0.f <= floatAlpha && floatAlpha <= 1.f);
+  return alpha(static_cast<unsigned char>(0xFF * floatAlpha));
+}
+
+ColorRGBA ColorRGBA::lighter(float amount) const
+{
+  ASSERT(0 <= amount && amount <= 1.0f);
+  unsigned char r2 = static_cast<unsigned char>(r + (0xFF - r) * amount);
+  unsigned char g2 = static_cast<unsigned char>(g + (0xFF - g) * amount);
+  unsigned char b2 = static_cast<unsigned char>(b + (0xFF - b) * amount);
+  return ColorRGBA(r2, g2, b2, a);
+}
+
+ColorRGBA ColorRGBA::darker(float amount) const
+{
+  ASSERT(0 <= amount && amount <= 1.0f);
+  unsigned char r2 = static_cast<unsigned char>(r * (1.f - amount));
+  unsigned char g2 = static_cast<unsigned char>(g * (1.f - amount));
+  unsigned char b2 = static_cast<unsigned char>(b * (1.f - amount));
+  return ColorRGBA(r2, g2, b2, a);
+}
+
+
 In& operator>>(In& stream, ColorRGBA& color)
 {
   stream >> color.r;

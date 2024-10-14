@@ -11,7 +11,7 @@
 #include "Representations/BehaviorControl/ActivationGraph.h"
 #include "Representations/BehaviorControl/BehaviorStatus.h"
 #include "Representations/BehaviorControl/Libraries/LibCheck.h"
-#include "Representations/Communication/RobotInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Configuration/CalibrationRequest.h"
 #include "Representations/Infrastructure/CameraStatus.h"
 #include "Representations/Infrastructure/FrameInfo.h"
@@ -33,7 +33,7 @@ MODULE(BehaviorControl,
   REQUIRES(CameraStatus),
   REQUIRES(EnhancedKeyStates),
   REQUIRES(RobotHealth),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
 
   REQUIRES(BallModel),
   REQUIRES(FrameInfo),

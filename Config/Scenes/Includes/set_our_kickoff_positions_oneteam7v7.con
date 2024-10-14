@@ -1,0 +1,22 @@
+# Move robots in 7v7 oneteam to kickoff positions - not guaranteed to match the formations/tactics.cfg
+
+# Move robots
+# overridePose (which fixes robot location belief also) uses SPL coords relative to defending half
+
+robot robot1
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -4500; y = 0; }; }; 
+robot robot2
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -2500; y = -550; }; }; 
+robot robot3
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -2500; y = 550; }; }; 
+robot robot4
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -1500; y = -275; }; }; 
+
+robot robot5
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -750; y = 1500; }; }; 
+robot robot6
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -750; y = -1500; }; }; 
+robot robot7
+set selfLocator:overridePose defendingHalf = left; pose = { rotation = 0deg; translation = { x = -500; y = 0; }; }; 
+
+

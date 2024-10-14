@@ -8,15 +8,16 @@
 
 #pragma once
 
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Math/Pose2f.h"
 #include "Tools/Streams/AutoStreamable.h"
+
+#include "Tools/FmtFormatter.h"
 
 /**
  * @struct RobotPose
  * The pose of the robot with additional information
  */
-STREAMABLE_WITH_BASE(RobotPose, Pose2f, COMMA public BHumanMessageParticle<idRobotPose>
+STREAMABLE_WITH_BASE(RobotPose, Pose2f,
 {
   /** Different states of robot pose estimate quality */
   ENUM(LocalizationQuality,
@@ -25,10 +26,6 @@ STREAMABLE_WITH_BASE(RobotPose, Pose2f, COMMA public BHumanMessageParticle<idRob
     okay,     /**< Could be better. The model is still somewhat unimodal but at least one deviation is quite high or the validity is low. Rough estimate might be correct but not precise. */
     poor,     /**< Nope. Do not do any serious stuff, if this is the current state. There seem to be multiple quite different hypotheses about the current pose or some deviations are REALLY high. We do not have any clue about the current pose, actually. */
   });
-
-  /** BHumanMessageParticle functions */
-  void operator>>(BHumanMessage& m) const override;
-  void operator<<(const BHumanMessage& m) override;
 
   /**
    * Assignment operator for Pose2f objects
@@ -105,6 +102,9 @@ STREAMABLE_WITH_BASE(RobotPose, Pose2f, COMMA public BHumanMessageParticle<idRob
   (unsigned)(0) timestampLastJump,                /**< Timestamp of last "big change" (jump) notification */
 });
 
+FMT_FORMATTER(RobotPose, p, "{{{:.1f}, {:.0f}, {:.0f}}}", p.rotation.toDegrees(), p.translation.x(), p.translation.y());
+
+
 /**
  * @struct GroundTruthRobotPose
  * The same as the RobotPose, but - in general - provided by an external
@@ -117,3 +117,5 @@ STREAMABLE_WITH_BASE(GroundTruthRobotPose, RobotPose,
 
   (unsigned)(0) timestamp,
 });
+
+FMT_FORMATTER(GroundTruthRobotPose, p, "{{{:.1f}, {:.0f}, {:.0f}}}", p.rotation.toDegrees(), p.translation.x(), p.translation.y());

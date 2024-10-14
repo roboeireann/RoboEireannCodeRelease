@@ -19,12 +19,15 @@ void TeamBallLocator::update(TeamBallModel& teamBallModel)
   // Check and adapt size of buffer -----
   if(balls.size() != static_cast<std::size_t>(Settings::highestValidPlayerNumber + 1))
     balls.resize(Settings::highestValidPlayerNumber + 1);
+
   // Add new observations to buffer (except for phases during which everything is deleted)
   if(!checkForResetByGameSituation())
     updateInternalBallBuffers();
+
   // Reset lists and variables:
   ballsAvailableForTeamBall.clear();
   teamBallModel.isValid = false;
+
   // Try to compute a team ball
   findAvailableBalls();
   clusterBalls();
@@ -74,7 +77,7 @@ void TeamBallLocator::computeModel(TeamBallModel& teamBallModel)
   // Count contributors to fill the team ball fields:
   int numberOfBallsByMe = 0;
   int numberOfBallsByOthers = 0;
-  if(bestBall.playerNumber == static_cast<unsigned char>(theRobotInfo.number))
+  if(bestBall.playerNumber == static_cast<unsigned char>(theGameInfo.playerNumber))
     numberOfBallsByMe++;
   else
     numberOfBallsByOthers++;
@@ -83,7 +86,7 @@ void TeamBallLocator::computeModel(TeamBallModel& teamBallModel)
   {
     ActiveBall& b = ballsAvailableForTeamBall[bestBall.compatibleBallsIndices[i]];
     teamBallModel.balls.push_back(b.position);
-    if(b.playerNumber == static_cast<unsigned char>(theRobotInfo.number))
+    if(b.playerNumber == static_cast<unsigned char>(theGameInfo.playerNumber))
       numberOfBallsByMe++;
     else
       numberOfBallsByOthers++;
@@ -130,7 +133,7 @@ void TeamBallLocator::computeModel(TeamBallModel& teamBallModel)
 void TeamBallLocator::updateInternalBallBuffers()
 {
   // I have new ball information!
-  unsigned i = theRobotInfo.number;
+  unsigned i = theGameInfo.playerNumber;
   if(balls[i].size() == 0 ||                                          // No balls yet
      balls[i][0].time != theBallModel.timeWhenLastSeen ||             // Current ball model is newer
      balls[i][0].vel.norm() < theBallModel.estimate.velocity.norm())  // Current ball is faster. This means that we have kicked the ball but not seen it again
@@ -166,21 +169,36 @@ void TeamBallLocator::updateInternalBallBuffers()
       newBall.valid = true;
       if(newBall.poseQualityModifier > 0.f) // If the value is zero, the final weighting would be 0, too.
         balls[teammate.number].push_front(newBall);
+
+      if (newBall.time > mostRecentTeammateBallTime)
+        mostRecentTeammateBallTime = newBall.time;
     }
   }
   // If any teammate is not PLAYING anymore, invalidate the observations that happened during the time
   // before the status changed:
+  // Similarly if any teammate's ball has been superseded by the most recent ball, invalidate it.
+  // (We do this because teammates - mainly the ball player - that sees the ball should send regular
+  // ball updates. If another teammate then sends a ball update it is generally because the original
+  // teammate lost the ball. Hence we invalidate it here.)
   for(auto const& teammate : theTeamData.teammates)
   {
+    unsigned tn = teammate.number;
     if(teammate.status != Teammate::PLAYING)
     {
-      unsigned n = teammate.number;
-      for(BufferedBall& ball : balls[n])
+      for(BufferedBall& ball : balls[tn])
       {
         if(theFrameInfo.getTimeSince(ball.time) <= inactivityInvalidationTimeSpan)
           ball.valid = false;
         else
           break;
+      }
+    }
+    else
+    {
+      for(BufferedBall& ball : balls[tn])
+      {
+        if (ball.valid && (static_cast<int>(mostRecentTeammateBallTime - ball.time) > ballSupersededTimeout))
+          ball.valid = false;
       }
     }
   }

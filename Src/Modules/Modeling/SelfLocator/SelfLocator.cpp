@@ -66,6 +66,9 @@ void SelfLocator::update(RobotPose& robotPose)
   }
 #endif
 
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:RobotPose")
+    OUTPUT_TEXT(fmt::format("TheRobotPose: {},{}",robotPose.translation.x(),robotPose.translation.y()));
+
   /* Initialize variable(s) */
   sampleSetHasBeenReset = false;
   validitiesHaveBeenUpdated = false;
@@ -313,7 +316,7 @@ void SelfLocator::sensorUpdate()
   if(currentMotionIsUnsafe())
     return;
   // In the penalty shootout, the goalkeeper should not perform any real localization
-  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT && theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber)
+  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT && !theGameInfo.isOurKick())
     return;
 
   // Perform integration of measurements:
@@ -556,7 +559,7 @@ void SelfLocator::handleGameStateChanges()
     // output the command in case we want to modify it again
     TLOGI(tlogger, "robot {}: set selfLocator:overridePose defendingHalf={}; pose={{ rotation={}deg; translation={{ "
                       "x={}; y={}; }}; }};",
-                      theRobotInfo.number, TypeRegistry::getEnumName(overridePose.defendingHalf), p.rotation.toDegrees(),
+                      theGameInfo.playerNumber, TypeRegistry::getEnumName(overridePose.defendingHalf), p.rotation.toDegrees(),
                       p.translation.x(), p.translation.y());
 
     std::string mvCommand =
@@ -567,14 +570,14 @@ void SelfLocator::handleGameStateChanges()
 
     // tell SimRobot users what's happened
     // OUTPUT_TEXT(fmt::format("mv {} {} 320 0 0 {}deg", -p.translation.x(), -p.translation.y(), rotation.toDegrees()));
-    // OUTPUT_TEXT(fmt::format("Robot{} pose manually repositioned to SPL pose ({}deg, {},{}) = SimRobot {}", theRobotInfo.number, p.rotation.toDegrees(),
+    // OUTPUT_TEXT(fmt::format("Robot{} pose manually repositioned to SPL pose ({}deg, {},{}) = SimRobot {}", theGameInfo.playerNumber, p.rotation.toDegrees(),
     //                         p.translation.x(), p.translation.y(), mvCommand));
   }
   else if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
   {
     // penalty shoot: if game state switched to playing reset samples to start position
     if((theExtendedGameInfo.gameStateLastFrame != STATE_PLAYING && theGameInfo.state == STATE_PLAYING) ||
-       (theExtendedGameInfo.penaltyLastFrame != PENALTY_NONE && theRobotInfo.penalty == PENALTY_NONE))
+       (theExtendedGameInfo.penaltyLastFrame != PENALTY_NONE && !theGameInfo.isPenalized()))
     {
       for(int i = 0; i < samples->size(); ++i)
         samples->at(i).init(getNewPoseAtPenaltyShootoutPosition(), penaltyShootoutPoseDeviation, nextSampleNumber++, 1.f);
@@ -609,7 +612,7 @@ void SelfLocator::handleGameStateChanges()
           // Normal game really starts: We start on the sidelines looking at our goal: (this is for actual setup)
           (theExtendedGameInfo.gameStateLastFrame == STATE_INITIAL && theGameInfo.state == STATE_READY) ||
           // switch from unstiff to active (we assume at setup pose position)
-          (theExtendedGameInfo.modeLastFrame == RobotInfo::Mode::unstiff && theRobotInfo.mode == RobotInfo::Mode::active))
+          (theExtendedGameInfo.modeLastFrame == GameInfo::unstiff && theGameInfo.playerMode == GameInfo::active))
   {
     for(int i = 0; i < samples->size(); ++i)
       samples->at(i).init(getNewPoseAtWalkInPosition(), walkInPoseDeviation, nextSampleNumber++, 0.5f);
@@ -692,7 +695,7 @@ void SelfLocator::domainSpecificSituationHandling()
   // Currently, this method only handles the case that the
   // keeper is turned by 180 degrees but assumes to stand correctly
   if(!goalieActivateTwistHandling ||
-     !theRobotInfo.isGoalkeeper() ||
+     !theGameInfo.isGoalkeeper() ||
      theGameInfo.state != STATE_PLAYING ||
      theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
     return;
@@ -825,7 +828,7 @@ Pose2f SelfLocator::getNewPoseReturnFromPenaltyPosition(bool leftSideOfGoal)
   // Special stuff for some demos:
   if(demoUseCustomReturnFromPenaltyPoses)
   {
-    if(theRobotInfo.isGoalkeeper())
+    if(theGameInfo.isGoalkeeper())
       return demoCustomReturnFromPenaltyPoseGoalie;
     else
       return demoCustomReturnFromPenaltyPoseFieldPlayer;
@@ -839,16 +842,20 @@ Pose2f SelfLocator::getNewPoseReturnFromPenaltyPosition(bool leftSideOfGoal)
   float xPosition = Random::triangular(theFieldDimensions.xPosOwnPenaltyMark - returnFromPenaltyMaxXOffset,
                                        theFieldDimensions.xPosOwnPenaltyMark,
                                        theFieldDimensions.xPosOwnPenaltyMark + returnFromPenaltyMaxXOffset);
+  const float leftPenaltyReturn = theFieldDimensions.yPosLeftSideline + 450.f;
+  float yPosition = Random::triangular(leftPenaltyReturn - 150.f,
+                                       leftPenaltyReturn,
+                                       leftPenaltyReturn + 150.f);
   if(leftSideOfGoal)
-    return Pose2f(-pi_2, xPosition, theFieldDimensions.yPosLeftSideline);
+    return Pose2f(-pi_2, xPosition, yPosition);
   else
-    return Pose2f(pi_2, xPosition, theFieldDimensions.yPosRightSideline);
+    return Pose2f(pi_2, xPosition, -yPosition);
 }
 
 Pose2f SelfLocator::getNewPoseAtWalkInPosition()
 {
-  const int effectivePlayerNumber = theOwnTeamInfo.getSubstitutedPlayerNumber(theRobotInfo.number);
-  if(effectivePlayerNumber >= 1 && effectivePlayerNumber <= 6)
+  const int effectivePlayerNumber = theGameInfo.ourTeam().getSubstitutedPlayerNumber(theGameInfo.playerNumber);
+  if(effectivePlayerNumber >= 1 && effectivePlayerNumber <= Settings::numPlayerNumbers)
   {
     const SetupPoses::SetupPose& p = theSetupPoses.getPoseOfRobot(effectivePlayerNumber);
     Pose2f result;
@@ -866,7 +873,7 @@ Pose2f SelfLocator::getNewPoseAtWalkInPosition()
 Pose2f SelfLocator::getNewPoseAtManualPlacementPosition()
 {
   // Goalie
-  if(theRobotInfo.isGoalkeeper())
+  if(theGameInfo.isGoalkeeper())
   {
     return Pose2f(0.f, theFieldDimensions.xPosOwnGroundLine + 52.f, 0.f);
   }
@@ -876,7 +883,7 @@ Pose2f SelfLocator::getNewPoseAtManualPlacementPosition()
     switch(nextManualPlacementPoseNumber)
     {
       case 0:
-        result = Pose2f(0.f, theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber ? -theFieldDimensions.centerCircleRadius - 127.f : theFieldDimensions.xPosOwnPenaltyArea + 127.f, 0.f);
+        result = Pose2f(0.f, theGameInfo.isOurKick() ? -theFieldDimensions.centerCircleRadius - 127.f : theFieldDimensions.xPosOwnPenaltyArea + 127.f, 0.f);
         break;
       case 1:
         result = Pose2f(0.f, theFieldDimensions.xPosOwnPenaltyMark, 0.f);
@@ -895,7 +902,7 @@ Pose2f SelfLocator::getNewPoseAtManualPlacementPosition()
 
 Pose2f SelfLocator::getNewPoseAtPenaltyShootoutPosition()
 {
-  if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+  if(theGameInfo.isOurKick())
   {
     //striker pose (edge of penalty area, looking towards opponent goal)
     return Pose2f(0.f, theFieldDimensions.xPosPenaltyStrikerStartPosition, 0.f);

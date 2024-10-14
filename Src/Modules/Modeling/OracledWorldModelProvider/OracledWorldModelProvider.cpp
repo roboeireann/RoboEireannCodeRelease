@@ -126,25 +126,25 @@ void OracledWorldModelProvider::update(ObstacleModel& obstacleModel)
     obstacleModel.obstacles.emplace_back(Matrix2f::Identity(), goalPost, theFrameInfo.time, Obstacle::goalpost);
 }
 
-void OracledWorldModelProvider::update(TeamPlayersModel& teamPlayersModel)
+void OracledWorldModelProvider::update(TeamPlayersObstacleModel& teamPlayersObstacleModel)
 {
-  teamPlayersModel.obstacles.clear();
+  teamPlayersObstacleModel.obstacles.clear();
 
   //add goal posts
-  teamPlayersModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosLeftGoal), 0, Obstacle::goalpost);
-  teamPlayersModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosRightGoal), 0, Obstacle::goalpost);
-  teamPlayersModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosLeftGoal), 0, Obstacle::goalpost);
-  teamPlayersModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosRightGoal), 0, Obstacle::goalpost);
+  teamPlayersObstacleModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosLeftGoal), 0, Obstacle::goalpost);
+  teamPlayersObstacleModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosRightGoal), 0, Obstacle::goalpost);
+  teamPlayersObstacleModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosLeftGoal), 0, Obstacle::goalpost);
+  teamPlayersObstacleModel.obstacles.emplace_back(Matrix2f::Identity(), Vector2f(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosRightGoal), 0, Obstacle::goalpost);
 
   if(!Global::settingsExist())
     return;
 
-  auto toObstacle = [this, &teamPlayersModel](const GroundTruthWorldState::GroundTruthPlayer& player, bool isTeammate)
+  auto toObstacle = [this, &teamPlayersObstacleModel](const GroundTruthWorldState::GroundTruthPlayer& player, bool isTeammate)
   {
-    teamPlayersModel.obstacles.emplace_back(Matrix2f::Identity(), player.pose.translation, theFrameInfo.time,
+    teamPlayersObstacleModel.obstacles.emplace_back(Matrix2f::Identity(), player.pose.translation, theFrameInfo.time,
                                             isTeammate ? (player.upright ? Obstacle::teammate : Obstacle::fallenTeammate)
                                                        : player.upright ? Obstacle::opponent : Obstacle::fallenOpponent);
-    teamPlayersModel.obstacles.back().setLeftRight(Obstacle::getRobotDepth());
+    teamPlayersObstacleModel.obstacles.back().setLeftRight(Obstacle::getRobotDepth());
   };
 
   const bool teammate = Global::getSettings().teamNumber == 1;

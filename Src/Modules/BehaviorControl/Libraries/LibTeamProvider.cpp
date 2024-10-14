@@ -56,11 +56,11 @@ Pose2f LibTeamProvider::getKeeperPose() const
 
 Pose2f LibTeamProvider::getStrikerPose() const
 {
-  if(theTeamBehaviorStatus.role.playsTheBall())
+  if(theTeamBehaviorStatus.role.isBallPlayer())
     return theRobotPose;
   for(auto const& teammate : theTeamData.teammates)
   {
-    if(teammate.status != Teammate::PENALIZED && teammate.theTeamBehaviorStatus.role.playsTheBall())
+    if(teammate.status != Teammate::PENALIZED && teammate.theTeamBehaviorStatus.role.isBallPlayer())
     {
       return teammate.theRobotPose;
     }
@@ -70,7 +70,7 @@ Pose2f LibTeamProvider::getStrikerPose() const
 
 Pose2f LibTeamProvider::getTeammatePose(int player) const
 {
-  if(player == theRobotInfo.number)
+  if(player == theGameInfo.playerNumber)
     return theRobotPose;
   for(auto const& teammate : theTeamData.teammates)
   {
@@ -88,7 +88,7 @@ Pose2f LibTeamProvider::getTeammatePose(int player) const
 int LibTeamProvider::getKeeperPlayerNumber() const
 {
   if(theTeamBehaviorStatus.role.isGoalkeeper())
-    return theRobotInfo.number;
+    return theGameInfo.playerNumber;
   for(auto const& teammate : theTeamData.teammates)
   {
     if(teammate.status != Teammate::PENALIZED && teammate.theTeamBehaviorStatus.role.isGoalkeeper())
@@ -101,11 +101,11 @@ int LibTeamProvider::getKeeperPlayerNumber() const
 
 int LibTeamProvider::getStrikerPlayerNumber() const
 {
-  if(theTeamBehaviorStatus.role.playsTheBall())
-    return theRobotInfo.number;
+  if(theTeamBehaviorStatus.role.isBallPlayer())
+    return theGameInfo.playerNumber;
   for(auto const& teammate : theTeamData.teammates)
   {
-    if(teammate.status != Teammate::PENALIZED && teammate.theTeamBehaviorStatus.role.playsTheBall())
+    if(teammate.status != Teammate::PENALIZED && teammate.theTeamBehaviorStatus.role.isBallPlayer())
     {
       return teammate.number;
     }
@@ -115,7 +115,7 @@ int LibTeamProvider::getStrikerPlayerNumber() const
 
 BehaviorStatus::Activity LibTeamProvider::getActivity(int player) const
 {
-  if(player == theRobotInfo.number)
+  if(player == theGameInfo.playerNumber)
     return theBehaviorStatus.activity;
   for(auto const& teammate : theTeamData.teammates)
   {
@@ -132,7 +132,7 @@ BehaviorStatus::Activity LibTeamProvider::getActivity(int player) const
 
 Teammate::Status LibTeamProvider::getStatus(int player) const
 {
-  if(player == theRobotInfo.number)
+  if(player == theGameInfo.playerNumber)
     return Teammate::PLAYING;
   for(auto const& teammate : theTeamData.teammates)
   {
@@ -146,7 +146,7 @@ Teammate::Status LibTeamProvider::getStatus(int player) const
 
 Vector2f LibTeamProvider::getBallPosition(int player) const
 {
-  if(player == theRobotInfo.number)
+  if(player == theGameInfo.playerNumber)
     return theBallModel.estimate.position;
   for(auto const& teammate : theTeamData.teammates)
   {
@@ -160,7 +160,7 @@ Vector2f LibTeamProvider::getBallPosition(int player) const
 
 const TimeToReachBall* LibTeamProvider::getTimeToReachBall(int player) const
 {
-  if(player == theRobotInfo.number)
+  if(player == theGameInfo.playerNumber)
     return &(theTeamBehaviorStatus.timeToReachBall);
   for(auto const& teammate : theTeamData.teammates)
   {

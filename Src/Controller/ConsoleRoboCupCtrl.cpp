@@ -16,6 +16,8 @@
 #include "Platform/Time.h"
 #include "Tools/FunctionList.h"
 
+#include "Tools/TextLogging.h"
+
 #include <SimRobotEditor.h>
 
 #include <QDir>
@@ -31,6 +33,8 @@
 #include <string>
 
 #define FRAMES_PER_SECOND 60
+
+DECL_TLOGGER(tlogger, "ConsoleRoboCupCtrl", TextLogging::INFO);
 
 ConsoleRoboCupCtrl::ConsoleRoboCupCtrl(SimRobot::Application& application) :
   RoboCupCtrl(application), calculateImageFps(FRAMES_PER_SECOND),
@@ -272,10 +276,16 @@ void ConsoleRoboCupCtrl::executeConsoleCommand(std::string command, RobotConsole
       stream >> buffer;
       std::size_t index;
       if(buffer.substr(0, 4) == "team" && (index = atoi(buffer.c_str() + 4) - 1) < scenarios.size())
+      {
         scenarios[index] = scenario;
+        TLOGI(tlogger, "Setting scenario for team{} to {}", index+1, scenario);
+      }
       else
         for(std::size_t i = 0; i < scenarios.size(); ++i)
+        {
           scenarios[i] = scenario;
+          TLOGI(tlogger, "Setting scenario for team{} to {}", i+1, scenario);
+        }
     }
     else if(!scenarioAndLocationOnly && !exists)
       printLn("Syntax Error: cs " + buffer);
@@ -287,7 +297,10 @@ void ConsoleRoboCupCtrl::executeConsoleCommand(std::string command, RobotConsole
     QDir qdir = QDir(dirString.c_str());
     const bool exists = qdir.exists();
     if(scenarioAndLocationOnly && exists)
+    {
       location = buffer;
+      TLOGI(tlogger, "Setting location to {}", location);
+    }
     else if(!scenarioAndLocationOnly && !exists)
       printLn("Syntax Error: cl " + buffer + " doesn't exist at " + dirString);
   }

@@ -21,6 +21,7 @@
 #include <deque>
 #include <stack>
 
+
 STREAMABLE(Logger,
 {
   /** Which representations will be logged for a certain thread? */
@@ -52,7 +53,7 @@ private:
   std::deque<MessageQueue*> buffersToWrite; /**< The buffers already filled that need to be written. */
   char gameInfoThreadName[32]; /**< The thread that started logging and decides to stop it. */
   bool logging = false; /**< Are we currently logging? */
-  bool hasLogged = false; /**< Have we logged before (reset when not logging and buffersToWrite is empty)? */
+  bool hasLoggedAnything = false; /**< Have we logged anything since last reset (reset when not logging and buffersToWrite is empty)? */
   std::string filename; /**< The base name of the log file. */
   Thread writerThread; /**< The thread that is writing the logged data to a file. */
   Semaphore framesToWrite; /**< How many frames the writer thread should write? */
@@ -76,7 +77,10 @@ public:
    */
   void execute(const std::string& threadName);
 
-private:,
+private:
+
+  /*** separate header from streamable members, note comma at end of line ***/,
+
   (bool) enabled, /**< Is logging enabled? */
   (std::string) path, /**< The directory that will contain the log file. */
   (unsigned) numOfBuffers, /**< The number of buffers allocated. */

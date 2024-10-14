@@ -142,7 +142,7 @@ void LibWalkProvider::calculateObstacles(const Pose2f& target, const Vector2f& t
   }
 
   // the field border is an obstacle, except if the target is not inside the field (in case theRobotPose is wrong and the ball deemed outside the field)
-  if(theGameInfo.state != STATE_PLAYING || !theTeamBehaviorStatus.role.playsTheBall() ||
+  if(theGameInfo.state != STATE_PLAYING || !theTeamBehaviorStatus.role.isBallPlayer() ||
      (std::abs(targetOnField.x()) < theFieldDimensions.xPosOpponentGroundLine
       && std::abs(targetOnField.y()) < theFieldDimensions.yPosLeftSideline))
   {
@@ -225,7 +225,7 @@ void LibWalkProvider::calculateObstacles(const Pose2f& target, const Vector2f& t
   /// the own penalty area is an obstacle, if already three teammates are in this area
   /// checks for two teammates other than the goalkeeper instead, to allow her/him to return should she/he be missing
   /// the penalty area obstacles are added after the rough check, so that they can't be deactivated
-  if(!theRobotInfo.isGoalkeeper() && theLibTeammates.nonKeeperTeammatesInOwnPenaltyArea >= 2)
+  if(!theGameInfo.isGoalkeeper() && theLibTeammates.nonKeeperTeammatesInOwnPenaltyArea >= 2)
   {
     if(theLibPosition.isNearOwnPenaltyArea(theRobotPose.translation, penaltyAreaAvoidanceDistance, penaltyAreaAvoidanceDistance))
     {

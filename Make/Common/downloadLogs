@@ -1,15 +1,18 @@
 #!/bin/bash
 #downloads all log files from the robot
 
-basePath=$(cd "$(dirname "$(which "$0")")" && pwd)
+BASE_PATH=$(cd "$(dirname "$(which "$0")")" && pwd)
 
 usage()
 {
-  echo "usage: downloadLogs [-d | --just-delete] <address>"
-  echo " -d            - Delete log files after download."
-  echo " --just-delete - Just delete log files."
+  echo "usage: downloadLogs [OPTIONS] <robot>"
+  echo " -d                    Delete log files after DOWNLOAD."
+  echo " --just-delete         Just delete log files."
+  echo " --list                List the log files without downloading."
+  echo " -l, --logdir LOGDIR   download to LOGDIR"
+  echo " -h, --help            print this usage"
   echo ""
-  echo "  NOTE: <address> is either a numeric IP address, a robot name (resolves to the robot\'s LAN IP address),"
+  echo "  NOTE: <robot> is either a numeric IP address, a robot name (resolves to the robot\'s LAN IP address),"
   echo "        or a robot name with a .wifi or .wlan suffix (resolves to the robot\'s WLAN IP address)"
   echo ""
   echo "  examples:"
@@ -20,119 +23,187 @@ usage()
   exit 1
 }
 
-#Variables
-logpath="/home/nao/logs/"
-keySource="${basePath}/../../Install/Keys/id_rsa_nao"
-keyFile=/tmp/id_rsa_nao
-cp -n "${keySource}" ${keyFile}
-sshoptions="-c aes128-ctr -i ${keyFile} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
+scpDownload()
+{
+  EXT=$1
 
-chmod 600 $keyFile
-
-if [ $# -lt 1 ]
-then
-  usage
-fi
-
-if [ "$1" = "-d" ]
-then
-    download=true
-    delete=true
-    ip=$2
-elif [ "$1" = "--just-delete" ]
-then
-    download=false
-    delete=true
-    ip=$2
-else
-    download=true
-    delete=false
-    ip=$1
-fi
-
-ip=`$basePath/../Common/resolveIp $ip`
-# echo "downloading from $ip"
-
-if $download
-then
-  name=`ssh $sshoptions -o ConnectTimeout=2 nao@$ip "hostname"`
-  if [ -z "$name" ]
-  then
-    echo "Could not get name from robot at $ip"
-    exit 1
-  fi
-  localLogpath=${BHUMAN_LOG_DIR:="${basePath}/../../Config/Logs"}/$(date +%F-%H-%M)/$name
-
-  #check if log file dir exists
-  if [ ! -d "$localLogpath" ]; then
-    mkdir -p "$localLogpath"
+  # do any files with the specified extension exist on remote?
+  NUM_FILES=`ssh $SSH_OPTIONS nao@$ROBOT_IP "ls $LOGS_PATH | grep -cF .$EXT"`
+  if [ $NUM_FILES -eq 0 ]; then
+    return 0 # OK
   fi
 
-  #check if log dir exist on the remote robot
-  ssh $sshoptions nao@$ip "test -d $logpath"
-  logPathExists=$?
-  if [ "$logPathExists" -ne 0 ]
-  then
-    echo "Logfile directory does not exist on robot."
-    exit 1
-  fi
-
-  #check if log directory is not empty
-  LOGS=`ssh $sshoptions nao@$ip "ls $logpath | grep .log"`
-  if [ -z "$LOGS" ]; then
-    echo "No log files on robot."
-    exit 1
-  fi
-fi
-
-PROCESSES=`ssh $sshoptions nao@$ip "pgrep roboeireann"`
-if [ ! -z "$PROCESSES" ]; then
-  RESTART=1
-  echo "stopping roboeireann"
-  ssh $sshoptions nao@$ip "systemctl --user stop roboeireann.service > /dev/null"
-fi
-
-if $download
-then
-  #download all log files
-  echo "Downloading log files..."
-
-  #-p = preserve original date and time
-  remoteSize=$(ssh $sshoptions nao@$ip "du -h $logpath" | awk '{print $1}')
-  scp $sshoptions -p nao@$ip:$logpath*.log "$localLogpath" &
+  # start the scp download in the background
+  scp $SSH_OPTIONS -p nao@$ROBOT_IP:$LOGS_PATH'*.'${EXT} "$LOCAL_LOG_PATH" &
   SCPPID=$!
 
+  # scp will display its own progress per file, but we add in progress every
+  # 30 secs to say how much total data has been downloaded
   ps -p$SCPPID 2>&1 > /dev/null
-  finished=$?
-  cnt=0
-  while [ "$finished" == "0" ]; do
+  FINISHED=$?
+  COUNTER=1
+  while [ "$FINISHED" == "0" ]; do
     ps -p$SCPPID 2>&1 > /dev/null
-    finished=$?
-    if (( $cnt % 30 == 0 )) # show download status every 30s
+    FINISHED=$?
+    if (( $COUNTER % 30 == 0 )) # show directory download status every 30s
     then
-      echo "downloaded: $(ls -l "$localLogpath" | awk '{ total += $5 }; END { CONVFMT = "%.0f"; print total/1024/1024 " MB" }') / $remoteSize"
+      LOCAL_SIZE=$(du -sh "$LOCAL_LOG_PATH" | awk '{print $1}')
+      printf "\ndownloaded: %s / %s\n" $LOCAL_SIZE $REMOTE_SIZE
     fi
-    let cnt+=1
+    let COUNTER+=1
     sleep 1
   done
 
   wait $SCPPID
   FAIL=$?
-  if [ $FAIL -ne 0 ]
+  if [ $FAIL -ne 0 ]; then
+     echo "scp failed! code $FAIL"
+     return 1
+  fi
+
+  return 0 # OK
+}
+
+
+#Variables
+LOGS_PATH="/home/nao/logs/"
+LOCAL_LOG_PATH=""
+KEY_SOURCE="${BASE_PATH}/../../Install/Keys/id_rsa_nao"
+KEY_FILE=/tmp/id_rsa_nao
+cp -n "${KEY_SOURCE}" ${KEY_FILE}
+SSH_OPTIONS="-c aes128-ctr -i ${KEY_FILE} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
+
+chmod 600 $KEY_FILE
+
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+# defaults
+LIST=true
+DOWNLOAD=true
+DELETE=false
+
+while true; do
+  case $1 in
+    "")
+      break
+      ;;
+    "-h" | "--help")
+      usage
+      ;;
+    "-d")
+      DOWNLOAD=true
+      DELETE=true
+      ;;
+    "--just-delete")
+      DOWNLOAD=false
+      DELETE=true
+      ;;
+    "--list")
+      DOWNLOAD=false
+      DELETE=false
+      ;;
+    "-l" | "--logdir")
+      shift
+      LOCAL_LOG_PATH=$1
+      ;;
+    *)
+      ROBOT_IP=$1
+      ;;
+  esac
+  shift
+done
+
+
+echo $ROBOT_IP
+
+ROBOT_IP=`$BASE_PATH/../Common/resolveIp $ROBOT_IP`
+# echo "downloading from $ROBOT_IP"
+
+if $LIST
+then
+  ROBOT_NAME=`ssh $SSH_OPTIONS -o ConnectTimeout=2 nao@$ROBOT_IP "hostname"`
+  if [ -z "$ROBOT_NAME" ]
   then
-     echo "scp failed!"
-     exit 1
+    echo "Could not get name from robot at $ROBOT_IP so exiting"
+    exit 1
+  fi
+
+  #check if log dir exist on the remote robot
+  ssh $SSH_OPTIONS nao@$ROBOT_IP "test -d $LOGS_PATH"
+  LOGS_PATH_EXISTS=$?
+  if [ "$LOGS_PATH_EXISTS" -ne 0 ]
+  then
+    echo "Logfile directory \"$LOGS_PATH\" does not exist on robot."
+    exit 1
+  fi
+
+  #check if log directory is not empty
+  LOGS=`ssh $SSH_OPTIONS nao@$ROBOT_IP "ls $LOGS_PATH | grep -e .log -e .tlog -e .trace"`
+  if [ -z "$LOGS" ]; then
+    echo "No log files on robot."
+    exit 1
+  else
+    NUM_LOGS=$(wc -l <<< "$LOGS")
+    echo "${NUM_LOGS} log files were found on the robot"
+  fi
+
+  if ! $DOWNLOAD && ! $DELETE; then
+    ssh $SSH_OPTIONS nao@$ROBOT_IP "ls -l $LOGS_PATH | grep -e .log -e .tlog -e .trace"
+  fi
+
+fi
+
+if $DOWNLOAD
+then
+  # set local directory into which to download
+  if [ -z "$LOCAL_LOG_PATH" ]; then
+    # default path
+    LOCAL_LOG_PATH="${BASE_PATH}/../../Config/Logs"/$(date +%F_%Hh%M)/$ROBOT_NAME
+  else
+    # use user supplied path - strip any trailing slash and concatenate with the robot name
+    LOCAL_LOG_PATH=$(echo "$LOCAL_LOG_PATH" | sed 's:/*$::')/$ROBOT_NAME
+  fi
+
+  echo creating directory: $LOCAL_LOG_PATH
+
+  #check if local log file dir exists, create it as needed
+  if [ ! -d "$LOCAL_LOG_PATH" ]; then
+    mkdir -p "$LOCAL_LOG_PATH"
   fi
 fi
 
-if $delete
+if $DOWNLOAD || $DELETE; then
+  PROCESSES=`ssh $SSH_OPTIONS nao@$ROBOT_IP "pgrep roboeireann"`
+  if [ ! -z "$PROCESSES" ]; then
+    RESTART=1
+    echo "stopping roboeireann"
+    ssh $SSH_OPTIONS nao@$ROBOT_IP "systemctl --user stop roboeireann.service > /dev/null"
+  fi
+fi
+
+if $DOWNLOAD
+then
+  #DOWNLOAD all log files
+  REMOTE_SIZE=$(ssh $SSH_OPTIONS nao@$ROBOT_IP "du -sh $LOGS_PATH" | awk '{print $1}')
+
+  echo "Downloading $NUM_LOGS log files..."
+  printf "size of directory is $REMOTE_SIZE\n"
+
+  scpDownload log
+  scpDownload tlog
+  scpDownload trace
+fi
+
+if $DELETE
 then
   #remove log files from robot
   echo "Deleting log files from robot"
-  ssh $sshoptions nao@$ip "rm -f $logpath*"
+  ssh $SSH_OPTIONS nao@$ROBOT_IP "rm -f $LOGS_PATH*"
 fi
 
 if [ ! -z $RESTART ]; then
   echo "starting roboeireann"
-  ssh $sshoptions nao@$ip "systemctl --user start roboeireann.service > /dev/null"
+  ssh $SSH_OPTIONS nao@$ROBOT_IP "systemctl --user start roboeireann.service > /dev/null"
 fi

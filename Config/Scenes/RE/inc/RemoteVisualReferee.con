@@ -1,0 +1,19 @@
+# make sure to run this on a robot that is running the REVisualReferee2022 scenario
+
+# switch off the game time
+dr debugDrawing3d:representation:GameInfo off
+dr debugDrawing3d:representation:GameInfo:scores off
+
+
+# add in the visual referee specific stuff
+vd representation:RefereeGesture
+vd module:RefereeGestureDetector:gesture 
+vd representation:WhistleProcessed
+vd representation:EnhancedKeyStates
+
+echo -- switch on the referee stick figure and side colours if you wish by executing the following line
+echo dr debugDrawing3d:module:RefereeGestureDetector:referee on
+echo
+echo -- to test the behaviour, modify the values in the module:RefereeGestureDetector:gesture data view.
+echo -- Then execute the following line
+echo dr module:RefereeGestureDetector:detectNow 

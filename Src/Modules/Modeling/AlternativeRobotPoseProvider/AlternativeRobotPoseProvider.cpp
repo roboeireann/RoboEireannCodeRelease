@@ -19,7 +19,7 @@ void AlternativeRobotPoseProvider::update(AlternativeRobotPoseHypothesis& altern
   clusters.clear();
   alternativeRobotPoseHypothesis.isValid = false;
   if(currentStateOrMotionRuinsOdometry() || // Things are going on and might (but must not) ruin the odometry completely
-     (theExtendedGameInfo.timeSinceLastCalibrationStarted > 5000 && theRobotInfo.mode == RobotInfo::calibration)) // Robot is calibrating
+     (theExtendedGameInfo.timeSinceLastCalibrationStarted > 5000 && theGameInfo.playerMode == GameInfo::calibration)) // Robot is calibrating
   {
     observations.clear();
     return;

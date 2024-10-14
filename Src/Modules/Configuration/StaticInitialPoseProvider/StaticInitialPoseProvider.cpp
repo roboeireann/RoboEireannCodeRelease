@@ -19,11 +19,11 @@ void StaticInitialPoseProvider::update(StaticInitialPose& staticInitialPose)
   if(isActive && static_cast<size_t>(loadVariation) < poseVariations.size())
   {
     const PoseVariation& poses = poseVariations[loadVariation];
-    staticInitialPose.staticPoseOnField = poses.poseVaria[theRobotInfo.number - 1];
+    staticInitialPose.staticPoseOnField = poses.poseVaria[theGameInfo.playerNumber - 1];
     staticInitialPose.jump = false;
     DEBUG_RESPONSE_ONCE("module:StaticInitialPoseProvider")
     {
-      setRobotsInSimulator(poses.poseVaria[theRobotInfo.number - 1]);
+      setRobotsInSimulator(poses.poseVaria[theGameInfo.playerNumber - 1]);
       staticInitialPose.jump = true;
       ++loadVariation;
     }

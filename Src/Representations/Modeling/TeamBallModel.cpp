@@ -38,21 +38,30 @@ void TeamBallModel::draw() const
 
   COMPLEX_DRAWING("representation:TeamBallModel")
   {
-    ColorRGBA teamBallColor(54, 81, 124, 240);
+    // ColorRGBA teamBallColor(54, 81, 124, 240);
+    ColorRGBA teamBallColor(100,30,192,255); // purple
+    ColorRGBA teamBgColor = teamBallColor.alpha(0.5f);
+
     for(auto& b : balls)
     {
-      CIRCLE("representation:TeamBallModel", b.x(), b.y(), 30, 20, Drawings::solidPen, teamBallColor, Drawings::solidBrush, teamBallColor);
+      CIRCLE("representation:TeamBallModel", b.x(), b.y(), 30, 20, Drawings::solidPen, teamBallColor, Drawings::solidBrush, teamBgColor);
       LINE("representation:TeamBallModel", b.x(), b.y(), position.x(), position.y(), 10, Drawings::dashedPen, teamBallColor);
     }
-    CIRCLE("representation:TeamBallModel", position.x(), position.y(), 60, 20, Drawings::solidPen, teamBallColor, Drawings::solidBrush, teamBallColor);
+    CIRCLE("representation:TeamBallModel", position.x(), position.y(), 60, 40, Drawings::solidPen, teamBallColor, Drawings::solidBrush, teamBgColor);
     ARROW("representation:TeamBallModel", position.x(), position.y(), position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, teamBallColor);
+
     if(isValid)
     {
-      CIRCLE("representation:TeamBallModel", position.x(), position.y(), 60, 20, Drawings::solidPen, ColorRGBA::white, Drawings::noBrush, teamBallColor);
+      CIRCLE("representation:TeamBallModel", position.x(), position.y(), 70, 40, Drawings::solidPen, ColorRGBA::white, Drawings::noBrush, teamBgColor);
     }
     else
     {
-      CIRCLE("representation:TeamBallModel", position.x(), position.y(), 60, 20, Drawings::solidPen, ColorRGBA::red, Drawings::noBrush, teamBallColor);
+      // CROSS("representation:TeamBallModel", position.x(), position.y(), 120, 20, Drawings::solidPen, ColorRGBA::red.darker(0.5f).alpha(0.5f));
+      // draw like a diagonal strikethrough
+      float size = 120;
+      LINE("representation:TeamBallModel", position.x() - size, position.y() - size, position.x() + size,
+           position.y() + size, 20, Drawings::solidPen, ColorRGBA::red.darker(0.25f).alpha(0.5f));
+      // CIRCLE("representation:TeamBallModel", position.x(), position.y(), 60, 20, Drawings::solidPen, ColorRGBA::red, Drawings::noBrush, teamBallColor);
     }
   }
 }

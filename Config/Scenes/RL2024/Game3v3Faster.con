@@ -1,0 +1,9 @@
+#cl MULabSmallField2015
+cs RL2024 team1
+cs Default team2
+
+call Includes/PerceptOracle
+
+robot all
+
+vd representation:TeamBehaviorStatus

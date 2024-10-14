@@ -54,11 +54,11 @@ namespace CoroBehaviour
             CR_YIELD();
           }
         }
-        else if (theRobotInfo.mode == RobotInfo::calibration)
+        else if (theGameInfo.playerMode == GameInfo::calibration)
         {
           annotation("Autonomous calibration mode.");
           CR_CHECKPOINT(calibrating);          
-          while (theRobotInfo.mode == RobotInfo::calibration)
+          while (theGameInfo.playerMode == GameInfo::calibration)
           {
             CALL_CARD(CalibrationCard); // use the BH2021 calibration routine for now
             CR_YIELD();
@@ -71,6 +71,12 @@ namespace CoroBehaviour
             CR_CHECKPOINT(initial);
             commonSkills.activityStatus(BehaviorStatus::initial);
             commonSkills.standLookForward(true);
+          }
+          else if (theGameInfo.state == STATE_STANDBY)
+          {
+            CR_CHECKPOINT(standby);
+            commonSkills.activityStatus(BehaviorStatus::initial);
+            CALL_BASIC_CORO(params.standbyStateBehaviour); // the configured playing state behaviour
           }
           else if (theGameInfo.state == STATE_FINISHED)
           {
@@ -93,12 +99,14 @@ namespace CoroBehaviour
 
             // Check if we need to any arm avoidance for obstacles
             armContactAnyArmTask();
-            if (!theRobotInfo.isGoalkeeper())
+            if (!theGameInfo.isGoalkeeper())
               armObstacleAvoidanceAnyArmTask();
 
             if ((theExtendedGameInfo.timeSinceLastPenaltyEnded == 0) || (returnFromPenalizedTask.isYielded()))
             {
               CR_CHECKPOINT(return_from_penalized);
+              if (theExtendedGameInfo.timeSinceLastPenaltyEnded == 0)
+                annotation("returnFromPenalized start");
               returnFromPenalizedTask();
             }
             else if (theGameInfo.state == STATE_READY)
@@ -122,19 +130,22 @@ namespace CoroBehaviour
   private:
     LOADS_PARAMS(SoccerGameControlTask, 
     {,
-      (std::string) setStateBehaviour,
+      (std::string) standbyStateBehaviour,
       (std::string) readyStateBehaviour,
+      (std::string) setStateBehaviour,
       (std::string) playingStateBehaviour,
       (std::string) returnFromPenalizedBehaviour,
     });
 
-    READS(RobotInfo);
     READS(GameInfo);
     READS(ExtendedGameInfo);
     READS(FallDownState);
     READS(MotionInfo);
+    READS(FieldDimensions);
+    READS(RobotPose);
 
     CommonSkills commonSkills  {env};
+    HeadSkills headSkills {env};
     MotionSkills motionSkills  {env};
 
     //For arm motion tasks

@@ -20,7 +20,7 @@
 #endif
 
 #include "Representations/BehaviorControl/ActivationGraph.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/JointCalibration.h"
 #include "Representations/Configuration/JointLimits.h"
 #include "Representations/Configuration/RobotDimensions.h"
@@ -292,7 +292,7 @@ private:
   JointLimits jointLimits; /**< The joint calibration received from the robot code. */
   KeyStates keyStates; /**< The most current set of key states received from the robot code. */
   RobotDimensions robotDimensions; /**< The robotDimensions received from the robot code. */
-  RobotInfo robotInfo; /**< The RobotInfo received from the robot code. */
+  // RobotInfo robotInfo; /**< The RobotInfo received from the robot code. */
 
   //Joystick
   Joystick joystick; /**< The joystick interface. */

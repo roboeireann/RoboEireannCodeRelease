@@ -14,7 +14,7 @@
 
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Configuration/RobotDimensions.h"
-#include "Representations/Communication/TeamInfo.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ECImage.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
@@ -29,8 +29,7 @@ MODULE(JerseyClassifierProvider,
   REQUIRES(CameraMatrix),
   REQUIRES(ECImage),
   REQUIRES(ImageCoordinateSystem),
-  REQUIRES(OpponentTeamInfo),
-  REQUIRES(OwnTeamInfo),
+  REQUIRES(GameInfo),
   REQUIRES(RobotDimensions),
   PROVIDES(JerseyClassifier),
   DEFINES_PARAMETERS(

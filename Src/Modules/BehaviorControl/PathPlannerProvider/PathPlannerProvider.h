@@ -14,12 +14,11 @@
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 #include "Representations/BehaviorControl/Libraries/LibTeammates.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Modeling/ObstacleModel.h"
 #include "Representations/Modeling/RobotPose.h"
-#include "Representations/Modeling/TeamPlayersModel.h"
+#include "Representations/Modeling/TeamPlayersObstacleModel.h"
 #include "Tools/Module/Module.h"
 #include <limits>
 
@@ -32,13 +31,12 @@ MODULE(PathPlannerProvider,
   REQUIRES(LibTeammates),
   REQUIRES(ObstacleModel),
   REQUIRES(RobotPose),
-  REQUIRES(OwnTeamInfo),
   REQUIRES(TeamBehaviorStatus),
-  REQUIRES(TeamPlayersModel),
+  REQUIRES(TeamPlayersObstacleModel),
   PROVIDES(PathPlanner),
   LOADS_PARAMETERS(
   {,
-    (bool) useObstacles, /**< Use TeamPlayersModel or ObstacleModel? */
+    (bool) useObstacles, /**< Use TeamPlayersObstacleModel or ObstacleModel? */
     (float) goalPostRadius, /**< Radius to walk around a goal post (in mm). */
     (float) uprightRobotRadius, /**< Radius to walk around an upright robot (in mm). */
     (float) fallenRobotRadius, /**< Radius to walk around a fallen robot (in mm). */

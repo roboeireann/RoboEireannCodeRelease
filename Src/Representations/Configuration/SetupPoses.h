@@ -15,6 +15,8 @@
 #include "Tools/Streams/AutoStreamable.h"
 #include <vector>
 
+#include "Tools/TextLogging.h"
+
 /**
  * @struct SetupPoses
  * A representation that contains a list of poses from which the robots enter
@@ -50,6 +52,8 @@ inline const SetupPoses::SetupPose& SetupPoses::getPoseOfRobot(int number) const
   for(const auto& pose : poses)
     if(pose.playerNumber == number)
       return pose;
-  ASSERT(false);
+
+  TLOGF_ABORT(TextLogging::get("SetupPoses"), "setupPoses.cfg missing a pose for player number {}", number);
+
   return poses[0]; // Dummy line to avoid compiler complaints
 }

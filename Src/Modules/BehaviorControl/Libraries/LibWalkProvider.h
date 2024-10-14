@@ -16,7 +16,7 @@
 #include "Representations/BehaviorControl/Libraries/LibWalk.h"
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
@@ -35,7 +35,6 @@ MODULE(LibWalkProvider,
   REQUIRES(LibTeammates),
   REQUIRES(LibPosition),
   REQUIRES(ObstacleModel),
-  REQUIRES(RobotInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamBehaviorStatus),
   REQUIRES(TeamData),

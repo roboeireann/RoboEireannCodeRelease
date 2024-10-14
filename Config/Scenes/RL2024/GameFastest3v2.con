@@ -1,0 +1,8 @@
+#call Includes/RE_settings
+call RL2024/inc/RL_settings
+call Includes/Fast
+#call RL2024/inc/ready_3v2
+
+echo gc ready
+echo gc set
+echo gc playing

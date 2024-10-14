@@ -1,0 +1,8 @@
+mr RawGameInfo LogDataProvider Cognition
+mr StandbyReadyGesture gestureDetection Perception
+
+vd representation:RawGameInfo 
+vd representation:GameInfo 
+vd representation:FrameInfo
+
+call RE/gestureDetector.con

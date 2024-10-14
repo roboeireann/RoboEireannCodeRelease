@@ -1,0 +1,44 @@
+<Simulation>
+
+  <Include href="../Includes/NaoV6H25.rsi2"/>
+  <Include href="../Includes/5vs5.rsi2"/>
+  <Include href="../Includes/Ball2016SPL.rsi2"/>
+  <Include href="../Includes/Field2020SPL.rsi2"/>
+
+  <!-- Loading in an image on the referee spot -->
+  <Include href="includes/ImagePanel.rsi2"/>
+
+  <Scene name="RoboCup" controller="SimulatedNao" stepLength="0.012" color="rgb(65%, 65%, 70%)" ERP="0.8" CFM="0.001" contactSoftERP="0.2" contactSoftCFM="0.005">
+    <Light z="9m" ambientColor="rgb(50%, 50%, 50%)"/>
+
+    <Compound name="teamColors">
+      <Appearance name="green"/>
+      <Appearance name="red"/>
+    </Compound>
+    
+    <Compound ref="robots"/>
+    <!-- <Compound name="robots">
+      <Body ref="Nao" name="robot5">
+        <Translation x="300mm" y="-3" z="320mm"/>
+        <Rotation z="90degree"/>
+        <Set name="NaoColor" value="green"/>
+      </Body>
+    </Compound> -->
+    <Compound name="extras">
+    </Compound>
+
+    <Compound name="balls">
+      <Body ref="ball">
+        <Translation z="1m"/>
+      </Body>
+    </Compound>
+
+    <Compound ref="field"/>
+
+    <Compound name="cats">
+        <Body ref="box">
+            <Translation x = "0m" y = "3m" z = "0.9m"/>
+        </Body>
+    </Compound>
+  </Scene>
+</Simulation>

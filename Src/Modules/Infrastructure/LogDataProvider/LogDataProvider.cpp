@@ -198,8 +198,8 @@ bool LogDataProvider::handleMessage2(InMessage& message)
       return true;
 
     case idGameInfo:
-      if(handle(message) && Blackboard::getInstance().exists("RawGameInfo"))
-        static_cast<GameInfo&>(Blackboard::getInstance()["RawGameInfo"]) = static_cast<GameInfo&>(Blackboard::getInstance()["GameInfo"]);
+      if(handle(message) && Blackboard::getInstance().exists("ReceivedGameControlData"))
+        static_cast<GameInfo&>(Blackboard::getInstance()["ReceivedGameControlData"]) = static_cast<GameInfo&>(Blackboard::getInstance()["GameInfo"]);
       return true;
 
     case idGroundTruthOdometryData:
@@ -233,6 +233,19 @@ bool LogDataProvider::handleMessage2(InMessage& message)
         static_cast<RobotPose&>(Blackboard::getInstance()["GroundTruthRobotPose"]) = static_cast<const RobotPose&>(Blackboard::getInstance()["RobotPose"]);
         if(Blackboard::getInstance().exists("FrameInfo"))
           static_cast<GroundTruthRobotPose&>(Blackboard::getInstance()["GroundTruthRobotPose"]).timestamp = static_cast<const FrameInfo&>(Blackboard::getInstance()["FrameInfo"]).time;
+      }
+      return true;
+
+    case idTeamData: // TODO - RV check if this is the correct way to do this
+      if (handle(message) && Blackboard::getInstance().exists("FrameInfo") &&
+          (SystemCall::getMode() == SystemCall::logFileReplay))
+      {
+        FrameInfo &frameInfo = static_cast<FrameInfo &>(Blackboard::getInstance()["FrameInfo"]);
+        TeamData &teamData = static_cast<TeamData &>(Blackboard::getInstance()["TeamData"]);
+
+        for (auto &teammate : teamData.teammates)
+          if (teammate.timeWhenLastUpdated > frameInfo.time)
+            teammate.timeWhenLastUpdated = frameInfo.time;
       }
       return true;
 

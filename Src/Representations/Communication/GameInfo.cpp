@@ -1,7 +1,9 @@
 /**
  * @file GameInfo.cpp
+ * 
  * The file implements a struct that encapsulates the structure RoboCupGameControlData
  * defined in the file RoboCupGameControlData.h that is provided with the GameController.
+ * 
  * @author Thomas Röfer
  */
 
@@ -16,10 +18,260 @@
 #include "Tools/Settings.h"
 #include <algorithm>
 
-GameInfo::GameInfo()
+
+///////////////////////////////////////////////////////////////////////////////
+// nested RobotInfo
+///////////////////////////////////////////////////////////////////////////////
+
+void ReceivedGameControlData::RobotInfo::reg()
+{
+  PUBLISH(reg);
+  REG_CLASS(RobotInfo);
+  // Note: must match the fields in RoboCup::RobotInfo
+  REG(penalty);
+  REG(secsTillUnpenalised);
+}
+
+/**
+ * Write a robot info to a stream.
+ */
+Out& operator<<(Out& stream, const ReceivedGameControlData::RobotInfo& robotInfo)
+{
+  STREAM_EXT(stream, robotInfo.penalty);
+  STREAM_EXT(stream, robotInfo.secsTillUnpenalised);
+  return stream;
+}
+
+/**
+ * Read a robot info from a stream.
+ */
+In& operator>>(In& stream, ReceivedGameControlData::RobotInfo& robotInfo)
+{
+  STREAM_EXT(stream, robotInfo.penalty);
+  STREAM_EXT(stream, robotInfo.secsTillUnpenalised);
+  return stream;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// nested TeamInfo
+///////////////////////////////////////////////////////////////////////////////
+
+int ReceivedGameControlData::TeamInfo::getSubstitutedPlayerNumber(int number) const
+{
+  if(number < 6)
+    return number;
+
+  for(unsigned int i = 0; i < 5; i++)
+    if(players[i].penalty == PENALTY_SUBSTITUTE)
+      return i + 1;
+
+  return number;
+}
+
+
+void ReceivedGameControlData::TeamInfo::reg()
+{
+  PUBLISH(reg);
+  REG_CLASS(TeamInfo);
+
+  // Note: must match the fields in RoboCup::TeamInfo
+
+  REG(teamNumber);
+  REG(fieldPlayerColor);
+  REG(goalkeeperColor);
+  REG(score);
+  REG(penaltyShot);
+  REG(singleShots);
+  REG(messageBudget);
+  REG(RobotInfo(&)[MAX_NUM_PLAYERS], players);
+}
+
+/**
+ * Write a team info to a stream.
+ */
+Out& operator<<(Out& stream, const ReceivedGameControlData::TeamInfo& teamInfo)
+{
+  const ReceivedGameControlData::RobotInfo(&players)[MAX_NUM_PLAYERS] =
+      reinterpret_cast<const ReceivedGameControlData::RobotInfo(&)[MAX_NUM_PLAYERS]>(teamInfo.players);
+  STREAM_EXT(stream, teamInfo.teamNumber);
+  STREAM_EXT(stream, teamInfo.fieldPlayerColor);
+  STREAM_EXT(stream, teamInfo.goalkeeperColor);
+  STREAM_EXT(stream, teamInfo.score);
+  STREAM_EXT(stream, teamInfo.penaltyShot);
+  STREAM_EXT(stream, teamInfo.singleShots);
+  STREAM_EXT(stream, teamInfo.messageBudget);
+  STREAM_EXT(stream, players);
+  return stream;
+}
+
+/**
+ * Read a team info from a stream.
+ */
+In& operator>>(In& stream, ReceivedGameControlData::TeamInfo& teamInfo)
+{
+  ReceivedGameControlData::RobotInfo(&players)[MAX_NUM_PLAYERS] =
+      reinterpret_cast<ReceivedGameControlData::RobotInfo(&)[MAX_NUM_PLAYERS]>(teamInfo.players);
+  STREAM_EXT(stream, teamInfo.teamNumber);
+  STREAM_EXT(stream, teamInfo.fieldPlayerColor);
+  STREAM_EXT(stream, teamInfo.goalkeeperColor);
+  STREAM_EXT(stream, teamInfo.score);
+  STREAM_EXT(stream, teamInfo.penaltyShot);
+  STREAM_EXT(stream, teamInfo.singleShots);
+  STREAM_EXT(stream, teamInfo.messageBudget);
+  STREAM_EXT(stream, players);
+  return stream;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// ReceivedGameControlData itself
+///////////////////////////////////////////////////////////////////////////////
+
+ReceivedGameControlData::ReceivedGameControlData()
 {
   memset(static_cast<RoboCup::RoboCupGameControlData*>(this), 0, sizeof(RoboCup::RoboCupGameControlData));
 }
+
+void ReceivedGameControlData::reg()
+{
+  PUBLISH(reg);
+  REG_CLASS(ReceivedGameControlData);
+  // must match the fields and order in RoboCup::RoboCupGameControlData with
+  // our additions at the end
+  REG(packetNumber);
+  REG(playersPerTeam);
+  REG(competitionPhase);
+  REG(competitionType);
+  REG(gamePhase);
+  REG(state);
+  REG(setPlay);
+  REG(firstHalf);
+  REG(kickingTeam);
+  REG(secsRemaining);
+  REG(secondaryTime);
+  REG(TeamInfo(&)[2], teams);
+
+  REG(timeLastPacketReceived);
+}
+
+
+
+void ReceivedGameControlData::read(In& stream)
+{
+  TeamInfo(&teams)[2] = reinterpret_cast<TeamInfo(&)[2]>(this->teams);
+
+  STREAM(packetNumber);
+  STREAM(playersPerTeam);
+  STREAM(competitionPhase); // phase of the competition (COMPETITION_PHASE_ROUNDROBIN, COMPETITION_PHASE_PLAYOFF)
+  STREAM(competitionType);  // type of the competition (COMPETITION_TYPE_NORMAL, COMPETITION_TYPE_GENERAL_PENALTY_KICK)
+  STREAM(gamePhase); // phase of the game (GAME_PHASE_NORMAL, GAME_PHASE_PENALTYSHOOT, etc)
+  STREAM(state); // STATE_READY, STATE_PLAYING, ...
+  STREAM(setPlay); // active set play (SET_PLAY_NONE, SET_PLAY_GOAL_KICK, etc)
+  STREAM(firstHalf); // 1 = game in first half, 0 otherwise
+  STREAM(kickingTeam); // team number
+  STREAM(secsRemaining); // estimate of number of seconds remaining in the half.
+  STREAM(secondaryTime);
+  STREAM(teams);
+
+  STREAM(timeLastPacketReceived); // used to decide whether a gameController is running
+}
+
+void ReceivedGameControlData::write(Out& stream) const
+{
+  const TeamInfo(&teams)[2] = reinterpret_cast<const TeamInfo(&)[2]>(this->teams);
+
+  STREAM(packetNumber);
+  STREAM(playersPerTeam);
+  STREAM(competitionPhase); // phase of the competition (COMPETITION_PHASE_ROUNDROBIN, COMPETITION_PHASE_PLAYOFF)
+  STREAM(competitionType);  // type of the competition (COMPETITION_TYPE_NORMAL, COMPETITION_TYPE_GENERAL_PENALTY_KICK)
+  STREAM(gamePhase); // phase of the game (GAME_PHASE_NORMAL, GAME_PHASE_PENALTYSHOOT, etc)
+  STREAM(state); // STATE_READY, STATE_PLAYING, ...
+  STREAM(setPlay); // active set play (SET_PLAY_NONE, SET_PLAY_GOAL_KICK, etc)
+  STREAM(firstHalf); // 1 = game in first half, 0 otherwise
+  STREAM(kickingTeam); // team number
+  STREAM(secsRemaining); // estimate of number of seconds remaining in the half.
+  STREAM(secondaryTime);
+  STREAM(teams);
+
+  STREAM(timeLastPacketReceived); // used to decide whether a gameController is running
+}
+
+
+std::string ReceivedGameControlData::getStateString() const
+{
+  switch(state)
+  {
+    case STATE_INITIAL:
+      return "Initial";
+    case STATE_STANDBY:
+      return "Standby";
+    case STATE_READY:
+      if(setPlay == SET_PLAY_PENALTY_KICK)
+        return "Ready (Penalty Kick)";
+      else
+        return "Ready";
+    case STATE_SET:
+      if(setPlay == SET_PLAY_PENALTY_KICK)
+        return "Set (Penalty Kick)";
+      else
+        return "Set";
+    case STATE_PLAYING:
+      switch(setPlay)
+      {
+        case SET_PLAY_NONE:
+          return "Playing";
+        case SET_PLAY_GOAL_KICK:
+          return "Goal Kick";
+        case SET_PLAY_PUSHING_FREE_KICK:
+          return "Pushing Free Kick";
+        case SET_PLAY_CORNER_KICK:
+          return "Corner Kick";
+        case SET_PLAY_KICK_IN:
+          return "Kick In";
+        case SET_PLAY_PENALTY_KICK:
+          return "Penalty Kick";
+        default:
+          return "Unknown";
+      }
+    case STATE_FINISHED:
+      return "Finished";
+    default:
+      return "Unknown";
+  }
+}
+
+
+std::string ReceivedGameControlData::getPenaltyString() const
+{
+  switch (playerInfo().penalty)
+  {
+    case PENALTY_SPL_ILLEGAL_BALL_CONTACT: return "Illegal Ball Contact";
+    case PENALTY_SPL_PLAYER_PUSHING: return "Player Pushing";
+    case PENALTY_SPL_ILLEGAL_MOTION_IN_SET: return "Illegal Motion in Set";
+    case PENALTY_SPL_ILLEGAL_MOTION_IN_STANDBY: return "Illegal Motion in Standby";
+    case PENALTY_SPL_INACTIVE_PLAYER: return "Inactive Player";
+    case PENALTY_SPL_ILLEGAL_POSITION: return "Illegal Position";
+    case PENALTY_SPL_LEAVING_THE_FIELD: return "Leaving the Field";
+    case PENALTY_SPL_REQUEST_FOR_PICKUP: return "Request for Pickup";
+    case PENALTY_SPL_LOCAL_GAME_STUCK: return "Local Game Stuck";
+    case PENALTY_SPL_ILLEGAL_POSITION_IN_SET: return "Illegal Position in Set";
+    case PENALTY_SUBSTITUTE: return "Substitute";
+    case PENALTY_MANUAL: return "Manual";
+    default: return "None";
+  }
+}
+
+std::string ReceivedGameControlData::getPlayerNumberAndColorString() const
+{
+  // Note we believe our settings in preference to the GC info for colour
+  return fmt::format("{} {}",
+                     TypeRegistry::getEnumName(isGoalkeeper() ? Global::getSettings().goalkeeperColor
+                                                              : Global::getSettings().fieldPlayerColor),
+                     toPlayerNumber(playerIndex()));
+}
+
+
+
 
 static void drawChar(int character, const Vector3f& pos, float size, const ColorRGBA& color)
 {
@@ -115,7 +367,8 @@ void GameInfo::draw() const
       "READY",
       "SET",
       "PLAYING",
-      "FINISHED"
+      "FINISHED",
+      "STANDBY"
     };
     print(gameStates[state], Vector3f(static_cast<float>((gameStates[state].size()) * -135.f + 35.f) / 2.f + 100.f, yPosLeftSideline, 500), 100, ColorRGBA::blue);
 
@@ -152,6 +405,46 @@ void GameInfo::draw() const
     }
   }
 
+
+  DEBUG_DRAWING3D("representation:GameInfo:scores", "field")
+  {
+    float yPosLeftSideline = 3000.f;
+    if(Blackboard::getInstance().exists("FieldDimensions"))
+      yPosLeftSideline = static_cast<const FieldDimensions&>(Blackboard::getInstance()["FieldDimensions"]).yPosLeftSideline;
+    yPosLeftSideline += 500.f;
+
+    for (int iTeam=0; iTeam<2; iTeam++)
+    {
+      const float x = iTeam == 0 ? -1535.f : 1465.f;
+      const int score = std::min(static_cast<int>(teams[iTeam].score), 99);
+      // drawDigit(score / 10, Vector3f(x, yPosLeftSideline, 1000), 200, gameInfo.teams[iTeam].fieldPlayerColor);
+      // drawDigit(score % 10, Vector3f(x + 270, yPosLeftSideline, 1000), 200, gameInfo.teams[iTeam].fieldPlayerColor);
+      print(std::to_string(score / 10) + std::to_string(score % 10), Vector3f(x, yPosLeftSideline, 1000), 200,
+            ColorRGBA::fromTeamColor(teams[iTeam].fieldPlayerColor));
+    }
+  };
+
+  DEBUG_DRAWING3D("representation:GameInfo:player", "robot")
+  {
+    // for (int iTeam = 0; iTeam < 2; iTeam++)
+    // {
+    //   for (int iPlayer = 0; iPlayer < playersPerTeam; iPlayer++)
+    //   {
+    //     if (teams[iTeam].players[iPlayer].penalty != PENALTY_SUBSTITUTE)
+    //     {
+    //       const int num = GameInfo::toPlayerNumber(iPlayer);
+    //       float centerDigit = (num > 1) ? 50.f : 0;
+    //       ROTATE3D("representation:GameInfo:player", 0, 0, pi_2);
+    //       DRAWDIGIT3D("representation:GameInfo:player", num, Vector3f(centerDigit, 0.f, 500.f), 80, 5, ColorRGBA::green);
+    //     }
+    //   }
+    // }
+    const int num = playerNumber;
+    float centerDigit = (num > 1) ? 50.f : 0;
+    ROTATE3D("representation:GameInfo:player", 0, 0, pi_2);
+    DRAWDIGIT3D("representation:GameInfo:player", num, Vector3f(centerDigit, 0.f, 500.f), 80, 5, ColorRGBA::green);
+  }
+
   DEBUG_DRAWING("representation:GameInfo", "drawingOnField")
   {
     float xPosOwnFieldBorder = -5200.f;
@@ -166,99 +459,28 @@ void GameInfo::draw() const
     const int mins = std::abs(static_cast<int>(secsRemaining)) / 60;
     const int secs = std::abs(static_cast<int>(secsRemaining)) % 60;
     const std::string secsAsString = std::to_string(secs);
-    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 200,  yPosRightFieldBorder + 500, (xPosOwnFieldBorder / -5200.f) * 200, ColorRGBA::white, "Time remaining: " << sign << mins << ":" << (secs < 10 ? "0" + secsAsString : secsAsString));
-    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 200,  yPosRightFieldBorder + 300, (xPosOwnFieldBorder / -5200.f) * 200, ColorRGBA::white, (firstHalf ? "First" : "Second") << " half");
-    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 1700, yPosRightFieldBorder + 300, (xPosOwnFieldBorder / -5200.f) * 180, ColorRGBA::white, "State: " << getStateAsString());
+    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 200, yPosRightFieldBorder + 500,
+              (xPosOwnFieldBorder / -5200.f) * 200, ColorRGBA::white,
+              "Time remaining: " << sign << mins << ":" << (secs < 10 ? "0" + secsAsString : secsAsString));
+    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 200, yPosRightFieldBorder + 300,
+              (xPosOwnFieldBorder / -5200.f) * 200, ColorRGBA::white, (firstHalf ? "First" : "Second") << " half");
+    DRAW_TEXT("representation:GameInfo", xPosOwnFieldBorder + 1700, yPosRightFieldBorder + 300,
+              (xPosOwnFieldBorder / -5200.f) * 180, ColorRGBA::white, "State: " << getStateString());
   }
-}
 
-std::string GameInfo::getStateAsString() const
-{
-  switch(state)
+  DEBUG_DRAWING("representation:GameInfo:ourTeam", "drawingOnField")
   {
-    case STATE_INITIAL:
-      return "Initial";
-    case STATE_READY:
-      if(setPlay == SET_PLAY_PENALTY_KICK)
-        return "Ready (Penalty Kick)";
-      else
-        return "Ready";
-    case STATE_SET:
-      if(setPlay == SET_PLAY_PENALTY_KICK)
-        return "Set (Penalty Kick)";
-      else
-        return "Set";
-    case STATE_PLAYING:
-      switch(setPlay)
-      {
-        case SET_PLAY_NONE:
-          return "Playing";
-        case SET_PLAY_GOAL_KICK:
-          return "Goal Kick";
-        case SET_PLAY_PUSHING_FREE_KICK:
-          return "Pushing Free Kick";
-        case SET_PLAY_CORNER_KICK:
-          return "Corner Kick";
-        case SET_PLAY_KICK_IN:
-          return "Kick In";
-        case SET_PLAY_PENALTY_KICK:
-          return "Penalty Kick";
-        default:
-          return "Unknown";
-      }
-    case STATE_FINISHED:
-      return "Finished";
-    default:
-      return "Unknown";
+    float xPosOwnFieldBorder = -5200.f;
+    float yPosRightFieldBorder = -3700;
+    if(Blackboard::getInstance().exists("FieldDimensions"))
+    {
+      const FieldDimensions& theFieldDimensions = static_cast<const FieldDimensions&>(Blackboard::getInstance()["FieldDimensions"]);
+      xPosOwnFieldBorder = theFieldDimensions.xPosOwnFieldBorder;
+      yPosRightFieldBorder = theFieldDimensions.yPosRightFieldBorder;
+    }
+    DRAW_TEXT("representation:GameInfo:ourTeam", xPosOwnFieldBorder + 200, yPosRightFieldBorder - 100,
+              (xPosOwnFieldBorder / -5200.f) * 140, ColorRGBA::red,
+              "Team color: " << TypeRegistry::getEnumName((Settings::TeamColor)ourTeam().fieldPlayerColor));
   }
 }
 
-void GameInfo::read(In& stream)
-{
-  STREAM(packetNumber);
-  STREAM(competitionPhase); // phase of the competition (COMPETITION_PHASE_ROUNDROBIN, COMPETITION_PHASE_PLAYOFF)
-  STREAM(competitionType);  // type of the competition (COMPETITION_TYPE_NORMAL, COMPETITION_TYPE_GENERAL_PENALTY_KICK)
-  STREAM(gamePhase); // phase of the game (GAME_PHASE_NORMAL, GAME_PHASE_PENALTYSHOOT, etc)
-  STREAM(state); // STATE_READY, STATE_PLAYING, ...
-  STREAM(setPlay); // active set play (SET_PLAY_NONE, SET_PLAY_GOAL_KICK, etc)
-  STREAM(firstHalf); // 1 = game in first half, 0 otherwise
-  STREAM(kickingTeam); // team number
-  STREAM(secsRemaining); // estimate of number of seconds remaining in the half.
-  STREAM(secondaryTime);
-  STREAM(timeLastPacketReceived); // used to decide whether a gameController is running
-  STREAM(stateIsGuessed); // used to decide whether a gameController is running
-}
-
-void GameInfo::write(Out& stream) const
-{
-  STREAM(packetNumber);
-  STREAM(competitionPhase); // phase of the competition (COMPETITION_PHASE_ROUNDROBIN, COMPETITION_PHASE_PLAYOFF)
-  STREAM(competitionType);  // type of the competition (COMPETITION_TYPE_NORMAL, COMPETITION_TYPE_GENERAL_PENALTY_KICK)
-  STREAM(gamePhase); // phase of the game (GAME_PHASE_NORMAL, GAME_PHASE_PENALTYSHOOT, etc)
-  STREAM(state); // STATE_READY, STATE_PLAYING, ...
-  STREAM(setPlay); // active set play (SET_PLAY_NONE, SET_PLAY_GOAL_KICK, etc)
-  STREAM(firstHalf); // 1 = game in first half, 0 otherwise
-  STREAM(kickingTeam); // team number
-  STREAM(secsRemaining); // estimate of number of seconds remaining in the half.
-  STREAM(secondaryTime);
-  STREAM(timeLastPacketReceived); // used to decide whether a gameController is running
-  STREAM(stateIsGuessed); // used to decide whether a gameController is running
-}
-
-void GameInfo::reg()
-{
-  PUBLISH(reg);
-  REG_CLASS(GameInfo);
-  REG(packetNumber);
-  REG(competitionPhase);
-  REG(competitionType);
-  REG(gamePhase);
-  REG(state);
-  REG(setPlay);
-  REG(firstHalf);
-  REG(kickingTeam);
-  REG(secsRemaining);
-  REG(secondaryTime);
-  REG(timeLastPacketReceived);
-  REG(stateIsGuessed); // used to decide whether a gameController is running
-}

@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/SensorData/KeyStates.h"
 #include "Representations/MotionControl/MotionRequest.h"
@@ -44,7 +44,6 @@ MODULE(ReplayWalkRequestProvider,
   REQUIRES(WalkKickGenerator),
   USES(WalkStepData),
   PROVIDES(ReplayWalkRequestGenerator),
-  REQUIRES(RobotInfo),
   LOADS_PARAMETERS(
   {,
     (std::vector<WalkPhaseData>) motionRequests,

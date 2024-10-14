@@ -9,8 +9,7 @@
 #include "RobotNumber.h"
 #include "Platform/Thread.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
-#include "Representations/Communication/TeamInfo.h"
+
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Tools/Math/Pose2f.h"
@@ -51,7 +50,11 @@ private:
   struct Robot
   {
     SimulatedRobot* simulatedRobot = nullptr;
-    RobotInfo info;
+    // RobotInfo info;
+    uint8_t penalty = PENALTY_NONE;
+    uint8_t secsTillUnpenalised = 0;
+    int number;
+
     unsigned timeWhenPenalized = 0;
     unsigned timeWhenBallNotStuckBetweenLegs = 0;
     float ownGoalAreaMargin = -1.f;
@@ -113,8 +116,8 @@ private:
   unsigned lastBallContactTime = 0;
   FieldDimensions fieldDimensions;
   BallSpecification ballSpecification;
-  RawGameInfo gameInfo;
-  TeamInfo teamInfos[2];
+  ReceivedGameControlData gameInfo;
+  // TeamInfo teamInfos[2];
   TeamMessageCounter teamMessageCounters[2]; // one counter per team
   int messageBudgets[2]; // track this independently of GameControlInfo so that we can see if we blow the budget
   int invalidCounts[2];
@@ -181,29 +184,27 @@ public:
    */
   bool writeGameInfo(Out& stream, uint8_t& lastGCPacketNumber);
 
-  /**
-   * Write the current information of the team to the stream
-   * provided.
-   * @param robot A robot from the team.
-   * @param stream The stream the team information is written to.
-   */
-  void writeOwnTeamInfo(int robot, Out& stream);
+//   /**
+//    * Write the current information of the team to the stream
+//    * provided.
+//    * @param robot A robot index from the team.
+//    * @param stream The stream the team information is written to.
+//    */
+//   void writeOwnTeamInfo(int robot, Out& stream);
+// 
+//   /**
+//    * Write the current information of the opponent team to the
+//    * stream provided.
+//    * @param robot A robot index from the team.
+//    * @param stream The stream the team information is written to.
+//    */
+//   void writeOpponentTeamInfo(int robot, Out& stream);
 
   /**
-   * Write the current information of the opponent team to the
-   * stream provided.
-   * @param robot A robot from the team.
-   * @param stream The stream the team information is written to.
+   * Check if the specified robot has moved (mainly for end of READY state)
+   * @param robot The robot index the information is about.
    */
-  void writeOpponentTeamInfo(int robot, Out& stream);
-
-  /**
-   * Write the current information of a certain robot to the
-   * stream provided.
-   * @param robot The robot the information is about.
-   * @param stream The stream the robot information is written to.
-   */
-  void writeRobotInfo(int robot, Out& stream);
+  void checkRobotMovement(int robot);
 
   /**
    * Adds all commands of this module to the set of tab completion

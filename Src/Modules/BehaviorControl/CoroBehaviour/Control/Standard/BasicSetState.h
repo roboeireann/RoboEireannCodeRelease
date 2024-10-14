@@ -36,7 +36,7 @@ namespace CoroBehaviour
             headSkills.lookAtPoint(theRobotPose.toRobotVector3f(
                 Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0),
                 theBallSpecification.radius)); // look at the penalty spot (the ball should be there)
-          else if (commonSkills.isOurTeamKick() && theTeamBehaviorStatus.role.playsTheBall())
+          else if (commonSkills.isOurTeamKick() && theTeamBehaviorStatus.role.isBallPlayer())
             headSkills.lookAtPoint(theRobotPose.toRobotVector3f(
                 Vector2f(theFieldDimensions.xPosOpponentPenaltyMark, 0),
                 theBallSpecification.radius)); // look at the penalty spot (the ball should be there)
@@ -45,7 +45,7 @@ namespace CoroBehaviour
         }
         else // standard set state (at kickoff)
         {
-          if (theTeamBehaviorStatus.role.playsTheBall())
+          if (theTeamBehaviorStatus.role.isBallPlayer())
             headSkills.lookAtPoint(theRobotPose.toRobotVector3f(
                 Vector2f::Zero(),
                 theBallSpecification.radius)); // look at the penalty spot (the ball should be there)

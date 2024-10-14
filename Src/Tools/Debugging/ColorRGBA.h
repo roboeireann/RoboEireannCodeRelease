@@ -33,6 +33,14 @@ public:
 
   ColorRGBA operator*(float scale) const;
   ColorRGBA blend(const ColorRGBA& other) const;
+
+  // floatAlpha must be between 0 and 1
+  ColorRGBA alpha(float floatAlpha) const;
+  ColorRGBA alpha(unsigned char inAlpha) const { return ColorRGBA(r,g,b,inAlpha); }
+  // makes the colour lighter - sometimes called tinting - amount between 0 and 1
+  ColorRGBA lighter(float amount = 0.25f) const;
+  // makes the colour darker - sometimes called shading - amount between 0 and 1
+  ColorRGBA darker(float amount = 0.25f) const;
 };
 
 In& operator>>(In& stream, ColorRGBA&);

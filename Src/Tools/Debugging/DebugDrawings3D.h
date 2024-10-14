@@ -150,9 +150,9 @@ class DrawingManager3D : public DrawingManager {};
         0x7f,\
         0x5f\
       };\
-      digit = digits[std::abs(digit)];\
+      unsigned char digit7seg = digits[std::abs(digit)];\
       for(int i = 0; i < 7; ++i)\
-        if(digit & (1 << i))\
+        if(digit7seg & (1 << i))\
         {\
           Vector3f from = pos - points[i] * digitSize;\
           Vector3f to = pos - points[i + 1] * digitSize;\
@@ -481,7 +481,7 @@ class DrawingManager3D : public DrawingManager {};
   do \
     COMPLEX_DRAWING3D(id) \
     { \
-      Vector3f from = (origin).translated(Vector3f(-(wideness) / 2,f, 0, 0)).translation; \
+      Vector3f from = (origin).translated(Vector3f(-(wideness) / 2.f, 0, 0)).translation; \
       Vector3f to = (origin).translated(Vector3f((wideness) / 2.f, 0, 0)).translation; \
       CYLINDERLINE3D(id, from, to, radius, color); \
     } \

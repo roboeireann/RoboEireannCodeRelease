@@ -9,11 +9,12 @@
 
 #pragma once
 
-#include "DetectedGesture.h"
 
 // #include "Platform/Semaphore.h"
 #include "Platform/Thread.h"
 #include "Representations/Infrastructure/CameraImage.h"
+
+#include "DetectedGesture.h"
 
 class RefereeGestureDetectorModel
 {

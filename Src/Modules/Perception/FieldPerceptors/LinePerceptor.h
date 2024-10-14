@@ -9,8 +9,9 @@
 
 #pragma once
 
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/FieldDimensions.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Perception/FieldPercepts/CirclePercept.h"
 #include "Representations/Perception/FieldPercepts/LinesPercept.h"
@@ -40,7 +41,7 @@ MODULE(LinePerceptor,
   REQUIRES(ImageCoordinateSystem),
   REQUIRES(ObstaclesImagePercept),
   REQUIRES(RelativeFieldColors),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   PROVIDES(LinesPercept),
   REQUIRES(LinesPercept),
   PROVIDES(CirclePercept),
@@ -402,9 +403,9 @@ private:
 
   bool debugIsPointWhite = false;
 
-#define GREEN_AROUND_LINE_RATIO (theRobotInfo.mode == RobotInfo::Mode::calibration ? greenAroundLineRatioCalibration : greenAroundLineRatio)
-#define MIN_SPOTS_PER_LINE (theRobotInfo.mode == RobotInfo::Mode::calibration ? minSpotsPerLineCalibration : minSpotsPerLine)
-#define TRIM_LINES (theRobotInfo.mode == RobotInfo::Mode::calibration ? trimLinesCalibration : trimLines)
+#define GREEN_AROUND_LINE_RATIO (theGameInfo.playerMode == GameInfo::calibration ? greenAroundLineRatioCalibration : greenAroundLineRatio)
+#define MIN_SPOTS_PER_LINE (theGameInfo.playerMode == GameInfo::calibration ? minSpotsPerLineCalibration : minSpotsPerLine)
+#define TRIM_LINES (theGameInfo.playerMode == GameInfo::calibration ? trimLinesCalibration : trimLines)
 
 public:
   LinePerceptor()

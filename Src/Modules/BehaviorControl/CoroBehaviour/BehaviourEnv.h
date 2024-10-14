@@ -13,7 +13,6 @@
 // representations used by this class only
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/BehaviorControl/ActivationGraph.h"
 
@@ -21,7 +20,9 @@
 
 #include "Tools/TextLogging.h"
 
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <typeinfo>
 #include <typeindex>
 
@@ -36,6 +37,8 @@ namespace CoroBehaviour
    */
   struct BehaviourEnv : public CoroEnv
   {
+    // the RepresentationRegistry is used to register all readable and modifiable
+    // representations that can be accessed throughout the behaviour coroutines
     struct RepresentationRegistry
     {
       void add(const Streamable &representation) 
@@ -62,13 +65,46 @@ namespace CoroBehaviour
       friend struct BehaviourEnv;
     };
 
+    // a structure to for declaring debug drawings in advance (since) a given behaviour 
+    // will not execute during every cycle
+    struct DebugDrawingInfo
+    {
+      const char* drawingId;
+      const char* drawingType;
+      const char* debugResponseId;
+
+      DebugDrawingInfo() : drawingId(""), drawingType(""), debugResponseId("") {}
+      DebugDrawingInfo(const char *id, const char *type, const char *responseId)
+          : drawingId(id), drawingType(type), debugResponseId(responseId)
+      {
+      }
+
+      bool operator==(const DebugDrawingInfo& other) const
+      {
+        return (strcmp(drawingId, other.drawingId) == 0) && (strcmp(drawingType, other.drawingType) == 0);
+      }
+
+      // bool operator<(const DebugDrawingInfo& other) const
+      // {
+      //   return (strcmp(drawingId, other.drawingId) < 0) ||
+      //          ((strcmp(drawingId, other.drawingId) == 0) && (strcmp(drawingType, other.drawingType) < 0));
+      // } 
+
+      size_t operator()(const DebugDrawingInfo& info) const
+      {
+        auto hasher = std::hash<std::string>{};
+        return hasher(std::string(info.drawingId) + std::string(info.drawingType));
+      }
+    };
+
+    using DebugDrawingDeclarations = std::unordered_set<DebugDrawingInfo, DebugDrawingInfo>;
+
 
     BehaviourEnv() = delete;
 
     BehaviourEnv(RepresentationRegistry&& registry, ActivationGraph& activationGraph) : registry(registry), 
       // we have to enforce initialization order by placing these here after the registry line
       theGameInfo(get<GameInfo>()),
-      theOwnTeamInfo(get<OwnTeamInfo>()),
       theRobotPose(get<RobotPose>()),
       theActivationGraph(activationGraph)
     {
@@ -99,9 +135,16 @@ namespace CoroBehaviour
       return dynamic_cast<T&>(*(found->second));
     }
 
-    // some helper functions to make life easier for behaviour
+    // debug drawings
 
-    bool isOurTeamKick() { return theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber; }
+    void registerDrawingDeclaration(const char* id, const char* type, const char* responseId)
+    {
+      debugDrawingDeclarations.insert({id, type, responseId});
+    }
+
+    const DebugDrawingDeclarations& getDrawingDeclarations() const { return debugDrawingDeclarations; }
+
+    // some helper functions to make life easier for behaviour
 
     Vector2f toRobotCoordinates(const Vector2f &fieldPoint) { return theRobotPose.inversePose * fieldPoint; }
 
@@ -111,9 +154,9 @@ namespace CoroBehaviour
     TextLogger& tlogger = TextLogging::get("BehaviourEnv", TextLogging::DEBUG);
 
     RepresentationRegistry registry;
+    DebugDrawingDeclarations debugDrawingDeclarations;
 
     const GameInfo& theGameInfo;
-    const OwnTeamInfo& theOwnTeamInfo;
     const RobotPose& theRobotPose;
 
   public:
@@ -122,6 +165,8 @@ namespace CoroBehaviour
 
 } // CoroBehaviour
 
+
+#define DECLARE_CRBEHAVIOUR_DRAWING(id, type) env.registerDrawingDeclaration(id, type, "debug drawing:" id)
 
 // Coro behaviours should use these 2 macros to get access to representations they read or modify
 // (The representations must have been registered in advance by the BehaviourModule)

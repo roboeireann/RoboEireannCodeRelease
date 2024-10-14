@@ -15,6 +15,7 @@
 #pragma once
 
 #include "Platform/Time.h"
+#include "Platform/BHAssert.h"
 
 #include "fmt/format.h"
 
@@ -63,7 +64,8 @@ public:
 
     /**
      * return a std::string which is a copy of the internal data.
-     * This is inefficient but easy to use and can be used as follows:
+     * This is slightly inefficient if used in a tight loop but easy to use
+     * for infrequent error messges. It can be used as follows:
      *
      *   foo(ErrorStr(errno).str());
      */
@@ -112,6 +114,14 @@ public:
     VERBOSE
     // NOTE: if you add to the enums, update levelStrings below
   };
+
+
+  /**
+   * get the default text logger which always has the INFO level
+   * (It does not need to to a lookup each time so slightly more efficient
+   * than doing TextLogging::get("Default") if you'll be calling it often.
+   */
+  static TextLogger& get();
 
   /**
    * get a text logger by name
@@ -255,6 +265,49 @@ private:
 #define TLOGD_STREAM(logger_,insertable_) TLOG_IMPL_STREAM(logger_, TextLogging::DEBUG, insertable_)
 #define TLOGV_STREAM(logger_,insertable_) TLOG_IMPL_STREAM(logger_, TextLogging::VERBOSE, insertable_)
 
+// in conjunction with BHAssert stuff
+#define TLOGF_ABORT(logger_, ...)                                                                                      \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    TLOGF(logger_, __VA_ARGS__);                                                                                       \
+    std::string s = fmt::format(__VA_ARGS__);                                                                          \
+    FAIL(s);                                                                                                           \
+  } while (0)
+
+
+#ifdef NDEBUG
+
+#define TLOG_VERIFY(logger_, cond)                                                                                     \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    if (!(cond))                                                                                                       \
+      TLOGE(logger_, "VERIFY({}) failed", #cond);                                                                      \
+  } while (0)
+
+#define TLOG_VERIFY_ERRNO TLOG_VERIFY
+
+#else // not NDEBUG
+
+#define TLOG_VERIFY(logger_, cond)                                                                                     \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    if (!(cond))                                                                                                       \
+      TLOGF_ABORT(logger_, "VERIFY({}) failed", #cond);                                                                \
+  } while (0)
+
+#define TLOG_VERIFY_ERRNO(logger_, cond)                                                                               \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    if (!(cond))                                                                                                       \
+    {                                                                                                                  \
+      TLOGF(logger_, "VERIFY({}) failed: {}", #cond);                                                                  \
+      TLOGF_ABORT(logger_, "  error: {}", ErrorStr().str());                                                           \
+    }                                                                                                                  \
+  } while (0)
+
+#endif // NDEBUG
+
+
 #else // TLOG_DISABLED
 
 #define TLOGF(...) (void)0
@@ -270,6 +323,10 @@ private:
 #define TLOGI_STREAM(insertable_) (void)0
 #define TLOGD_STREAM(insertable_) (void)0
 #define TLOGV_STREAM(insertable_) (void)0
+
+#define TLOGF_ABORT(logger_,...) static_cast<void>(logger_, FAIL(fmt::format(__VA_ARGS__), 0))
+#define TLOG_VERIFY(logger_,cond) static_cast<void>(logger_, VERIFY(cond), 0)
+#define TLOG_VERIFY_ERRNO TLOG_VERIFY
 
 #endif // TLOG_DISABLED
 

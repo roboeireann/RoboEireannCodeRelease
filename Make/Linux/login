@@ -17,10 +17,10 @@ else
   IP=`../Common/resolveIp $1`
   echo "sc Remote $IP" >../../Config/Scenes/Includes/connect.con
 fi
-echo "Connecting to $IP"
+echo "Connecting to \"$IP\""
 cp -n ../../Install/Keys/id_rsa_nao /tmp/id_rsa_nao
 chmod 600 /tmp/id_rsa_nao
-ssh -i /tmp/id_rsa_nao -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet nao@$1
+ssh -i /tmp/id_rsa_nao -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet nao@$IP
 if [ $? = 255 ]; then
   echo "Error: Cannot connect to $IP" >&2
 fi

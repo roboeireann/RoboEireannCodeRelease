@@ -10,8 +10,7 @@
 #include "Cognition2D.h"
 #include "Modules/Infrastructure/LogDataProvider/LogDataProvider.h"
 
-#include "Representations/Communication/BHumanMessage.h"
-#include "Representations/Communication/TeamMessage2023.h"
+#include "Representations/Communication/TeamMessage2024.h"
 
 #include "Tools/Debugging/Debugging.h"
 #include "Tools/Settings.h"
@@ -43,17 +42,11 @@ void Cognition2D::afterModules()
   // needed to see which module has actually filled in the representation
   // (sendIfNeeded) in order to decide how to proceed
 
-  if (blackboard.exists("BHumanMessageOutputGenerator") &&
-      static_cast<const BHumanMessageOutputGenerator &>(blackboard["BHumanMessageOutputGenerator"]).sendIfNeeded)
-  {
-    BH_TRACE_MSG("before BHumanMessageOutputGenerator.sendIfNeeded()");
-    static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).sendIfNeeded();
-  }
-  else if (blackboard.exists("TeamMessage2023OutputGenerator") &&
-           static_cast<const TeamMessage2023OutputGenerator &>(blackboard["TeamMessage2023OutputGenerator"])
+  if (blackboard.exists("TeamMessage2024OutputGenerator") &&
+           static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"])
                .sendIfNeeded)
   {
-    BH_TRACE_MSG("before TeamMessage2023OutputGenerator.sendIfNeeded()");
-    static_cast<const TeamMessage2023OutputGenerator &>(blackboard["TeamMessage2023OutputGenerator"]).sendIfNeeded();
+    BH_TRACE_MSG("before TeamMessage2024OutputGenerator.sendIfNeeded()");
+    static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"]).sendIfNeeded();
   }
 }

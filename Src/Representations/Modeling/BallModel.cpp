@@ -15,30 +15,6 @@
 
 #include <algorithm>
 
-void BallModelSimplified::operator>>(BHumanMessage& m) const
-{
-  Streaming::streamIt(*m.theBHumanStandardMessage.out, "theBallModelSimplified",  *this);
-
-  // m.theBSPLStandardMessage.ball[0] = estimate.position.x();
-  // m.theBSPLStandardMessage.ball[1] = estimate.position.y();
-
-  // if(timeWhenLastSeen && Blackboard::getInstance().exists("FrameInfo"))
-  // {
-  //   const FrameInfo& theFrameInfo = static_cast<const FrameInfo&>(Blackboard::getInstance()["FrameInfo"]);
-  //   m.theBSPLStandardMessage.ballAge = theFrameInfo.getTimeSince(timeWhenLastSeen) / 1000.f;
-  // }
-  // else
-  //   m.theBSPLStandardMessage.ballAge = -1.f;
-}
-
-void BallModelSimplified::operator<<(const BHumanMessage& m)
-{
-  Streaming::streamIt(*m.theBHumanStandardMessage.in, "theBallModelSimplified", *this);
-
-  // estimate.position.x() = m.theBSPLStandardMessage.ball[0];
-  // estimate.position.y() = m.theBSPLStandardMessage.ball[1];
-}
-
 void BallModelSimplified::toBallModel(BallModel& ballModel)
 {
   ballModel.lastPerception = lastPerception;

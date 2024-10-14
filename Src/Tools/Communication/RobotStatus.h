@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Settings.h"
 #include "Tools/Streams/AutoStreamable.h"
+
 #include <array>
 
-STREAMABLE(RobotStatus, COMMA BHumanCompressedMessageParticle<RobotStatus>
+STREAMABLE(RobotStatus,
 {
   static constexpr std::size_t numOfSequenceNumbers = Settings::highestValidPlayerNumber - Settings::lowestValidPlayerNumber + 1,
 

@@ -11,6 +11,9 @@
 // #include "Tools/Communication/SPLMessageHandler.h" // include this first to prevent WinSock2.h/Windows.h conflicts
 #include "Tools/Framework/FrameExecutionUnit.h"
 
+#include "Platform/WatchdogTimer.h"
+#include "Tools/Streams/AutoStreamable.h"
+
 /**
  * @class Cognition
  *
@@ -19,6 +22,12 @@
 class Cognition : public FrameExecutionUnit
 {
 private:
+  STREAMABLE(Params,
+  {,
+    (bool)(false) watchdogEnabled,
+    (unsigned)(5000) watchdogTimeout,
+  });
+
   // SPLMessageHandler::Buffer inTeamMessages;
   // RoboCup::SPLStandardMessage outTeamMessage;
   // SPLMessageHandler theSPLMessageHandler;
@@ -29,6 +38,9 @@ private:
   bool lowerIsNew = false; /**< The is unused data from the lower camera thread. */
   bool acceptNext = false; /**< Immediately process the frame still waiting. */
 
+  Params params;
+  WatchdogTimer watchdog;
+  
 public:
   thread_local static bool isUpper; /**< The current frame picked is from the upper camera thread. */
 

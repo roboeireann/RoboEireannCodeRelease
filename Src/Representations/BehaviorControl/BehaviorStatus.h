@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Math/Eigen.h"
 #include "Tools/Streams/AutoStreamable.h"
 #include "Tools/Streams/Enum.h"
@@ -15,7 +14,7 @@
  * @struct BehaviorStatus
  * A struct that contains data about the current behavior state.
  */
-STREAMABLE(BehaviorStatus, COMMA public BHumanCompressedMessageParticle<BehaviorStatus>
+STREAMABLE(BehaviorStatus,
 {
   ENUM(Activity,
   {,
@@ -70,9 +69,9 @@ STREAMABLE(BehaviorStatus, COMMA public BHumanCompressedMessageParticle<Behavior
 
   (Activity)(unknown) activity, /**< What is the robot doing in general? */
   (int)(-1) passTarget,
-  (Vector2f)(Vector2f::Zero()) walkingTo,
+  (Vector2f)(Vector2f::Zero()) walkingTo, ///< robot relative coordinates
   (float) speed, /**< The absolute speed in mm/s. */
-  (Vector2f)(Vector2f::Zero()) shootingTo,
+  (Vector2f)(Vector2f::Zero()) shootingTo, ///< robot relative coordinates
 });
 
 typedef BehaviorStatus BehaviourStatus; // alias with "correct" spelling

@@ -186,7 +186,7 @@ void PathPlannerProvider::createBarriers(const Pose2f& target, bool excludeOwnPe
 
   if(wrongBallSideCostFactor > 0.f)
   {
-    const Vector2f& ballPosition = theTeamBehaviorStatus.role.playsTheBall() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
+    const Vector2f& ballPosition = theTeamBehaviorStatus.role.isBallPlayer() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
     Vector2f end = ballPosition + (ballPosition - Vector2f(theFieldDimensions.xPosOwnGoal, 0)).normalized(wrongBallSideRadius);
     barriers.emplace_back(ballPosition.x(), ballPosition.y(), end.x(), end.y(), ballRadius * pi2 * wrongBallSideCostFactor);
   }
@@ -215,7 +215,7 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
 
   // Reserve enough space that prevents any reallocation, because the addresses of entries are used.
   nodes.reserve(sqr((excludeOwnPenaltyArea ? 8 : 6) + (excludeOpponentPenaltyArea ? 2 : 0) +
-                    (useObstacles ? theObstacleModel.obstacles.size() : theTeamPlayersModel.obstacles.size())));
+                    (useObstacles ? theObstacleModel.obstacles.size() : theTeamPlayersObstacleModel.obstacles.size())));
 
   // Insert start and target
   nodes.emplace_back(theRobotPose.translation, 0.f);
@@ -266,7 +266,7 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
   }
   else
   {
-    for(const auto& obstacle : theTeamPlayersModel.obstacles)
+    for(const auto& obstacle : theTeamPlayersObstacleModel.obstacles)
       if(obstacle.center != theRobotPose.translation && obstacle.type != Obstacle::goalpost)
         addObstacle(obstacle.center, getRadius(obstacle.type));
   }
@@ -274,14 +274,14 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
   // Add ball in playing if it is not the target
   if(theGameInfo.state == STATE_PLAYING)
   {
-    const Vector2f& ballPosition = theTeamBehaviorStatus.role.playsTheBall() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
-    if(theGameInfo.setPlay != SET_PLAY_NONE && theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber)
+    const Vector2f& ballPosition = theTeamBehaviorStatus.role.isBallPlayer() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
+    if(theGameInfo.setPlay != SET_PLAY_NONE && !theGameInfo.isOurKick())
       addObstacle(ballPosition, freeKickRadius);
     else if((ballPosition - to.center).norm() >= 1.f)
       addObstacle(ballPosition, ballRadius);
   }
 
-  if(centerCircleRadius != 0.f && theGameInfo.state == STATE_READY && theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber)
+  if(centerCircleRadius != 0.f && theGameInfo.state == STATE_READY && !theGameInfo.isOurKick())
     addObstacle(Vector2f::Zero(), centerCircleRadius);
 
   // If other nodes surround start or target, shrink them.
@@ -717,7 +717,7 @@ void PathPlannerProvider::addNeighborsFromTangents(Node& node, Tangents& tangent
 #ifndef NDEBUG
           {
             OutBinaryFile stream("PathPlannerProvider.log");
-            stream << theRobotPose << theTeamPlayersModel << lastDir;
+            stream << theRobotPose << theTeamPlayersObstacleModel << lastDir;
           }
           FAIL("Send Config/PathPlannerProvider.log to Thomas.Roefer@dfki.de.");
 #endif

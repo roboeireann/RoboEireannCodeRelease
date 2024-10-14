@@ -5,7 +5,7 @@
 #include "Utils/bush/models/Team.h"
 #include "Utils/bush/tools/Platform.h"
 
-static const size_t MAX_PLAYERS = 6;
+static const size_t MAX_PLAYERS = 8; // FIXME - tie into num robots in rest of codebase
 
 void Team::init()
 {

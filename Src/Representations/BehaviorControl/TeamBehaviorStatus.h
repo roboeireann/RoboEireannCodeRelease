@@ -12,11 +12,10 @@
 #include "Representations/BehaviorControl/TeammateRoles.h"
 #include "Representations/BehaviorControl/TimeToReachBall.h"
 #include "Representations/BehaviorControl/PassStatus.h"
-#include "Tools/Communication/BHumanTeamMessageParts/BHumanMessageParticle.h"
 #include "Tools/Streams/AutoStreamable.h"
 #include "Tools/Streams/Enum.h"
 
-STREAMABLE(TeamBehaviorStatus, COMMA public BHumanCompressedMessageParticle<TeamBehaviorStatus>
+STREAMABLE(TeamBehaviorStatus,
 {
   ENUM(TeamActivity,
   {,
@@ -26,7 +25,11 @@ STREAMABLE(TeamBehaviorStatus, COMMA public BHumanCompressedMessageParticle<Team
     minimalTeam,
     dynamicBallHandlingTeam,
   });
-  static constexpr TeamActivity numOfTeamActivities = numOfTeamActivitys,
+  static constexpr TeamActivity numOfTeamActivities = numOfTeamActivitys;
+
+  void draw() const;
+  
+    /**** streamable fields follow - note comma at end of this line ****/,
 
   (TeamActivity)(noTeam) teamActivity,
   (TimeToReachBall) timeToReachBall,

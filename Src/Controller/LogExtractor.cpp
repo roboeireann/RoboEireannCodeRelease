@@ -10,7 +10,7 @@
 #include "LogPlayer.h"
 #include "Platform/File.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Infrastructure/AudioData.h"
 #include "Representations/Infrastructure/CameraImage.h"
@@ -279,7 +279,7 @@ bool LogExtractor::saveImages(const std::string& path, const bool raw, const boo
     GameInfo,
     CameraImage,
     JPEGImage,
-    RobotInfo,
+    // RobotInfo,
   });
 
   const std::string& folderPath = createNewFolder(path);
@@ -303,7 +303,7 @@ bool LogExtractor::saveImages(const std::string& path, const bool raw, const boo
                theCameraInfo.camera == CameraInfo::upper ? "upper" : "lower", theJPEGImage.timestamp);
 
     if (onlyPlaying && (theGameInfo.state != STATE_PLAYING      // isStateValid
-                        || theRobotInfo.penalty != PENALTY_NONE // isNotPenalized
+                        || theGameInfo.isPenalized() // isNotPenalized
                         || (theFallDownState.state != FallDownState::upright &&
                             theFallDownState.state != FallDownState::staggering) /*isStanding*/))
     {

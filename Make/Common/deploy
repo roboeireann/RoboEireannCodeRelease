@@ -57,7 +57,8 @@ copy()
   REMOTE=`../Common/resolveIp $1`
   PLAYER=$2
 
-  if [ ! -z $PLAYER ] && ( (( $PLAYER < 1 )) || (( $PLAYER > 6 )) ); then
+  # FIXME num players
+  if [ ! -z $PLAYER ] && ( (( $PLAYER < 1 )) || (( $PLAYER > 8 )) ); then
     echo "error: player number is $PLAYER!" >&2
     exit 1
   fi
@@ -99,6 +100,9 @@ copy()
 
   echo "updating roboeireann"
   rsync --del --exclude=.* --exclude=/Images --exclude=/Keys --exclude=/Logs --exclude=/Scenes --chmod=u+rw,go+r,Dugo+x -rzce "ssh $sshoptions" ../../Build/Linux/Nao/$CONFIG/roboeireann ../../Config/. nao@$REMOTE:/home/nao/Config
+
+  # update scripts that are changed infrequently, but are sometimes changed
+  rsync -p -rce "ssh $sshoptions" ../../Install/Files/bin/roboeireann nao@$REMOTE:/home/nao/bin
 
   # set playback volume and reset capture value to 75%
   echo "setting volume to $VOLUME%"

@@ -87,20 +87,25 @@ public:
 
 
   static constexpr int lowestValidPlayerNumber = 1;  /**< No player can have a number smaller than this */
-  // FIXME: hack to reduce the size of transmitted data since we never use numbers above 6
-  static constexpr int highestValidPlayerNumber = 7; /* FIXME NUMROBOTS: MAX_NUM_PLAYERS; */ /**< No player can have a number greater than this */
+  // FIXME: hack to reduce the size of transmitted data since we never use numbers above 7
+  static constexpr int highestValidPlayerNumber = 8; /* FIXME NUMROBOTS: MAX_NUM_PLAYERS; */ /**< No player of ours can have a number greater than this */
   static constexpr int numPlayerNumbers = highestValidPlayerNumber - lowestValidPlayerNumber + 1;
 
   std::string headName; /**< The name of this robot's head. */
   std::string bodyName; /**< The name of this robot's body. */
   
+  static int toPlayerNumber(int index) { return index + lowestValidPlayerNumber; }
+  static int toPlayerIndex(int number) { return number - lowestValidPlayerNumber; }
 
-  /* separate header from streamable fields, note comma after comment */,
+  static int isGoalkeeper(int number) { return number == 1; }
 
-  (int)(-1) teamNumber, /**< The number of our team in the game controller. Use theOwnTeamInfo.teamNumber instead. */
-  (TeamColor)(numOfTeamColors) fieldPlayerColor, /**< The color of our team. Use theOwnTeamInfo value instead. */
-  (TeamColor)(numOfTeamColors) goalkeeperColor, /**< The color of our goalie. Use theOwnTeamInfo value instead. */
-  (int)(-1) playerNumber, /**< The number of the robot in the team. Use theRobotInfo.playerNumber instead. */
+
+  /**** separate header from streamable fields, note comma after comment ****/,
+
+  (int)(-1) teamNumber, /**< The number of our team in the game controller. Use theGameInfo.ourTeam().teamNumber instead. */
+  (TeamColor)(numOfTeamColors) fieldPlayerColor, /**< The color of our team. Use theGameInfo.ourTeam() value instead. */
+  (TeamColor)(numOfTeamColors) goalkeeperColor, /**< The color of our goalie. Use theGameInfo.ourTeam() value instead. */
+  (int)(-1) playerNumber, /**< The number of the robot in the team. Use theGameInfo.playerNumber instead. */
   (std::string)("Default") location, /**< The name of the location. */
   (std::string)("Default") scenario, /**< The name of the scenario. */
   (int)(-1) teamPort, /**< The UDP port our team uses for team communication. */

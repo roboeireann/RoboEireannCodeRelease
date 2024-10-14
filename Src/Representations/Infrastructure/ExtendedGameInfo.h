@@ -12,8 +12,9 @@
 
 #pragma once
 
+#include "Representations/Communication/GameInfo.h"
 #include "Tools/Communication/RoboCupGameControlData.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Tools/Streams/AutoStreamable.h"
 
 STREAMABLE(ExtendedGameInfo,
@@ -40,7 +41,7 @@ STREAMABLE(ExtendedGameInfo,
   (decltype(RoboCup::RoboCupGameControlData::state))(STATE_INITIAL) gameStateBeforeCurrent,         /**< The game state before the current game state. */
   (decltype(RoboCup::RoboCupGameControlData::gamePhase))(GAME_PHASE_NORMAL) gamePhaseBeforeCurrent, /**< The game phase before the current game phase. */
 
-  (RobotInfo::Mode)(RobotInfo::Mode::unstiff) modeLastFrame, ///< the robot mode during the last frame
+  (GameInfo::Mode)(GameInfo::Mode::unstiff) modeLastFrame, ///< the robot mode during the last frame
 
   (bool)(false) didNotHearWhistleThisTime,       /**< Whether the state is playing and the transition to playing was not initiated by a whistle. */
   (bool)(false) walkingInFromSidelines,          /**< Whether the state is ready and the robots started from the sidelines. */

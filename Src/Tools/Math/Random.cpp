@@ -1,11 +1,15 @@
 #include "Random.h"
 
 #ifndef TARGET_ROBOT
+#include "Tools/Global.h"
+#include "Tools/Settings.h"
+
 #include <chrono>
 
 std::mt19937& Random::getGenerator()
 {
-  static thread_local std::mt19937 generator(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
+  static thread_local std::mt19937 generator(static_cast<unsigned int>(
+      std::chrono::system_clock::now().time_since_epoch().count() + Global::getSettings().playerNumber * 111));
 
   return generator;
 }

@@ -10,7 +10,7 @@
 
 #include "Platform/SystemCall.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Sensing/GyroOffset.h"
 #include "Representations/Sensing/GyroState.h"
 #include "Representations/Infrastructure/FrameInfo.h"
@@ -29,7 +29,6 @@ MODULE(GyroOffsetProvider,
   USES(GroundContactState),
   USES(InertialData),
   USES(MotionRequest),
-  USES(RobotInfo),
   REQUIRES(GyroState),
   PROVIDES(GyroOffset),
   DEFINES_PARAMETERS(

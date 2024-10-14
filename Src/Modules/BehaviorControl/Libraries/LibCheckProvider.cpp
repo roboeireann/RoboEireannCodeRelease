@@ -56,7 +56,7 @@ void LibCheckProvider::checkOutputs(const ActivationGraph& activationGraph, LibC
     // Check, if output has been set at least once:
     if(callCounters[i] == 0 && notSetCheck[i] == 1)
     {
-      OUTPUT_TEXT("Meeek! " << TypeRegistry::getEnumName(i) << " has not been set in this cycle (Robot " << theRobotInfo.number
+      OUTPUT_TEXT("Meeek! " << TypeRegistry::getEnumName(i) << " has not been set in this cycle (Robot " << theGameInfo.playerNumber
                   << (!callCounters[LibCheck::role] ? "" : ", Role: " + std::string(TypeRegistry::getEnumName(theTeamBehaviorStatus.role.role)))
                   << (options == "" ? "" : ", Options: " + options) << ") !");
     }
@@ -106,7 +106,7 @@ void LibCheckProvider::inc(LibCheck::CheckedOutput outputToCheck)
         const std::string options = getActivationGraphString(index >= LibCheck::firstTeamCheckedOutput ? theTeamActivationGraph : theActivationGraph);
 
         OUTPUT_TEXT("Meeek! " << TypeRegistry::getEnumName(static_cast<LibCheck::CheckedOutput>(index)) << " has been set more than once in this cycle (Robot "
-                    << theRobotInfo.number
+                    << theGameInfo.playerNumber
                     << (!callCounters[LibCheck::role] ? "" : ", Role: " + std::string(TypeRegistry::getEnumName(theTeamBehaviorStatus.role.role)))
                     << (options == "" ? "" : ", Options: " + options) << ") !");
       }
@@ -119,7 +119,7 @@ void LibCheckProvider::inc(LibCheck::CheckedOutput outputToCheck)
         const std::string options = getActivationGraphString(index >= LibCheck::firstTeamCheckedOutput ? theTeamActivationGraph : theActivationGraph);
 
         FAIL(fmt::format("Robot {}: many repetitions of {} in one cyle implies infinite behaviour loop {} - ",
-                         theRobotInfo.number, (options == "" ? "empty behaviour graph" : options)));
+                         theGameInfo.playerNumber, (options == "" ? "empty behaviour graph" : options)));
       }
     }
   }

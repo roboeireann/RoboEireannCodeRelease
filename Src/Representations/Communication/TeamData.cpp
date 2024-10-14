@@ -9,27 +9,59 @@
 #include <algorithm>
 
 // #define HANDLE_PARTICLE(particle) case id##particle: return the##particle.handleArbitraryMessage(message, [this](unsigned u){return this->toLocalTimestamp(u);})
-bool Teammate::handleMessage(InMessage& message)
-{
-  (void)message; // force use
-  return false;
-  // switch(message.getMessageID())
-  // {
-  //     HANDLE_PARTICLE(FieldCoverage);
-  //     HANDLE_PARTICLE(RobotHealth);
-  //   default:
-  //     return false;
-  // }
-}
+// bool Teammate::handleMessage(InMessage& message)
+// {
+//   (void)message; // force use
+//   return false;
+//   // switch(message.getMessageID())
+//   // {
+//   //     HANDLE_PARTICLE(FieldCoverage);
+//   //     HANDLE_PARTICLE(RobotHealth);
+//   //   default:
+//   //     return false;
+//   // }
+// }
 
 Vector2f Teammate::getEstimatedPosition(unsigned time) const
 {
-  const float timeSinceLastPacket = std::max(0, static_cast<int>(time) - static_cast<int>(timeWhenLastPacketReceived)) / 1000.f;
+  const float secsSinceLastPacket = std::max(0, static_cast<int>(time - timeWhenLastPacketReceived)) / 1000.f;
   const float distanceToTarget = theBehaviorStatus.walkingTo.norm(); // Do not overshoot the target.
   const float correctionFactor = 0.5f;
   const Vector2f walkDirection = ((theRobotPose * theBehaviorStatus.walkingTo) - theRobotPose.translation).normalized();
-  return theRobotPose.translation + std::min(distanceToTarget, timeSinceLastPacket * correctionFactor * theBehaviorStatus.speed) * walkDirection;
+  return theRobotPose.translation +
+         std::min(distanceToTarget, secsSinceLastPacket * correctionFactor * theBehaviorStatus.speed) * walkDirection;
 };
+
+
+
+int TeamData::countActiveTeammatesKickedSinceRestart() const
+{
+  int count = 0;
+  for (Teammate* pTeammate : activeTeammates)
+  {
+    if (pTeammate->kickedSinceRestart)
+      count++;
+  }
+
+  return count;
+}
+
+void TeamData::onRead()
+{
+  activeTeammates.clear();
+
+  teammatesByNumber.assign(Settings::highestValidPlayerNumber + 1, nullptr);
+
+  for (Teammate& t : teammates)
+  {
+    if (!t.isPenalized)
+      activeTeammates.push_back(&t);
+
+    teammatesByNumber[t.number] = &t;
+  }
+}
+
+
 
 void TeamData::draw() const
 {
@@ -67,12 +99,16 @@ void TeamData::draw() const
     // Player number
     DRAW_TEXT("representation:TeamData", rPos.x() + 100, rPos.y(), 100, ColorRGBA::black, teammate.number);
 
+    if (teammate.kickedSinceRestart)
+      CIRCLE("representation:TeamData", rPos.x(), rPos.y(), 70.f, 20, Drawings::dashedPen,
+           ColorRGBA::white, Drawings::noBrush, ColorRGBA::white);
+
     // Role
     DRAW_TEXT("representation:TeamData", rPos.x() + 100, rPos.y() - 150, 100,
              ColorRGBA::black, TypeRegistry::getEnumName(teammate.theTeamBehaviorStatus.role.role));
 
     // Time to reach ball
-    int ttrb = teammate.theTeamBehaviorStatus.role.playsTheBall()
+    int ttrb = teammate.theTeamBehaviorStatus.role.isBallPlayer()
                ? static_cast<int>(teammate.theTeamBehaviorStatus.timeToReachBall.timeWhenReachBallStriker)
                : static_cast<int>(teammate.theTeamBehaviorStatus.timeToReachBall.timeWhenReachBall);
     if(Blackboard::getInstance().exists("FrameInfo"))

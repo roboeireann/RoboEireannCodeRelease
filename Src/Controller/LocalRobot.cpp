@@ -111,15 +111,10 @@ bool LocalRobot::main()
 
             debugSender->out.bin << "Cognition";
             debugSender->out.finishMessage(idFrameBegin);
-            if (ctrl->gameController.writeGameInfo(debugSender->out.bin, lastGCPacketNumber))
-              debugSender->out.finishMessage(idRawGameInfo);
             const int robot = RobotNumber::getRobotIndexFromScene(std::atoi(robotName.substr(5).c_str()));
-            ctrl->gameController.writeOwnTeamInfo(robot, debugSender->out.bin);
-            debugSender->out.finishMessage(idOwnTeamInfo);
-            ctrl->gameController.writeOpponentTeamInfo(robot, debugSender->out.bin);
-            debugSender->out.finishMessage(idOpponentTeamInfo);
-            ctrl->gameController.writeRobotInfo(robot, debugSender->out.bin);
-            debugSender->out.finishMessage(idRobotInfo);
+            if (ctrl->gameController.writeGameInfo(debugSender->out.bin, lastGCPacketNumber))
+              debugSender->out.finishMessage(idReceivedGameControlData);
+            ctrl->gameController.checkRobotMovement(robot);
             debugSender->out.bin << worldState;
             debugSender->out.finishMessage(idGroundTruthWorldState);
             debugSender->out.bin << "Cognition";
@@ -159,15 +154,10 @@ bool LocalRobot::main()
           }
           debugSender->out.bin << motionInfo;
           debugSender->out.finishMessage(idMotionInfo);
+          const int robot = RobotNumber::getRobotIndexFromScene(std::atoi(robotName.substr(5).c_str()));
           if (ctrl->gameController.writeGameInfo(debugSender->out.bin, lastGCPacketNumber))
             debugSender->out.finishMessage(idGameInfo);
-          const int robot = RobotNumber::getRobotIndexFromScene(std::atoi(robotName.substr(5).c_str()));
-          ctrl->gameController.writeOwnTeamInfo(robot, debugSender->out.bin);
-          debugSender->out.finishMessage(idOwnTeamInfo);
-          ctrl->gameController.writeOpponentTeamInfo(robot, debugSender->out.bin);
-          debugSender->out.finishMessage(idOpponentTeamInfo);
-          ctrl->gameController.writeRobotInfo(robot, debugSender->out.bin);
-          debugSender->out.finishMessage(idRobotInfo);
+          ctrl->gameController.checkRobotMovement(robot);
           debugSender->out.bin << worldState;
           debugSender->out.finishMessage(idGroundTruthWorldState);
           debugSender->out.bin << "Cognition";

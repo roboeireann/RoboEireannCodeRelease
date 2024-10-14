@@ -12,7 +12,7 @@
 #include "Representations/BehaviorControl/Libraries/LibTeam.h"
 #include "Representations/BehaviorControl/Libraries/LibPosition.h"
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
@@ -29,7 +29,7 @@ MODULE(LibTeamProvider,
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
   REQUIRES(LibPosition),
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamBehaviorStatus),
   REQUIRES(TeamData),

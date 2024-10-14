@@ -3,6 +3,7 @@
  * This file declares a module that provides audio samples.
  * @author Thomas Röfer
  * @author Lukas Plecher
+ * @author Shauna Recto
  */
 
 #pragma once
@@ -20,7 +21,7 @@ MODULE(AudioProvider,
 {,
   USES(GameInfo),
   REQUIRES(DamageConfigurationHead),
-  REQUIRES(RawGameInfo),
+  REQUIRES(ReceivedGameControlData),
   PROVIDES_WITHOUT_MODIFY(AudioData),
   LOADS_PARAMETERS(
   {,
@@ -32,6 +33,7 @@ MODULE(AudioProvider,
     (bool) onlySoundInSetAndPlaying, /**< If true, the module will not provide audio data in game states other than set and playing. */
     (std::string) captureCard,       /**< The ALSA sound card to be used for audio capture. */
     (float) captureVolume,           /**< The microphone volume in percent. */
+    (std::string) pcmDevice,         /**< The PCM device configuration (if you plan to use more than 2 mics) */
   }),
 });
 
@@ -40,20 +42,14 @@ class AudioProvider : public AudioProviderBase
 private:
 #ifdef TARGET_ROBOT
   snd_pcm_t* handle;
-  int channels;
+  unsigned channels;
   float currentCaptureVolume = -1.f;
+  std::string currentPCMDevice; 
   bool setCaptureVolume(const std::string& element, float volume);
 #endif
   void update(AudioData& audioData) override;
 
 public:
-  /**
-   * Default constructor.
-   */
   AudioProvider();
-
-  /**
-   * Destructor.
-   */
   ~AudioProvider();
 };

@@ -3,7 +3,9 @@
  * 
  * Skills related obstacle detection and avoidance etc
  * 
- * @author: Rudi Villing
+ * @author Rudi Villing
+ * @author James Petri
+ * @author Andy Lee Mitchell
  */
 
 #pragma once
@@ -62,6 +64,25 @@ namespace CoroBehaviour
       return false; // all clear
     }
 
+    bool isOpponentDangerNearBallDuel(float distanceThreshold = 1200.f)
+    {
+      for (auto obstacle : theObstacleModel.obstacles)
+      {
+        if ((obstacle.type == Obstacle::opponent || obstacle.type == Obstacle::someRobot  || obstacle.type == Obstacle::teammate) &&
+            (isCloserThan(obstacle.center - theFieldBall.endPositionRelative, distanceThreshold)))
+        {
+          return true;
+        }
+        if ((obstacle.type == Obstacle::opponent || obstacle.type == Obstacle::someRobot  || obstacle.type == Obstacle::teammate) &&
+            (isCloserThan(obstacle.center - theFieldBall.positionRelative, distanceThreshold)))
+        {
+          return true;
+        }
+      }
+
+      return false; // all clear
+    }
+
 
     bool areTeammatesNearPointOnField(const Vector2f& pointOnField, float distanceThreshold = 1000.f)
     {
@@ -105,10 +126,7 @@ namespace CoroBehaviour
       // mark the goal
       Vector2f goalLeft {theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosLeftGoal - theFieldDimensions.goalPostRadius};
       Vector2f goalRight {theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosRightGoal + theFieldDimensions.goalPostRadius};
-      // Vector2f goalCenter {theFieldDimensions.xPosOpponentGroundLine, 0.f};
 
-      // sectorWheel.addSector(Rangea(theRobotPose.toRobotCoordinates(goalRight).angle(), theRobotPose.toRobotCoordinates(goalLeft).angle()), 
-      //   theRobotPose.toRobotCoordinates(goalCenter).norm(), SectorWheel::Sector::goal);
       sectorWheel.addSector(theRobotPose.toRobotCoordinates(goalLeft), theRobotPose.toRobotCoordinates(goalRight),
                             SectorWheel::Sector::goal);
 
@@ -271,7 +289,122 @@ namespace CoroBehaviour
       return closest;
     }
 
+    Angle getNearestOpponentAngle()
+    {
+      Angle nearestOpponentAngle = 0;
+      using obstacleDistancePair = std::pair<float, Obstacle>;
+      std::vector<obstacleDistancePair> obstaclesDistances = {};
 
+      // create the pairs of opponents and their distances
+      for (auto obstacle : theObstacleModel.obstacles)
+      {
+        if (obstacle.type == Obstacle::opponent)
+        {
+          obstaclesDistances.push_back(
+            obstacleDistancePair{obstacle.center.norm(), obstacle}
+          );
+        }
+      }
+
+      // check for empty obstacle model, i.e. cannot see any opponents.
+      if (obstaclesDistances.empty())
+        return nearestOpponentAngle;
+      
+      // sort pairs from closest to furthest
+      std::sort(
+        obstaclesDistances.begin(),
+        obstaclesDistances.end(),
+        [](obstacleDistancePair a, obstacleDistancePair b){return a.first < b.first;}
+      );
+
+      Obstacle closestOpponent = obstaclesDistances.front().second;
+
+      if (closestOpponent.center.norm() < 10000.f)
+      {
+        nearestOpponentAngle = closestOpponent.center.angle();
+      }
+
+
+      return nearestOpponentAngle;
+    }
+
+    const std::list<SectorWheel::Sector>& populateKickSectorsToFieldArea(const Vector2f& originPoint, const Vector2f& kickAreaPoint1, const Vector2f& kickAreaPoint2)
+    {
+      sectorWheel.begin(originPoint);
+
+      // add the area defined by the two kickAreaPoints as the "goal" area, 
+      // i.e. the area in the field we would like the ball to go
+      sectorWheel.addSector(theRobotPose.toRobotCoordinates(kickAreaPoint1), theRobotPose.toRobotCoordinates(kickAreaPoint2),
+                            SectorWheel::Sector::goal);
+
+      // add obstacles from the obstacle model
+      for (auto obstacle : theObstacleModel.obstacles)
+      {
+        SectorWheel::Sector::Type sectorType;
+
+        switch (obstacle.type)
+        {
+          default:
+            sectorType = SectorWheel::Sector::obstacle;
+            break;
+
+          case Obstacle::teammate:
+          case Obstacle::fallenTeammate:
+            sectorType = SectorWheel::Sector::teammate;
+            break;
+
+          case Obstacle::someRobot:
+            sectorType = SectorWheel::Sector::obstacle;
+            break;
+        }
+
+        sectorWheel.addSector(obstacle.center, (obstacle.left - obstacle.right).norm()/2, sectorType);
+      }
+
+      return sectorWheel.finish();
+    }
+
+    const std::list<SectorWheel::Sector>& populateKickSectorsAtBallToFieldArea(const Vector2f& kickAreaPoint1, const Vector2f& kickAreaPoint2)
+    {
+      const std::list<SectorWheel::Sector>& sectors = populateKickSectorsToFieldArea(theFieldBall.endPositionRelative, kickAreaPoint1, kickAreaPoint2);
+
+      // set origin to robot relative coordinates
+      ORIGIN("behaviour:ObstacleSkills:ballKickSectorWheel", theRobotPose.translation.x(), theRobotPose.translation.y(), theRobotPose.rotation);
+      DRAW_SECTOR_WHEEL("behaviour:ObstacleSkills:ballKickSectorWheel", sectors, theFieldBall.endPositionRelative);
+      ORIGIN("behaviour:ObstacleSkills:ballKickSectorWheel", 0, 0, 0); // reset coordinates to field
+
+      return sectors;
+    }
+
+    Rangea getBestFieldAreaSector(const std::list<SectorWheel::Sector> &sectorList)
+    {
+      Rangea angleRange(0,0);
+
+      for (auto sector : sectorList)
+      {
+        if (sector.type == SectorWheel::Sector::goal && (sector.angleRange.getSize() > angleRange.getSize()))
+          angleRange = sector.angleRange;
+      }
+
+      return angleRange;
+    }
+
+    std::pair<Rangea, float> getBestFieldAreaSectorForPass(const std::list<SectorWheel::Sector> &sectorList)
+    {
+      Rangea angleRange(0,0);
+      float distance = 0;
+
+      for (auto sector : sectorList)
+      {
+        if (sector.type == SectorWheel::Sector::teammate && (sector.angleRange.getSize() > angleRange.getSize()))
+        {
+          angleRange = sector.angleRange;
+          distance = sector.distance;
+        }
+      }
+
+      return std::make_pair(angleRange, distance);
+    }
 
   private:
     BehaviourEnv& env;

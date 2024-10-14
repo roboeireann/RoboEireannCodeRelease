@@ -1,0 +1,11 @@
+dr annotation
+
+set representation:RawGameInfo packetNumber = 0; competitionPhase = 0; competitionType = 0; gamePhase = 0; state = 2; setPlay = 0; firstHalf = 1; kickingTeam = 1; secsRemaining = 600; secondaryTime = 0; timeLastPacketReceived = 0;
+
+echo Plotting gestureConfidence
+vp gestureDetection 250 -0.05 1.15
+vpd gestureDetection module:ReadyGestureDetector:gestureConfidence green
+vpd gestureDetection module:ReadyGestureDetector:gestureConfidenceThreshold red
+
+echo Plotting cropBox
+vid upper module:ReadyGestureDetector:cropBox

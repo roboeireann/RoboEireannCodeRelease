@@ -12,18 +12,32 @@ template<typename V>
 constexpr V toDegrees(V angle) { return angle * V(180.f / pi); }
 
 /**
- * The Angle class stores the represented angle in radiant.
+ * The Angle class stores the represented angle in radians.
  */
 class Angle
 {
 public:
+  /**
+   * wrapper type to enable auto-formatting of angles with fmtlib and get around the implicit conversion of Angle to
+   * float
+   */
+  struct Fmt
+  {
+    float value;
+    Fmt(float v) : value(v) {}
+  };
+
   constexpr Angle() = default;
   constexpr Angle(float angle) : value(angle) {}
 
+  // implicit conversion seems to be needed for working with Eigen (at least as the code is currently written)
   operator float& () { return value; }
   constexpr operator const float& () const { return value; }
 
+  // unary sign operator
   constexpr Angle operator-() const { return Angle(-value); }
+
+  // arithmetic operators
   Angle& operator+=(float angle) { value += angle; return *this; }
   Angle& operator-=(float angle) { value -= angle; return *this; }
   Angle& operator*=(float angle) { value *= angle; return *this; }
@@ -39,12 +53,14 @@ public:
   template<typename V>
   static V normalize(V data);
 
-  Angle diffAbs(Angle b) const { return std::abs(normalize(value - b)); }
+  Angle diffAbs(Angle b) const { return std::abs(normalize(value - static_cast<float>(b))); }
 
   static constexpr Angle fromDegrees(float degrees) { return Angle((degrees / 180.f) * pi); }
   static constexpr Angle fromDegrees(int degrees) { return fromDegrees(static_cast<float>(degrees)); }
 
   constexpr float toDegrees() const { return (value / pi) * 180.f; }
+
+  Fmt fmt() const { return Fmt(value); }
 
 private:
   float value = 0.f;

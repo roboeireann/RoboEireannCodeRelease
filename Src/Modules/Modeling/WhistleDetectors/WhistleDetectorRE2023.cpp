@@ -189,7 +189,7 @@ void WhistleDetectorRE2023::processAudio(Whistle &theWhistle, bool detectWhistle
     }
 
     /* normalize the mono sample level and add to the mono mix buffer */
-    monoBuffer.push_front(clampSample(monoSum / theAudioData.channels * sampleGain, 1.f));
+    monoBuffer.push_front(clampSample(monoSum / theAudioData.channels * sampleGain, 3.f));
 
     /* Plot monoBuffer Data
      * TODO: Check whether this is the right way for indexing through monoBuffer.
@@ -202,15 +202,24 @@ void WhistleDetectorRE2023::processAudio(Whistle &theWhistle, bool detectWhistle
    * into our NN which produces a single float value */
   float whistleConfidence = compareAudio();
 
+  /* Set the whistleDetection to false at start of the block */
+  theWhistle.whistleDetected = false;
+
   /* Set the detection info */
   if (detectWhistles)
-  {
-    theWhistle.confidenceOfLastWhistleDetection = whistleConfidence;
-    theWhistle.channelsUsedForWhistleDetection = static_cast<unsigned char>(channelBuffers.size());
-    if (whistleConfidence > 0.f)
+  { 
+    /* Checks whether the confidence value from the NN */
+    if (whistleConfidence > whistleConfidenceThresh)
     {
-      if (theFrameInfo.getTimeSince(theWhistle.lastTimeWhistleDetected) > detTimeoutMs)
-        theWhistle.lastTimeWhistleDetected = theFrameInfo.time;
+      ANNOTATION_FMT("Whistle", "Whistle has been detected with confidence of {}", whistleConfidence);
+      theWhistle.whistleDetected = true;
+      theWhistle.lastTimeWhistleDetected = theFrameInfo.time;
+
+      /* Part of the whistle module. TODO if these are needed still or used
+        * elsewhere apart from whistleDetector or whistleHandler.
+        */
+      theWhistle.confidenceOfLastWhistleDetection = whistleConfidence;
+      theWhistle.channelsUsedForWhistleDetection = static_cast<unsigned char>(channelBuffers.size());
     }
   }
   else
@@ -315,7 +324,7 @@ float WhistleDetectorRE2023::compareAudio()
   ASSERT(whistleDetCompNN.input(0).dims(2) == 1);
 
   /* We only want 1 output */
-  ASSERT(whistleDetCompNN.output(0).dims(0) == 2);
+  ASSERT(whistleDetCompNN.output(0).dims(0) == 1);
 
   /* Passing FFTs into NN */
   float *fftDest = whistleDetCompNN.input(0).data();
@@ -345,42 +354,9 @@ float WhistleDetectorRE2023::compareAudio()
   /* Prints values of the whistleConfidence. Debugging. */
   TLOGD(tlogger, "WhistleConfidence Value is {}", whistleConfidence);
   PLOT("module:WhistleDetectorRE2023:whistleConfidence", whistleConfidence);
-
-  /* Smoothening of the confidence.
-   * The aim of this is to pick the best confidence value.
-   * After testing with the current whistle detector,
-   * there are random and sudden spikes, which can be
-   * attentuated via averaging smoothing.
-   * However, it will output unchanged confidences over
-   * upperWhistleConfidenceThresh.
-   */
-  static int whistConfN = 0;
-  whistConfN = whistConfN < averagingLength ? whistConfN++ : 0;
-  float averagedWhistleConfidence = 0;
-
-  /* Get all the confidences stored up and average the result*/
-  whistleConfidences[whistConfN] = whistleConfidence;
-  for (auto &n : whistleConfidences)
-    averagedWhistleConfidence += n;
-
-  averagedWhistleConfidence /= averagingLength;
-
-  /* If the values are above the upper threshold and less than 0, do nothing,
-   * otherwise use the averaged value.
-   */
-  float bestWhistleConfidence = ((whistleConfidence > upperWhistleConfidenceThresh) || (whistleConfidence < 0))
-                                    ? whistleConfidence
-                                    : averagedWhistleConfidence;
-
-  PLOT("module:WhistleDetectorRE2023:bestWhistleConfidence", bestWhistleConfidence);
   PLOT("module:WhistleDetectorRE2023:whistleConfidenceThresh", whistleConfidenceThresh);
-  PLOT("module:WhistleDetectorRE2023:upperWhistleConfidenceThresh", upperWhistleConfidenceThresh);
 
-  /* Checks whether the confidence value from the NN */
-  if (bestWhistleConfidence > whistleConfidenceThresh)
-    ANNOTATION("Whistle", fmt::format("Whistle has been detected with confidence of {}", bestWhistleConfidence));
-
-  return bestWhistleConfidence;
+  return whistleConfidence;
 }
 
 float WhistleDetectorRE2023::clampSample(float audioSample, float limit)

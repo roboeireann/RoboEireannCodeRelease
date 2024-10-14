@@ -103,7 +103,7 @@ void BallDropInLocator::updateTouchPositions()
   for(const auto& teammate : theTeamData.teammates)
   {
     if(teammate.status == Teammate::PENALIZED
-       && theOwnTeamInfo.players[teammate.number - 1].penalty != PENALTY_SPL_ILLEGAL_MOTION_IN_SET
+       && theGameInfo.ourTeam().players[teammate.number - 1].penalty != PENALTY_SPL_ILLEGAL_MOTION_IN_SET
        && theFrameInfo.getTimeSince(teammate.timeWhenStatusChanged) > timeUntilPenalizedRobotsAreRemoved)
       continue;
     if((teammate.theRobotPose.translation - theTeamBallModel.position).squaredNorm() < ballTouchThresholdSquared)
@@ -113,7 +113,7 @@ void BallDropInLocator::updateTouchPositions()
     }
   }
 
-  for(const auto& obstacle : theTeamPlayersModel.obstacles)
+  for(const auto& obstacle : theTeamPlayersObstacleModel.obstacles)
     if(!obstacle.isTeammate() && obstacle.type != Obstacle::goalpost
        && (obstacle.center - theTeamBallModel.position).squaredNorm() < ballTouchThresholdSquared)
     {
@@ -187,19 +187,19 @@ void BallDropInLocator::updateGameControllerData(BallDropInModel& ballDropInMode
 {
   if(theExtendedGameInfo.setPlayLastFrame != SET_PLAY_GOAL_KICK && theGameInfo.setPlay == SET_PLAY_GOAL_KICK)
   {
-    ownTeamTouchedLast = theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber;
+    ownTeamTouchedLast = !theGameInfo.isOurKick();
     ballDropInModel.dropInType = BallDropInModel::goalKick;
     ballDropInModel.lastTimeWhenBallWentOut = theFrameInfo.time;
   }
   else if(theExtendedGameInfo.setPlayLastFrame != SET_PLAY_CORNER_KICK && theGameInfo.setPlay == SET_PLAY_CORNER_KICK)
   {
-    ownTeamTouchedLast = theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber;
+    ownTeamTouchedLast = !theGameInfo.isOurKick();
     ballDropInModel.dropInType = BallDropInModel::cornerKick;
     ballDropInModel.lastTimeWhenBallWentOut = theFrameInfo.time;
   }
   else if(theExtendedGameInfo.setPlayLastFrame != SET_PLAY_KICK_IN && theGameInfo.setPlay == SET_PLAY_KICK_IN)
   {
-    ownTeamTouchedLast = theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber;
+    ownTeamTouchedLast = !theGameInfo.isOurKick();
     ballDropInModel.dropInType = BallDropInModel::kickIn;
     ballDropInModel.lastTimeWhenBallWentOut = theFrameInfo.time;
   }
@@ -212,8 +212,8 @@ void BallDropInLocator::draw() const
   {
     for(unsigned int i = 0; i < numOfTouchedBys; ++i)
     {
-      ColorRGBA color = i != unknown ? ColorRGBA::fromTeamColor((i == ownTeam) ? theOwnTeamInfo.fieldPlayerColor
-                                                                               : theOpponentTeamInfo.fieldPlayerColor)
+      ColorRGBA color = i != unknown ? ColorRGBA::fromTeamColor((i == ownTeam) ? theGameInfo.ourTeam().fieldPlayerColor
+                                                                               : theGameInfo.opponentTeam().fieldPlayerColor)
                                      : ColorRGBA::orange;
       const int age = theFrameInfo.getTimeSince(lastTouchEvents[i].timestamp);
       if(age > rememberEventDuration)

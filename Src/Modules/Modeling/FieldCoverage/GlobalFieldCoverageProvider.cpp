@@ -1,5 +1,8 @@
 /**
  * @file GlobalFieldCoverageProvider.cpp
+ * 
+ * DEPRECATED
+ * 
  * @author Andreas Stolpmann
  */
 
@@ -40,9 +43,11 @@ void GlobalFieldCoverageProvider::update(GlobalFieldCoverage& globalFieldCoverag
 
   for(size_t y = 0; y < theFieldCoverage.lines.size(); ++y)
     addLine(theFieldCoverage.lines[y]);
-  for(const auto& teammate : theTeamData.teammates)
-    for(size_t y = 0; y < teammate.theFieldCoverage.lines.size(); ++y)
-      addLine(teammate.theFieldCoverage.lines[y]);
+
+  // RV delete - DEPRECATED
+  // for(const auto& teammate : theTeamData.teammates)
+  //   for(size_t y = 0; y < teammate.theFieldCoverage.lines.size(); ++y)
+  //     addLine(teammate.theFieldCoverage.lines[y]);
 
   if(theTeamBallModel.isValid)
     setCoverageAtFieldPosition(globalFieldCoverage, theTeamBallModel.position, 0);

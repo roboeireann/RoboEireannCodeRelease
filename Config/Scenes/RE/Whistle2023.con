@@ -31,9 +31,6 @@ vpd monoBuffer module:WhistleDetectorRE2023:monoBuffer red
 echo Plotting whistleConfidence
 vp whistleConfidence 250 -0.05 1.05
 vpd whistleConfidence module:WhistleDetectorRE2023:whistleConfidence red
-vpd whistleConfidence module:WhistleDetectorRE2023:bestWhistleConfidence blue
 vpd whistleConfidence module:WhistleDetectorRE2023:whistleConfidenceThresh orange
-vpd whistleConfidence module:WhistleDetectorRE2023:upperWhistleConfidenceThresh green
-
 
 get parameters:WhistleDetectorRE2023

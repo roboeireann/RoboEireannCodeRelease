@@ -7,13 +7,14 @@
  */
 
 #include "FieldDimensions.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Tools/Debugging/Modify.h"
 #include "Tools/Streams/InStreams.h"
 #include "Platform/BHAssert.h"
 #include "Tools/Math/Geometry.h"
 #include "Tools/Math/Eigen.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Tools/Debugging/DebugDrawings.h"
+#include "Tools/Debugging/DebugDrawings3D.h"
 #include "Tools/Module/Blackboard.h"
 #include <algorithm>
 
@@ -137,28 +138,45 @@ void FieldDimensions::drawLines() const
     CIRCLE("field lines", centerCircle.center.x(), centerCircle.center.y(), centerCircle.radius, fieldLinesWidth, Drawings::solidPen, lineColor, Drawings::noBrush, ColorRGBA::black);
   }
 
-  DEBUG_DRAWING("half meter grid", "drawingOnField")
+  DEBUG_DRAWING("halfMeterGrid", "drawingOnField")
   {
     for(int y = 0; y < yPosLeftFieldBorder; y += 500)
     {
-      LINE("half meter grid", xPosOwnFieldBorder, y, xPosOpponentFieldBorder, y, 10, Drawings::dottedPen, ColorRGBA::black);
-      LINE("half meter grid", xPosOwnFieldBorder, -y, xPosOpponentFieldBorder, -y, 10, Drawings::dottedPen, ColorRGBA::black);
+      LINE("halfMeterGrid", xPosOwnFieldBorder, y, xPosOpponentFieldBorder, y, 10, Drawings::dottedPen, ColorRGBA::green);
+      LINE("halfMeterGrid", xPosOwnFieldBorder, -y, xPosOpponentFieldBorder, -y, 10, Drawings::dottedPen, ColorRGBA::green);
     }
 
     for(int x = 0; x < xPosOpponentFieldBorder; x += 500)
     {
-      LINE("half meter grid", x, yPosLeftFieldBorder, x, yPosRightFieldBorder, 10, Drawings::dottedPen, ColorRGBA::black);
-      LINE("half meter grid", -x, yPosLeftFieldBorder, -x, yPosRightFieldBorder, 10, Drawings::dottedPen, ColorRGBA::black);
+      LINE("halfMeterGrid", x, yPosLeftFieldBorder, x, yPosRightFieldBorder, 10, Drawings::dottedPen, ColorRGBA::green);
+      LINE("halfMeterGrid", -x, yPosLeftFieldBorder, -x, yPosRightFieldBorder, 10, Drawings::dottedPen, ColorRGBA::green);
+    }
+  }
+
+  DEBUG_DRAWING3D("halfMeterGrid", "field")
+  {
+    float z = 0.f;
+    ColorRGBA col = ColorRGBA::green.alpha(0.25f); // FIXME: alpha doesn't seem to work
+
+    for(int y = 0; y < yPosLeftFieldBorder; y += 500)
+    {
+      LINE3D("halfMeterGrid", xPosOwnFieldBorder, y, z, xPosOpponentFieldBorder, y, z, 1, col);
+      LINE3D("halfMeterGrid", xPosOwnFieldBorder, -y, z, xPosOpponentFieldBorder, -y, z, 1, col);
+    }
+
+    for(int x = 0; x < xPosOpponentFieldBorder; x += 500)
+    {
+      LINE3D("halfMeterGrid", x, yPosLeftFieldBorder, z, x, yPosRightFieldBorder, z, 1, col);
+      LINE3D("halfMeterGrid", -x, yPosLeftFieldBorder, z, -x, yPosRightFieldBorder, z, 1, col);
     }
   }
 }
 
 void FieldDimensions::drawPolygons() const
 {
-  if(Blackboard::getInstance().exists("OwnTeamInfo") && Blackboard::getInstance().exists("OpponentTeamInfo"))
+  if (Blackboard::getInstance().exists("GameInfo"))
   {
-    const OwnTeamInfo& ownTeamInfo = static_cast<const OwnTeamInfo&>(Blackboard::getInstance()["OwnTeamInfo"]);
-    const OpponentTeamInfo& opponentTeamInfo = static_cast<const OpponentTeamInfo&>(Blackboard::getInstance()["OpponentTeamInfo"]);
+    const GameInfo& gameInfo = static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]);
 
     DEBUG_DRAWING("field polygons", "drawingOnField")
     {
@@ -176,8 +194,8 @@ void FieldDimensions::drawPolygons() const
         ColorRGBA(127, 80, 20), // brown
         ColorRGBA(120, 120, 120) // light gray
       };
-      const ColorRGBA& own = colors[ownTeamInfo.fieldPlayerColor];
-      const ColorRGBA& opp = colors[opponentTeamInfo.fieldPlayerColor];
+      const ColorRGBA& own = colors[gameInfo.ourTeam().fieldPlayerColor];
+      const ColorRGBA& opp = colors[gameInfo.opponentTeam().fieldPlayerColor];
 
       Vector2f goal[4];
       goal[0] = Vector2f(xPosOwnGroundLine - fieldLinesWidth * 0.5f, yPosLeftGoal);
@@ -246,6 +264,47 @@ void FieldDimensions::LinesTable::pushCircle(const Vector2f& center, float radiu
     p2 = p1;
   }
 }
+
+
+
+void FieldDimensions::populateSymbols(std::unordered_map<std::string, float>& symbols) const
+{
+#define SET_SYMBOL(member) symbols[#member] = member
+  SET_SYMBOL(xPosOwnFieldBorder);
+  SET_SYMBOL(xPosOwnGoal);
+  SET_SYMBOL(xPosOwnGoalPost);
+  SET_SYMBOL(xPosOwnGroundLine);
+  SET_SYMBOL(xPosOwnGoalArea);
+  SET_SYMBOL(xPosOwnPenaltyMark);
+  SET_SYMBOL(xPosOwnPenaltyArea);
+  SET_SYMBOL(xPosHalfWayLine);
+  SET_SYMBOL(xPosPenaltyStrikerStartPosition);
+  SET_SYMBOL(xPosOpponentPenaltyArea);
+  SET_SYMBOL(xPosOpponentPenaltyMark);
+  SET_SYMBOL(xPosOpponentGoalArea);
+  SET_SYMBOL(xPosOpponentGroundLine);
+  SET_SYMBOL(xPosOpponentGoalPost);
+  SET_SYMBOL(xPosOpponentGoal);
+  SET_SYMBOL(xPosOpponentFieldBorder);
+
+  SET_SYMBOL(yPosLeftFieldBorder);
+  SET_SYMBOL(yPosLeftSideline);
+  SET_SYMBOL(yPosLeftPenaltyArea);
+  SET_SYMBOL(yPosLeftGoal);
+  SET_SYMBOL(yPosLeftGoalArea);
+  SET_SYMBOL(yPosRightGoalArea);
+  SET_SYMBOL(yPosRightGoal);
+  SET_SYMBOL(yPosRightPenaltyArea);
+  SET_SYMBOL(yPosRightSideline);
+  SET_SYMBOL(yPosRightFieldBorder);
+
+  SET_SYMBOL(centerCircleRadius);
+  SET_SYMBOL(fieldLinesWidth);
+  SET_SYMBOL(goalPostRadius);
+  SET_SYMBOL(penaltyMarkSize);
+#undef SET_SYMBOL
+}
+
 
 void FieldDimensions::read(In& stream)
 {

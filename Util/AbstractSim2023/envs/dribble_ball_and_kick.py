@@ -1,0 +1,740 @@
+from cmath import rect
+from re import A
+import gym
+import pygame
+import numpy as np
+# import pandas as pd
+import json
+import torch
+import time
+import sys
+from pygame.rect import *
+import os
+sys.path.append(sys.path[0] + "/..")
+
+from gym import spaces
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, VecMonitor
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.evaluation import evaluate_policy
+
+from envs.base import BaseEnv
+
+import warnings
+from utils.utils import save_vec_normalize_data
+
+warnings.filterwarnings("ignore")
+
+LENGTH = 500
+TRAINING_STEPS = 1000000
+
+
+class DribbleBallAndKickEnv(BaseEnv):
+    def __init__(self):
+        super().__init__()
+
+        """
+        OBSERVATION SPACE:
+            - x-coordinate of robot with respect to target
+            - y-coordinate of robot with respect to target
+            - sin(Angle between robot and target)
+            - cos(Angle between robot and target)
+        """
+        observation_space_size = 12
+
+        observation_space_low = -1 * np.ones(observation_space_size)
+        observation_space_high = np.ones(observation_space_size)
+        self.observation_space = gym.spaces.Box(
+            observation_space_low, observation_space_high
+        )
+        """
+        ACTION SPACE:
+            - Angle of robot
+            - x-coordinate of robot with respect to target
+            - y-coordinate of robot with respect to target
+            - pass threshold
+            - shoot threshold
+        """
+        action_space_low = np.array([-np.pi / 2, 0, -1, 0, 0])
+        action_space_high = np.array([np.pi / 2, 1, 1, 1, 1])
+        self.action_space = gym.spaces.Box(action_space_low, action_space_high)
+
+        self.reward_init()
+        self.reset()
+
+
+    def reward_init(self):
+        if os.path.exists('reward.py'):
+            os.remove('reward.py')
+
+        # maxReward = 1
+        # minReward = -1
+        # collisionReward = -0.2
+        # goalThreshold = 5
+        # dribbleThreshold = 5
+
+        # distanceToBall = ((self.robot_x - self.target_x) ** 2 + (self.robot_y - self.target_y) ** 2) ** 0.5
+        # distanceToGoal = self.get_distance_target_goal()
+        # angleBallAndGoal = np.arctan2(self.goal_y - self.target_y, self.goal_x - self.target_y)
+        # angleBallAndTeammate = np.arctan2(self.teammate_y - self.target_y, self.teammate_x - self.target_y)
+        # teammateDistanceToGoal = ((self.teammate_x - self.goal_x) ** 2 + (self.teammate_y - self.goal_y) ** 2) ** 0.5
+
+        # reward = 0  # Initialize reward
+
+        # if distanceToGoal < goalThreshold:
+        #     reward += maxReward
+        # elif self.contacted_ball or (distanceToBall < dribbleThreshold):
+        #     reward = 1 / distanceToGoal
+        #     if self.defender_collision:
+        #         reward += collisionReward
+        #     if self.robot_x < self.target_x:
+        #         reward += 0.05
+        #     if self.check_facing_down_field():
+        #         reward += 0.05
+        #     if self.shooting:
+        #         if self.good_shooting_position():
+        #             reward += 1
+        #         else:
+        #             reward -= 0.2
+        #     elif self.passing:
+        #         if self.good_passing_position():
+        #             reward += 0.8
+        #         else:
+        #             reward -= 0.2
+        # else:
+        #     reward -= distanceToBall / 1000
+        #     if self.passing or self.shooting:
+        #         reward -= minReward
+        # if self.out_of_bounds:
+        #     reward -= 1
+
+        # # Normalize the reward to be between -1 and 1
+        # reward = max(minReward, min(maxReward, reward))
+
+        # # Penalize actions leading to undesired outcomes more heavily
+        # if self.out_of_bounds():
+        #     reward -= 0.5
+
+        # # Reward exploration
+        # reward += 0.01  # Small reward for exploring new states
+
+        # # Prioritize important goals
+        # if self.shooting:
+        #     reward += 0.2  # Additional reward for shooting
+        # elif self.passing:
+        #     reward += 0.1  # Additional reward for passing
+
+        # # Regularization - discourage large changes in reward
+        # reward -= 0.02 * abs(reward)
+
+        # # Ensure final reward stays within range
+        # reward = max(minReward, min(maxReward, reward))
+
+
+        with open('reward.py', 'w') as f:
+            f.write("maxReward = 1\n")
+            f.write("minReward = -1\n")
+            f.write("collisionReward = -0.2\n")
+            f.write("goalThreshold = 5\n")
+            f.write("dribbleThreshold = 5\n\n")
+            f.write("distanceToBall = ((self.robot_x - self.target_x) ** 2 + (self.robot_y - self.target_y) ** 2) ** 0.5\n")
+            f.write("distanceToGoal = self.get_distance_target_goal()\n")
+            f.write("angleBallAndGoal = np.arctan2(self.goal_y - self.target_y, self.goal_x - self.target_y)\n")
+            f.write("angleBallAndTeammate = np.arctan2(self.teammate_y - self.target_y, self.teammate_x - self.target_y)\n")
+            f.write("teammateDistanceToGoal = ((self.teammate_x - self.goal_x) ** 2 + (self.teammate_y - self.goal_y) ** 2) ** 0.5\n\n")
+            f.write("if distanceToGoal < goalThreshold:\n")
+            f.write("    reward += maxReward\n")
+            f.write("elif self.contacted_ball or (distanceToBall < dribbleThreshold):\n")
+            f.write("    reward = 1 / distanceToGoal\n")
+            f.write("    if self.defender_collision:\n")
+            f.write("        reward += collisionReward\n")
+            f.write("    if self.robot_x < self.target_x:\n")
+            f.write("        reward += 0.05\n")
+            f.write("    if self.check_facing_down_field():\n")
+            f.write("        reward += 0.07 \n")
+            f.write("    if self.shooting:\n")
+            f.write("        if self.good_shooting_position():\n")
+            f.write("            reward += 1\n")
+            f.write("        else:\n")
+            f.write("            reward -= 0.2\n")
+            f.write("    elif self.passing:\n")
+            f.write("        if self.good_passing_position():\n")
+            f.write("            reward += 0.8\n")
+            f.write("        else:\n")
+            f.write("            reward -= 0.2\n")
+            f.write("else:\n")
+            f.write("    reward -= distanceToBall / 1000\n")
+            f.write("    if self.passing or self.shooting:\n")
+            f.write("        reward -= minReward\n")
+            f.write("if self.out_of_bounds():\n")
+            f.write("    reward -= 1\n\n")
+            f.write("reward = max(minReward, min(maxReward, reward))\n\n")
+            f.write("if self.out_of_bounds():\n")
+            f.write("    reward -= 0.5\n\n")
+            f.write("reward += 0.01\n\n")
+            f.write("if self.shooting:\n")
+            f.write("    reward += 0.2\n")
+            f.write("elif self.passing:\n")
+            f.write("    reward += 0.1\n\n")
+            f.write("reward -= 0.02 * abs(reward)\n\n")
+            f.write("reward = max(minReward, min(maxReward, reward))\n\n")
+
+
+
+    def reset(self):
+        self.time = 0
+
+        self.displacement_coef = 0.2
+
+        self.ball_move = False
+
+        self.contacted_ball = False
+
+        # agent
+        self.robot_x = np.random.uniform(-3500, 3500)
+        self.robot_y = np.random.uniform(-2500, 2500)
+
+        # ball
+        self.target_x = np.random.uniform(-2500, 2500)
+        self.target_y = np.random.uniform(-2000, 2000)
+
+        # face the ball
+        self.robot_angle = np.arctan2(self.target_y - self.robot_y, self.target_x - self.robot_x)
+
+        # self.target_x = -4000
+        # self.target_y = -3300
+
+        self.goal_x = 4800
+        self.goal_y = 0
+
+        self.dummy1_x = np.random.uniform(1000, 3750)
+        self.dummy1_y = np.random.uniform(-2000, 2000)
+
+        self.dummy2_x = np.random.uniform(1000, 3750)
+        self.dummy2_y = np.random.uniform(-2000, 2000)
+
+        self.teammate_x = np.random.uniform(0, 3500)
+        self.teammate_y = np.random.uniform(-2500, 2500)
+
+        # check if dummies are too close to each other
+        while np.linalg.norm([self.dummy1_x - self.dummy2_x, self.dummy1_y - self.dummy2_y]) < 300:
+            self.dummy2_x = np.random.uniform(1000, 3750)
+            self.dummy2_y = np.random.uniform(-2000, 2000)
+
+        # self.defender_x = np.random.uniform(2500, 3500)
+        # self.defender_y = np.random.uniform(-2000, 2000)
+        # self.defender_angle = -np.pi
+
+        # self.defenderPath = './Models/kicking_defender_tune/policy'
+        # self.defenderModel = PPO.load(self.defenderPath)
+
+        self.update_goal_value()
+        # self.update_def_goal_value()
+
+        robot_location = np.array([self.robot_x, self.robot_y])
+        target_location = np.array([self.target_x, self.target_y])
+        dummy1_location = np.array([self.dummy1_x, self.dummy1_y])
+        dummy2_location = np.array([self.dummy2_x, self.dummy2_y])
+
+        self.initial_distance = np.linalg.norm(target_location - robot_location)
+
+        self.radius_multiplier = 7
+
+        self.shooting = False
+        self.passing = False
+
+        return self._observe_state()
+    
+    def move_robot(self, action):
+        # prioritise the shooting action, then passing, then dribble if none of the above       
+        policy_target_x = self.robot_x + (
+            (
+                (np.cos(self.robot_angle) * np.clip(action[1], -1, 1))
+                + (np.cos(self.robot_angle + np.pi / 2) * np.clip(action[2], -1, 1))
+            )
+            * 200
+        )  # the x component of the location targeted by the high level action
+        policy_target_y = self.robot_y + (
+            (
+                (np.sin(self.robot_angle) * np.clip(action[1], -1, 1))
+                + (np.sin(self.robot_angle + np.pi / 2) * np.clip(action[2], -1, 1))
+            )
+            * 200
+        )  # the y component of the location targeted by the high level action
+
+        # Update robot position
+        self.robot_x = (
+            self.robot_x * (1 - self.displacement_coef)
+            + policy_target_x * self.displacement_coef
+        )  # weighted sums based on displacement coefficient
+        self.robot_y = (
+            self.robot_y * (1 - self.displacement_coef)
+            + policy_target_y * self.displacement_coef
+        )  # the idea is we move towards the target position and angle
+
+        self.position_rule()
+
+        # Find distance between robot and target
+        robot_location = np.array([self.robot_x, self.robot_y])
+        target_location = np.array([self.target_x, self.target_y])
+        distance_robot_target = np.linalg.norm(target_location - robot_location)
+
+        # push ball, if collision with robot
+        if distance_robot_target < (self.robot_radius + self.target_radius) * 5:
+            # changed to reached reward mode
+            self.contacted_ball = True
+
+            # Update Relative Angle
+            self.delta_x = self.target_x - self.robot_x
+            self.delta_y = self.target_y - self.robot_y
+            self.theta_radians = np.arctan2(self.delta_y, self.delta_x)
+
+            self.target_x = (
+                self.target_x
+                + np.cos(self.theta_radians)
+                * (self.robot_radius + self.target_radius)
+                * 6
+            )
+            self.target_y = (
+                self.target_y
+                + np.sin(self.theta_radians)
+                * (self.robot_radius + self.target_radius)
+                * 5
+            )
+
+                # Check if line of ball intersects goal line
+            A = self.Point(self.target_x, self.target_y)
+            B = self.Point(self.robot_x, self.robot_y)
+            C = self.Point(-4500, -750)
+            D = self.Point(-4500, 750)
+
+            # Put ball at goal location (-4500, 0)
+            if self.intersect(A, B, C, D):
+                self.target_x = -4501
+                self.target_y = 0
+
+        # Turn towards the target as suggested by the policy
+        self.robot_angle = self.robot_angle + self.displacement_coef * action[0]
+
+    def step(self, action):
+        self.time += 1
+        self.defender_collision = False
+    
+        self.move_robot(action)
+
+        self.update_target_value()
+        self.update_goal_value()
+
+        if self.ball_move == False:
+            # enable robot collision with dummy defenders
+            self.collision_dummy(self.dummy1_x, self.dummy1_y, self.dummy2_x, self.dummy2_y)
+            self.defender_collision_ball(self.dummy1_x, self.dummy1_y, self.dummy2_x, self.dummy2_y)
+            self.collision_ball()
+            self.position_rule()
+
+            # Turn towards the target as suggested by the policy
+            self.robot_angle = self.robot_angle + self.displacement_coef * action[0]
+
+            self.update_target_value()
+            self.update_goal_value()
+
+        # by goal kick, goalie,attacker get little pause during ball moving.
+        elif self.ball_move == True:
+            self.ball_move = False
+
+            self.speed = [self.ball_go_x, self.ball_go_y]
+            self.rect2 = self.rect2.move(self.speed)
+            self.target_x = self.rect2.centerx
+            self.target_y = self.rect2.centery
+
+        new_obs = self._observe_state()
+        done = self.time > DribbleBallAndKickEnv.EPISODE_LENGTH
+
+        if action[3] > 0.7:
+            self.shooting = True
+            self.passing = False
+            self.ball_go_x = self.goal_x - self.target_x
+            self.ball_go_y = self.goal_y - self.target_y
+        elif action[4] > 0.7:
+            self.passing = True
+            self.shooting = False
+            self.ball_go_x = self.teammate_x - self.target_x
+            self.ball_go_y = self.teammate_y - self.target_y
+        else:
+            self.passing = False
+            self.shooting = False
+
+        reward = self.calculate_reward()
+
+        return (new_obs, reward, done, {})
+    
+    def render(self, mode="display"):
+        time.sleep(0.01)
+
+        # your screen size for pygame
+        Field_length = 1200
+
+        if self.rendering_init == False:
+            pygame.init()
+            self.field = pygame.display.set_mode((Field_length, Field_length * (2 / 3)))
+
+            self.basic_field(Field_length)
+            pygame.display.set_caption("Point Targeting Environment")
+            self.clock = pygame.time.Clock()
+
+            self.rendering_init = True
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
+        self.basic_field(Field_length)
+
+        render_robot_x = (self.robot_x / 5200 + 1) * (Field_length / 2)
+        render_robot_y = (self.robot_y / 3700 + 1) * (Field_length / 3)
+
+        render_target_x = (self.target_x / 5200 + 1) * (Field_length / 2)
+        render_target_y = (self.target_y / 3700 + 1) * (Field_length / 3)
+
+        render_dummy1_x = (self.dummy1_x / 5200 + 1) * (Field_length / 2)
+        render_dummy1_y = (self.dummy1_y / 3700 + 1) * (Field_length / 3)
+
+        render_dummy2_x = (self.dummy2_x / 5200 + 1) * (Field_length / 2)
+        render_dummy2_y = (self.dummy2_y / 3700 + 1) * (Field_length / 3)
+
+        render_teammate_x = (self.teammate_x / 5200 + 1) * (Field_length / 2)
+        render_teammate_y = (self.teammate_y / 3700 + 1) * (Field_length / 3)
+
+        pygame.draw.circle(
+            self.field,
+            pygame.Color(40, 40, 40),
+            (render_target_x, render_target_y),
+            self.target_radius,
+        )
+        pygame.draw.circle(
+            self.field,
+            pygame.Color(0, 32, 96),
+            (render_dummy1_x, render_dummy1_y),
+            self.robot_radius,
+            width=4,
+        )
+        pygame.draw.circle(
+            self.field,
+            pygame.Color(0, 32, 96),
+            (render_dummy2_x, render_dummy2_y),
+            self.robot_radius,
+            width=4,
+        )
+
+        pygame.draw.circle(
+            self.field,
+            pygame.Color(148, 17, 0),
+            (render_robot_x, render_robot_y),
+            self.robot_radius,
+            width=5,
+        )
+        pygame.draw.line(
+            self.field,
+            pygame.Color(50, 50, 50),
+            (render_robot_x, render_robot_y),
+            (
+                render_robot_x + self.robot_radius * np.cos(self.robot_angle),
+                render_robot_y + self.robot_radius * np.sin(self.robot_angle),
+            ),
+            width=5,
+        )
+        pygame.draw.circle(
+            self.field,
+            pygame.Color(148, 17, 0),
+            (render_teammate_x, render_teammate_y),
+            self.robot_radius,
+            width=5,
+        )
+        # draw field of view
+        pygame.draw.line(
+            self.field,
+            pygame.Color(155, 155, 155),
+            (render_robot_x, render_robot_y),
+            (
+                render_robot_x + (5000 * 1200 / 9000) * np.cos(self.robot_angle - np.pi / 3),
+                render_robot_y + (5000 * 1200 / 9000) * np.sin(self.robot_angle - np.pi / 3),
+            ),
+            width=2,
+        )
+        pygame.draw.line(
+            self.field,
+            pygame.Color(155, 155, 155),
+            (render_robot_x, render_robot_y),
+            (
+                render_robot_x + (5000 * 1200 / 9000) * np.cos(self.robot_angle + np.pi / 3),
+                render_robot_y + (5000 * 1200 / 9000) * np.sin(self.robot_angle + np.pi / 3),
+            ),
+            width=2,
+        )
+        pygame.display.update()
+
+        self.clock.tick(60)
+
+    def calculate_reward(self):
+        local = {
+            "self": self,
+            "reward": 0,
+        }
+        with open('reward.py', 'r') as f:
+            exec(f.read(), globals(), local)
+        return local['reward']
+    
+    def _observe_state(self):
+
+        self.update_target_value()
+        self.update_goal_value()
+        # get closer defender
+        dummy1_distance = np.linalg.norm([self.robot_x - self.dummy1_x, self.robot_y - self.dummy1_y])
+        dummy2_distance = np.linalg.norm([self.robot_x - self.dummy2_x, self.robot_y - self.dummy2_y])
+        if dummy1_distance < dummy2_distance:
+            dummy_x = self.dummy1_x
+            dummy_y = self.dummy1_y
+        else:
+            dummy_x = self.dummy2_x
+            dummy_y = self.dummy2_y
+
+        return np.array(
+            [
+                (self.teammate_x - self.robot_x) / 9000,
+                (self.teammate_y - self.robot_y) / 6000,
+                (dummy_x - self.robot_x) / 9000,
+                (dummy_y - self.robot_y) / 6000,
+                # (self.dummy2_x - self.robot_x) / 9000,
+                # (self.dummy2_y - self.robot_y) / 6000,
+                (self.target_x - self.robot_x) / 9000,
+                (self.target_y - self.robot_y) / 6000,
+                (self.goal_x - self.target_x) / 9000,
+                (self.goal_y - self.target_y) / 6000,
+                np.sin(self.relative_angle - self.robot_angle),
+                np.cos(self.relative_angle - self.robot_angle),
+                np.sin(self.goal_relative_angle - self.robot_angle),
+                np.cos(self.goal_relative_angle - self.robot_angle),
+            ]
+        )
+    
+    
+    def collision_dummy(self, dummy1_x, dummy1_y, dummy2_x, dummy2_y):
+        # Find distance between dummy defender 1 and robot
+        dummy1_defender_location = np.array([dummy1_x, dummy1_y])
+        dummy2_defender_location = np.array([dummy2_x, dummy2_y])
+        robot_location = np.array([self.robot_x, self.robot_y])
+        distance_dummy1_robot = np.linalg.norm(robot_location - dummy1_defender_location)
+        distance_dummy2_robot = np.linalg.norm(robot_location - dummy2_defender_location)
+
+        # push robot, if collision with dummy defender 1
+        if distance_dummy1_robot < (self.robot_radius * 2) * self.radius_multiplier:
+            self.defender_collision = True
+
+            # Update Relative Angle
+            delta_x = self.robot_x - dummy1_x
+            delta_y = self.robot_y - dummy1_y
+            theta_radians = np.arctan2(delta_y, delta_x)
+            self.robot_x = (
+                self.robot_x + np.cos(theta_radians) * (self.robot_radius * 2) * 5
+            )
+            self.robot_y = (
+                self.robot_y + np.sin(theta_radians) * (self.robot_radius * 2) * 5
+            )
+        if distance_dummy2_robot < (self.robot_radius * 2) * self.radius_multiplier:
+            self.defender_collision = True
+
+            # Update Relative Angle
+            delta_x = self.robot_x - dummy2_x
+            delta_y = self.robot_y - dummy2_y
+            theta_radians = np.arctan2(delta_y, delta_x)
+            self.robot_x = (
+                self.robot_x + np.cos(theta_radians) * (self.robot_radius * 2) * 5
+            )
+            self.robot_y = (
+                self.robot_y + np.sin(theta_radians) * (self.robot_radius * 2) * 5
+            )
+
+    def defender_collision_ball(self, dummy1_x, dummy1_y, dummy2_x, dummy2_y):
+        # Find distance between dummy defender 1 and ball
+        dummy1_defender_location = np.array([dummy1_x, dummy1_y])
+        dummy2_defender_location = np.array([dummy2_x, dummy2_y])
+        target_location = np.array([self.target_x, self.target_y])
+        distance_dummy1_target = np.linalg.norm(target_location - dummy1_defender_location)
+        distance_dummy2_target = np.linalg.norm(target_location - dummy2_defender_location)
+
+        # push robot, if collision with dummy defender 1
+        if distance_dummy1_target < (self.target_radius * 2) * self.radius_multiplier:
+            self.defender_collision = True
+
+            # Update Relative Angle
+            delta_x = self.target_x - dummy1_x
+            delta_y = self.target_y - dummy1_y
+            theta_radians = np.arctan2(delta_y, delta_x)
+            self.target_x = (
+                self.target_x + np.cos(theta_radians) * (self.target_radius * 2) * 5
+            )
+            self.target_y = (
+                self.target_y + np.sin(theta_radians) * (self.target_radius * 2) * 5
+            )
+        if distance_dummy2_target < (self.target_radius * 2) * self.radius_multiplier:
+            self.defender_collision = True
+
+            # Update Relative Angle
+            delta_x = self.target_x - dummy2_x
+            delta_y = self.target_y - dummy2_y
+            theta_radians = np.arctan2(delta_y, delta_x)
+            self.target_x = (
+                self.target_x + np.cos(theta_radians) * (self.target_radius * 2) * 5
+            )
+            self.target_y = (
+                self.target_y + np.sin(theta_radians) * (self.target_radius * 2) * 5
+            )
+
+    def check_if_dummy_in_line_with_goal(self):
+        A = self.target_y - self.goal_y
+        B = self.goal_x - self.target_x
+        C = self.target_x * self.goal_y - self.goal_x * self.target_y
+
+        # ignore if dummy is behind the robot or in goal
+        if (self.dummy1_x < self.robot_x) or (self.dummy1_x >= (self.goal_x - 500)):
+            return False
+        
+        # distance from point to line
+        # ax + by + c / sqrt(a^2 + b^2)
+        distance = abs(A * self.dummy1_x + B * self.dummy1_y + C) / (A**2 + B**2)**0.5
+
+        if distance < 100:
+            return True
+        return False
+    
+    def check_if_dummy_in_line_with_teammate(self):
+        A = self.target_y - self.teammate_y
+        B = self.teammate_x - self.target_x
+        C = self.target_x * self.teammate_y - self.teammate_x * self.target_y
+
+        # ignore if dummy is behind the robot or in teammate
+        if (self.dummy1_x < self.robot_x) or (self.dummy1_x >= (self.teammate_x - 500)):
+            return False
+        
+        # distance from point to line
+        # ax + by + c / sqrt(a^2 + b^2)
+        distance = abs(A * self.dummy1_x + B * self.dummy1_y + C) / (A**2 + B**2)**0.5
+
+        if distance < 100:
+            return True
+        return False
+        
+    def collision_ball(self):
+        # Find distance between robot and target
+        robot_location = np.array([self.robot_x, self.robot_y])
+        target_location = np.array([self.target_x, self.target_y])
+        distance_robot_target = np.linalg.norm(target_location - robot_location)
+
+        # push ball, if collision with robot
+        if distance_robot_target < (self.robot_radius + self.target_radius) * 5:
+            # changed to reached reward mode
+            self.contacted_ball = True
+
+            # Update Relative Angle
+            self.delta_x = self.target_x - self.robot_x
+            self.delta_y = self.target_y - self.robot_y
+            self.theta_radians = np.arctan2(self.delta_y, self.delta_x)
+            self.target_x = (
+                self.target_x
+                + np.cos(self.theta_radians)
+                * (self.robot_radius + self.target_radius)
+                * 5
+            )
+            self.target_y = (
+                self.target_y
+                + np.sin(self.theta_radians)
+                * (self.robot_radius + self.target_radius)
+                * 5
+            )
+
+    def _observe_global_state(self):
+        return [
+            self.robot_x / 9000,
+            self.robot_y / 6000,
+            self.target_x / 9000,
+            self.target_y / 6000,
+            self.dummy1_x / 9000,
+            self.dummy1_y / 6000,
+            self.dummy2_x / 9000,
+            self.dummy2_y / 6000,
+            np.sin(self.robot_angle),
+            np.cos(self.robot_angle),
+        ]
+    
+    def get_max(self, x, y, z):
+        return max(x, max(y, z))
+    
+    def good_shooting_position(self):
+        distanceToGoal = self.get_distance_target_goal()
+        angleBallAndGoal = np.arctan2(self.goal_y - self.target_y, self.goal_x - self.target_x)
+        return distanceToGoal < 3000 and abs(angleBallAndGoal) < np.pi/4 and not self.check_if_dummy_in_line_with_goal()
+    
+    def good_passing_position(self):
+        angleBallAndTeammate = np.arctan2(self.teammate_y - self.target_y, self.teammate_x - self.target_x)
+        teammateDistanceToGoal = ((self.teammate_x - self.goal_x) ** 2 + (self.teammate_y - self.goal_y) ** 2) ** 0.5
+        return teammateDistanceToGoal < 3000 and abs(angleBallAndTeammate) < np.pi/4 and not self.check_if_dummy_in_line_with_teammate() and (self.teammate_x > self.target_x)
+
+
+    def set_abstract_state(self, abstract_state):
+
+        self.robot_x = abstract_state[0] * 9000
+        self.robot_y = abstract_state[1] * 6000
+        self.target_x = abstract_state[2] * 9000
+        self.target_y = abstract_state[3] * 6000
+
+        self.dummy1_x = abstract_state[4] * 9000
+        self.dummy1_y = abstract_state[5] * 6000
+        self.dummy2_x = abstract_state[6] * 9000
+        self.dummy2_y = abstract_state[7] * 6000
+
+        self.robot_angle = np.arctan2(abstract_state[8], abstract_state[9])
+
+
+
+if __name__ == "__main__":
+    if not len(sys.argv) == 2:
+        print("usage: python ./push_ball_to_goal.py <policy and vector path folder>")
+        exit(1)
+
+    policy_path = sys.argv[1] + "/policy.zip"
+    normalization_path = sys.argv[1] + "/vector_normalize"
+
+    os.environ["RLHF"] = "disabled"
+
+    env = VecNormalize.load(
+        normalization_path, make_vec_env(DribbleBallAndKickEnv, n_envs=1)
+    )
+    env.norm_obs = True
+    env.norm_reward = False
+    env.clip_obs = 1.0
+    env.training = False
+
+    # #derived from https://github.com/DLR-RM/rl-baselines3-zoo/blob/75afd65fa4a1f66814777d43bd14e4bba18d96db/enjoy.py#L171
+    #     newer_python_version = sys.version_info.major == 3 and sys.version_info.minor >= 8
+
+    custom_objects = {
+    "lr_schedule": lambda x: .003,
+    "clip_range": lambda x: .02,
+    }   
+    model = PPO.load(policy_path, custom_objects = custom_objects, env= env)
+
+    mean_reward, std_reward = evaluate_policy(
+        model, model.get_env(), n_eval_episodes=10
+    )
+    print(mean_reward, std_reward)
+
+    it = 0
+
+    obs = env.reset()
+
+    while True:
+        action = model.predict(obs)
+        obs, reward, done, _ = env.step(action[0])
+        env.envs[0].render()
+        it = it + 1

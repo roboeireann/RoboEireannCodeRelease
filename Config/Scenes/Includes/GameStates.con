@@ -1,8 +1,5 @@
 # Simulator provides GameController info
-mr RobotInfo LogDataProvider Cognition
-mr OwnTeamInfo LogDataProvider Cognition
-mr OpponentTeamInfo LogDataProvider Cognition
-mr RawGameInfo LogDataProvider Cognition
+mr ReceivedGameControlData LogDataProvider Cognition
 
 # use keyboard to set different game states
 jc press 9 gc initial # Shift+Ctrl+I

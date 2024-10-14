@@ -17,7 +17,7 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/DamageConfiguration.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/JointAngles.h"
@@ -50,7 +50,6 @@ MODULE(ArmContactModelProvider,
   REQUIRES(JointAngles),
   REQUIRES(MassCalibration),
   REQUIRES(RobotDimensions),
-  REQUIRES(RobotInfo),
   REQUIRES(RobotModel),
   REQUIRES(RobotPose),
   REQUIRES(DamageConfigurationBody),

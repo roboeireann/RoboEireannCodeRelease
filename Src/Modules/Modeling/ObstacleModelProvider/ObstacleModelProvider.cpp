@@ -62,7 +62,7 @@ bool ObstacleModelProvider::clearAndFinish(ObstacleModel& obstacleModel)
   DEBUG_RESPONSE_ONCE("module:ObstacleModelProvider:clear")
     obstacleHypotheses.clear();
 
-  if(theRobotInfo.penalty != PENALTY_NONE
+  if(theGameInfo.isPenalized()
      || theGameInfo.state == STATE_INITIAL
      // While falling down / getting up / the obstacles might be invalid, better clean up
      || theFallDownState.state == FallDownState::falling

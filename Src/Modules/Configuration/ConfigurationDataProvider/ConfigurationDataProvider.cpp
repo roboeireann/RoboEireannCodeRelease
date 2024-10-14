@@ -6,7 +6,11 @@
 
 #include "ConfigurationDataProvider.h"
 #include "Tools/Framework/ModuleContainer.h"
+#include "Tools/Streams/InExpr.h"
 #include "Tools/Settings.h"
+
+#include <unordered_map>
+#include <string>
 
 thread_local ConfigurationDataProvider* ConfigurationDataProvider::theInstance = nullptr;
 
@@ -36,7 +40,19 @@ ConfigurationDataProvider::ConfigurationDataProvider()
   read(theRelativeFieldColorsParameters);
   read(theRobotDimensions);
   read(theStiffnessSettings);
-  read(theSetupPoses);
+
+  // theSetupPoses
+  std::unordered_map<std::string, float> fieldSymbols;
+  theFieldDimensions->populateSymbols(fieldSymbols);
+
+  theSetupPoses = std::make_unique<SetupPoses>();
+  // loadModuleParameters(*theSetupPoses, TypeRegistry::demangle(typeid(T).name()).c_str(), fileName);
+  InExprMapFile stream("setupPoses.cfg", fieldSymbols);
+  ASSERT(stream.exists());
+  stream >> *theSetupPoses;
+
+
+  read(theGameConfig);
   read(theWalkModifier);
 }
 

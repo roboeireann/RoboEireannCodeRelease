@@ -10,7 +10,6 @@
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Tools/BehaviorControl/Framework/Card/Card.h"
 #include "Tools/BehaviorControl/Framework/Card/Dealer.h"
 
@@ -22,8 +21,6 @@ CARD(GameplayCard,
   CALLS(TeamCountdown),
   REQUIRES(FrameInfo),
   REQUIRES(GameInfo),
-  REQUIRES(OwnTeamInfo),
-  REQUIRES(OpponentTeamInfo),
   REQUIRES(TeamBehaviorStatus),
   LOADS_PARAMETERS(
   {,
@@ -58,7 +55,7 @@ class GameplayCard : public GameplayCardBase
     {
       if(theGameInfo.setPlay == SET_PLAY_PENALTY_KICK)
       {
-        if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+        if(theGameInfo.isOurKick())
         {
           dealer.deal(ownPenaltyKick)->call();
           setState("ownPenaltyKick");
@@ -71,7 +68,7 @@ class GameplayCard : public GameplayCardBase
       }
       else
       {
-        if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+        if(theGameInfo.isOurKick())
         {
           dealer.deal(ownKickoff)->call();
           setState("ownKickoff");
@@ -92,7 +89,7 @@ class GameplayCard : public GameplayCardBase
 
       if(theGameInfo.setPlay != SET_PLAY_NONE)
       {
-        if(theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+        if(theGameInfo.isOurKick())
         {
           if(theGameInfo.setPlay == SET_PLAY_PENALTY_KICK)
           {
@@ -131,7 +128,7 @@ class GameplayCard : public GameplayCardBase
       }
 
       #ifdef TARGET_ROBOT
-        if(theOpponentTeamInfo.teamNumber > 0 && stateTime > 11000)
+        if(theGameInfo.opponentTeam().teamNumber > 0 && stateTime > 11000)
           theCountDownHalfTimeSkill();
       #endif
     }

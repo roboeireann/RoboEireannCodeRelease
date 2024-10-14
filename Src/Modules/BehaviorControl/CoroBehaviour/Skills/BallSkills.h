@@ -4,6 +4,7 @@
  * Skills related to ball control
  * 
  * @author: Rudi Villing
+ * @author: Andy Lee Mitchell
  * 
  * Note - many parts of this file are based on Skill implementations in the
  * BH2021 code release but re-written for the CoroBehaviour engine. 
@@ -134,12 +135,14 @@ namespace CoroBehaviour
      * @param preStepAllowed Is a prestep for the InWalkKick allowed?
      * @param turnKickAllowed Does the forward kick not need to align with the kick direction?
      * @param speed The walking speed
+     * @param ignoreObstacles always ignore obstacles if true, default behaviour if false
      * @param directionPrecision The allowed deviation of the direction in which the ball should go. 
      *                           If default, the WalkToBallAndKickEngine uses its own precision.
      */
     void operator()(Angle targetDirection, KickInfo::KickType kickType, bool alignPrecisely = true,
                     float length = std::numeric_limits<float>::max(), bool preStepAllowed = true,
                     bool turnKickAllowed = true, const Pose2f &speed = Pose2f(1.f, 1.f, 1.f),
+                    bool ignoreObstacles = false,
                     const Rangea &directionPrecision = Rangea(0_deg, 0_deg))
     {
       const Pose2f kickPose = Pose2f(targetDirection, theFieldBall.endPositionRelative)
@@ -148,22 +151,26 @@ namespace CoroBehaviour
 
       behaviorStatusSkills.walkingTo(kickPose.translation, 1.f);
 
+      ACTGRAPH_FMT("kickType: {}", TypeRegistry::getEnumName(kickType));
+      ACTGRAPH_FMT("targetDirection: {}", targetDirection.fmt());
+      ACTGRAPH_FMT("kickPose: {}", kickPose);
+
       CRBEHAVIOUR_LOOP()
       {
         CR_CHECKPOINT(walkToBallFar);
-        CR_WHILE(!shouldIgnoreObstacles(kickPose, false) && !shouldUseLibWalk(kickPose, false) &&
+        CR_WHILE(!ignoreObstacles && !goalieIgnoreObstacles(kickPose, false) && !shouldUseLibWalk(kickPose, false) &&
                       !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
                             directionPrecision, kickPose, /* usePathPlanner: */ true, /* avoidObstacles: */ true));
 
         CR_CHECKPOINT(walkToBallNear);
-        CR_WHILE(!shouldIgnoreObstacles(kickPose, false) && shouldUseLibWalk(kickPose, true) &&
+        CR_WHILE(!ignoreObstacles && !goalieIgnoreObstacles(kickPose, false) && shouldUseLibWalk(kickPose, true) &&
                       !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
                             directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ true));
 
         CR_CHECKPOINT(walkToBallIgnoreObstacles);
-        CR_WHILE(shouldIgnoreObstacles(kickPose, true) && !walkToBallAndKickTask.isSuccess(),
+        CR_WHILE((ignoreObstacles || goalieIgnoreObstacles(kickPose, true)) && !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
                             directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ false));
 
@@ -183,6 +190,7 @@ namespace CoroBehaviour
 
               remainingRotation = turnToAngleOdometryTask(postKickRotation);
               headSkills.lookAtAngles(remainingRotation, 23_deg);
+              CR_YIELD();
             }
           }
 
@@ -205,11 +213,11 @@ namespace CoroBehaviour
       (Rangef) forwardFastKickRange, ///< the min and max distance of forwardFastLeft/Right kicks (depends on location)
     });
 
+    READS(GameInfo);
     READS(FieldBall);
     READS(BallModel);
     READS(KickInfo);
     READS(MotionInfo);
-    READS(RobotInfo);
     READS(PathPlanner);
     READS(RobotPose);
     READS(LibWalk);
@@ -227,12 +235,12 @@ namespace CoroBehaviour
      * return true if the robot is the goalie and should ignore obstacles now
      * @param started true if the robot is already ignoring obstacles, false otherwise
      */
-    bool shouldIgnoreObstacles(const Pose2f& kickPose, bool started)
+    bool goalieIgnoreObstacles(const Pose2f& kickPose, bool started)
     {
       float goalieIgnoreObstaclesDistance =
           started ? params.goalkeeperIgnoreObstaclesDistanceStop : params.goalkeeperIgnoreObstaclesDistanceStart;
 
-      return (theRobotInfo.isGoalkeeper() && (kickPose.translation.norm() < goalieIgnoreObstaclesDistance));
+      return (theGameInfo.isGoalkeeper() && (kickPose.translation.norm() < goalieIgnoreObstaclesDistance));
     }
 
     /**
@@ -252,9 +260,10 @@ namespace CoroBehaviour
                         bool usePathPlanner, bool avoidObstacles)
     {
       const float kickPower = kickLengthToPower(kickType, length, targetDirection);
-      auto obstacleAvoidance = usePathPlanner
-                                    ? thePathPlanner.plan(theRobotPose * kickPose, speed)
-                                    : theLibWalk.calcObstacleAvoidance(kickPose, /* rough: */ true, !avoidObstacles);
+      auto obstacleAvoidance =
+          usePathPlanner
+              ? thePathPlanner.plan(theRobotPose * kickPose, speed)
+              : theLibWalk.calcObstacleAvoidance(kickPose, /* rough: */ true, /* disableAvoidance */ !avoidObstacles);
       Vector2f kickTarget = theFieldBall.endPositionRelative +
                             Vector2f(theKickInfo[kickType].range.max, 0.f).rotated(targetDirection);
 
@@ -299,6 +308,116 @@ namespace CoroBehaviour
         return std::min(1.f, std::max(0.f, length - useKickRange.min) / (useKickRange.max - useKickRange.min));
       }
     }
+  };
+
+
+
+  /**
+   * go to ball and dribble 
+   * 
+   * Based on BH2021 GoToBallAndDribble.cpp
+   */
+  CRBEHAVIOUR(GotoBallAndDribbleTask)
+  {
+      CRBEHAVIOUR_INIT(GotoBallAndDribbleTask) {}
+
+    /**
+     * Walk to the ball and kick it.
+     * @param targetDirection The direction to which the ball should be kicked in robot-relative coordinates
+     * @param ignoreObstacles always ignore obstacles if true, default behaviour if false
+     * @param kickPower The desired strength of the dribble kick [0.0 -> 1.0]
+     * @param alignPrecisely Whether the robot should align more precisely than usual
+     * @param preStepAllowed Is a prestep for the InWalkKick allowed?
+     * @param turnKickAllowed Does the forward kick not need to align with the kick direction?
+     * @param speed The walking speed
+     * @param directionPrecision The allowed deviation of the direction in which the ball should go. 
+     *                           If default, the WalkToBallAndKickEngine uses its own precision.
+     */
+    void operator()(Angle targetDirection, bool ignoreObstacles = false, float kickPower = 0.f,
+                    bool alignPrecisely = false, bool preStepAllowed = true,
+                    bool turnKickAllowed = true, const Pose2f &speed = Pose2f(1.f, 1.f, 1.f),
+                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg))
+    {
+      if (kickPower == 0.f)
+        kickPower = params.kickPower;
+
+      const Pose2f dribblePose = Pose2f(targetDirection, theFieldBall.endPositionRelative);
+
+      behaviorStatusSkills.walkingTo(dribblePose.translation, 1.f);
+
+      ACTGRAPH_FMT("targetDirection: {}", targetDirection.fmt());
+      ACTGRAPH_FMT("dribblePose: {}", dribblePose);
+      ACTGRAPH_FMT("dribblePower: {:.1f}", kickPower);
+
+      CRBEHAVIOUR_LOOP()
+      {
+        if(dribblePose.translation.squaredNorm() < sqr(params.switchToLibWalkDistance))
+        {
+          usePathPlanner = false;
+          CR_CHECKPOINT(dribbleCloseRange);
+        }
+        else
+        {
+          usePathPlanner = true;
+          CR_CHECKPOINT(dribbleFarRange);
+        }
+
+        dribbleBall(targetDirection, alignPrecisely, kickPower, preStepAllowed, turnKickAllowed, speed, directionPrecision, 
+                            dribblePose, /* usePathPlanner: */ usePathPlanner, /* avoidObstacles: */ (!ignoreObstacles));
+          
+        if (dribbleTask.isSuccess())
+        {
+          CR_EXIT_SUCCESS();
+        }
+        else
+        {
+          CR_YIELD();
+        }
+      }
+    }
+
+  private:
+    LOADS_PARAMS(GotoBallAndDribbleTask, 
+    {,
+      (float) switchToPathPlannerDistance, /**< If the target is further away than this distance, the path planner is used. */
+      (float) switchToLibWalkDistance, /**< If the target is closer than this distance, LibWalk is used. */
+      (float) kickPower, /**< default kick power of dribble (0 -> 1) */
+    });
+
+    READS(FieldBall);
+    READS(BallModel);
+    READS(KickInfo);
+    READS(MotionInfo);
+    READS(PathPlanner);
+    READS(RobotPose);
+    READS(LibWalk);
+
+    BehaviorStatusSkills behaviorStatusSkills  {env};
+    HeadSkills headSkills {env};
+    GotoBallHeadControlTask gotoBallHeadControlTask  {env};
+    DribbleTask dribbleTask {env};
+
+    bool usePathPlanner;
+
+    void dribbleBall(Angle targetDirection, bool alignPrecisely, float kickPower,
+                        bool preStepAllowed, bool turnKickAllowed, const Pose2f &speed,
+                        const Rangea &directionPrecision, const Pose2f &dribblePose,
+                        bool usePathPlanner, bool avoidObstacles)
+    {      
+      auto obstacleAvoidance =
+          usePathPlanner
+              ? thePathPlanner.plan(theRobotPose * dribblePose, speed)
+              : theLibWalk.calcObstacleAvoidance(dribblePose, /* rough: */ true, /* disableAvoidance */ !avoidObstacles);
+      Vector2f kickTarget = theFieldBall.endPositionRelative +
+                            Vector2f(3000.f, 0.f).rotated(targetDirection);
+
+      gotoBallHeadControlTask(dribblePose.translation.norm(), /* lookAtKickTarget: */ true, kickTarget);
+      dribbleTask(targetDirection, alignPrecisely, kickPower, speed,
+                                obstacleAvoidance, preStepAllowed, turnKickAllowed, directionPrecision);
+
+      ACTGRAPH_FMT("kickPower: {}", kickPower);
+    }
+
   };
 
 } // CoroBehaviour

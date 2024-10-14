@@ -89,11 +89,11 @@ void BehaviorControl::execute()
   if ((theEnhancedKeyStates.hitStreak[KeyStates::headRear] == 3 && theEnhancedKeyStates.pressedDuration[KeyStates::headFront] > 0) ||
       (theEnhancedKeyStates.hitStreak[KeyStates::headFront] == 3 && theEnhancedKeyStates.pressedDuration[KeyStates::headRear] > 0))
     SKILL(Say)(fmt::format("{} hottest joint is {}. It is {} degrees.",
-                theRobotInfo.getRobotAndColourString(),
+                theGameInfo.getPlayerNumberAndColorString(),
                 Joints::jointLongNames[theRobotHealth.jointWithMaxTemperature],
                 theJointSensorData.temperatures[theRobotHealth.jointWithMaxTemperature]));
 
-  if((status == gettingUp || status == penalized || status == playing) && theRobotInfo.mode == RobotInfo::unstiff)
+  if((status == gettingUp || status == penalized || status == playing) && theGameInfo.playerMode == GameInfo::unstiff)
     status = sittingDown;
 
   if((status == penalized || status == playing) && !theCameraStatus.ok)
@@ -121,7 +121,7 @@ void BehaviorControl::execute()
     SKILL(Activity)(BehaviorStatus::unknown);
     SKILL(LookAtAngles)(JointAngles::off, JointAngles::off);
     SKILL(PlayDead)();
-    if(theRobotInfo.mode != RobotInfo::unstiff)
+    if(theGameInfo.playerMode != GameInfo::unstiff)
       status = gettingUp;
     return;
   }
@@ -137,12 +137,12 @@ void BehaviorControl::execute()
     return;
   }
 
-  if(theRobotInfo.penalty != PENALTY_NONE)
+  if(theGameInfo.isPenalized())
   {
     // Is this the first frame that we are penalized?
     if(status != penalized)
     {
-      ANNOTATION("Behavior", "Penalized " + theRobotInfo.getPenaltyString());
+      ANNOTATION("Behavior", "Penalized " + theGameInfo.getPenaltyString());
       SystemCall::say("Penalized");
     }
 

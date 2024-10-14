@@ -15,9 +15,8 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Configuration/SetupPoses.h"
 #include "Representations/Configuration/StaticInitialPose.h"
@@ -41,8 +40,6 @@ MODULE(SideInformationProvider,
   REQUIRES(FrameInfo),
   REQUIRES(GameInfo),
   REQUIRES(Odometer),
-  REQUIRES(OwnTeamInfo),
-  REQUIRES(RobotInfo),
   REQUIRES(SetupPoses),
   REQUIRES(StaticInitialPose),
   REQUIRES(WorldModelPrediction),

@@ -17,7 +17,7 @@ vid upper representation:PenaltyMarkPercept:image
 vid lower representation:PenaltyMarkPercept:image
 
 vfd worldState representation:GameInfo
-vfd worldState representation:OwnTeamInfo
+vfd worldState representation:GameInfo:ourTeam
 
 # navigate in log file using shortcuts
 jc press 1 log pause # Shift+Crtl+A
@@ -34,10 +34,7 @@ jc press 14 log fastForward # Shift+Ctrl+N
 set representation:GroundContactState contact = true;
 
 # deactivate game info provided in Cognition
-mr RobotInfo default
-mr OwnTeamInfo default
-mr OpponentTeamInfo default
-mr RawGameInfo default
+mr ReceivedGameControlData default
 mr GameInfo default
 
 # Support replaying legacy logs: It is assumed that the

@@ -1,0 +1,17 @@
+#cl MULabSmallField2015
+cs RL2024 team1
+cs Default team2
+
+call Includes/Normal
+
+robot robot1 robot3 robot5
+jc press 11 call Includes/PenaltyKickFirst # Shift+Ctrl+K (penalty kicK)
+jc press 12 call Includes/PushingFreeKickFirst # Shift+Ctrl+L (fouL)
+
+robot robot21 robot23 robot25
+jc press 11 call Includes/PenaltyKickSecond # Shift+Ctrl+K (penalty kicK)
+jc press 12 call Includes/PushingFreeKickSecond # Shift+Ctrl+L (fouL)
+
+robot all
+
+dr debugDrawing3d:representation:RobotPose

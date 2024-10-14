@@ -24,10 +24,28 @@ namespace RE2022
 
   CRBEHAVIOUR(KickOnceTask)
   {
-    CRBEHAVIOUR_INIT(KickOnceTask) {}
+    CRBEHAVIOUR_INIT(KickOnceTask) 
+    {
+      DECLARE_DEBUG_RESPONSE("behaviour:KickLengthCalibration:kickOnce");
+    }
 
     void operator()(KickInfo::KickType kickType, float kickDistance)
     {
+      // it can be a bit tricky to test button presses in the simulator.
+      // (a) If you want to really test the button press you need to visualise the
+      //     data for the EnhancedKeyStates, then modify the pressedDuration
+      //     for headFront to be more than params.buttonPressThreshold (see below)
+      //     and then briefly clikc the checkbox for pressed for headFront to be
+      //     on and then off again.
+      // (b) Otherwise, just write "dr behaviour:KickLengthCalibration:kickOnce"
+      //     in the console to set debugKickOnce to true for a single cycle which is enough
+      //     to break the wait for button press while loop
+      bool debugKickOnce = false;
+      DEBUG_RESPONSE_ONCE("behaviour:KickLengthCalibration:kickOnce")
+      {
+        debugKickOnce = true;
+      }
+
       CRBEHAVIOUR_BEGIN();
 
       CR_CHECKPOINT(wait_for_button);
@@ -35,7 +53,10 @@ namespace RE2022
       commonSkills.say("Please measure the previous kick distance if any.");
       commonSkills.say("When ready, place the ball. Then touch the front head button.");
 
-      while (!(theEnhancedKeyStates.pressedDuration[KeyStates::headFront] >= params.buttonPressThreshold))
+      // wait for the button to be pressed (or a debug request from SimRobot)
+      while (!(debugKickOnce ||
+               (theEnhancedKeyStates.pressed[KeyStates::headFront] &&
+                theEnhancedKeyStates.pressedDuration[KeyStates::headFront] >= params.buttonPressThreshold)))
       {
         commonSkills.standLookForward();
         CR_YIELD();
@@ -110,7 +131,7 @@ namespace RE2022
     void operator()(void)
     {
       // do this regardless of place within coro body
-      commonSkills.activityStatus(BehaviorStatus::unknown);
+      // commonSkills.activityStatus(BehaviorStatus::unknown);
 
       CRBEHAVIOUR_BEGIN();
       

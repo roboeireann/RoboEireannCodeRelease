@@ -6,13 +6,15 @@
  * @author Arne Hasselbring
  */
 
-#include "Representations/Communication/RobotInfo.h"
+
+#include "Representations/Communication/GameInfo.h"
+
 #include "Tools/BehaviorControl/Framework/Card/Card.h"
 #include "Tools/BehaviorControl/Framework/Card/Dealer.h"
 
 CARD(GameControlCard,
 {,
-  REQUIRES(RobotInfo),
+  REQUIRES(GameInfo),
   LOADS_PARAMETERS(
   {,
     (DeckOfCards<CardRegistry>) deck, /**< The deck from which a card is played. */
@@ -23,12 +25,12 @@ class GameControlCard : public GameControlCardBase
 {
   bool preconditions() const override
   {
-    return theRobotInfo.penalty == PENALTY_NONE;
+    return !theGameInfo.isPenalized();
   }
 
   bool postconditions() const override
   {
-    return theRobotInfo.penalty != PENALTY_NONE;
+    return theGameInfo.isPenalized();
   }
 
   void execute() override

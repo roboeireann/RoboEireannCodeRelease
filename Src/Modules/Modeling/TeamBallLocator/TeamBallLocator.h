@@ -10,9 +10,8 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
@@ -33,8 +32,6 @@ MODULE(TeamBallLocator,
   REQUIRES(FrameInfo),
   REQUIRES(GameInfo),
   REQUIRES(BallModel),
-  REQUIRES(OwnTeamInfo),
-  REQUIRES(RobotInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamData),
   PROVIDES(TeamBallModel),
@@ -42,6 +39,11 @@ MODULE(TeamBallLocator,
   {,
     (int) inactivityInvalidationTimeSpan,     /**< Minimum time to go back in ball buffer (in case of a problem) */
     (int) ballLastSeenTimeout,                /**< After this amount of time (in ms), a ball is not considered anymore */
+    (int) ballSupersededTimeout,              /**< if the ball is more than this timeout older than the newest ball 
+                                                   received, it is considered supersed by the newer ball. This should be
+                                                   slightly longer than teamMessageHandler2024.cfg maxBallPlayerBallSendInterval.
+                                                   If a ballPlayer sends no update in this time, they've lost the ball, hence
+                                                   why a newer transmission from a different robot supersedes it. */
   }),
 });
 
@@ -59,8 +61,8 @@ public:
     float poseQualityModifier;         /**< Quality of the pose, robot pose, used for computing the weight of an observation */
     Vector2f pos = Vector2f::Zero();   /**< Position of the ball (relative to the observer) */
     Vector2f vel = Vector2f::Zero();   /**< Velocity of the ball (relative to the observer) */
-    unsigned time;                     /**< Point of time (in ms) of the observation */
-    bool valid;                        /**< This observation can be considered */
+    unsigned time = 0;                 /**< Point of time (in ms) of the observation */
+    bool valid = false;                /**< This observation can be considered */
   };
 
   /** A ball that is a candidate for becoming (a part of the) team ball */
@@ -77,6 +79,7 @@ public:
 private:
   std::vector<RingBuffer<BufferedBall, BALL_BUFFER_LENGTH>> balls; /**< A buffer for all observations made by my teammates */
   std::vector<ActiveBall> ballsAvailableForTeamBall;               /**< List of all balls that are suitable for computing a team ball */
+  unsigned mostRecentTeammateBallTime = 0;
 
   /** Main method that triggers the model computation */
   void update(TeamBallModel& teamBallModel) override;

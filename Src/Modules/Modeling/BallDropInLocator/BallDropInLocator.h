@@ -10,14 +10,13 @@
 
 #include "Representations/Communication/GameInfo.h"
 #include "Representations/Communication/TeamData.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Modeling/BallDropInModel.h"
 #include "Representations/Modeling/TeamBallModel.h"
-#include "Representations/Modeling/TeamPlayersModel.h"
+#include "Representations/Modeling/TeamPlayersObstacleModel.h"
 #include "Tools/Math/Eigen.h"
 #include "Tools/Module/Module.h"
 #include "Tools/Streams/Enum.h"
@@ -29,12 +28,10 @@ MODULE(BallDropInLocator,
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
   REQUIRES(GameInfo),
-  REQUIRES(OpponentTeamInfo),
-  REQUIRES(OwnTeamInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamData),
   REQUIRES(TeamBallModel),
-  REQUIRES(TeamPlayersModel),
+  REQUIRES(TeamPlayersObstacleModel),
   PROVIDES(BallDropInModel),
   DEFINES_PARAMETERS(
   {,

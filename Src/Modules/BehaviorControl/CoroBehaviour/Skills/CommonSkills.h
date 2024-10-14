@@ -93,7 +93,7 @@ namespace CoroBehaviour
 
     // game functions
 
-    bool isOurTeamKick() { return theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber; }
+    bool isOurTeamKick() { return theGameInfo.isOurKick(); }
 
     // coordinate systems
 
@@ -131,82 +131,11 @@ namespace CoroBehaviour
 
     READS(RobotPose);
     READS(GameInfo);
-    READS(OwnTeamInfo);
 
     BehaviorStatusSkills statusSkills {env};
     HeadSkills headSkills {env};
     MotionSkills motionSkills {env};
     SoundSkills soundSkills;
   };
-
-
-
-  /// placeholder task that does nothing much - useful during behaviour development
-  /// it doesn't specify an activity
-  CRBEHAVIOUR(StandLookForwardTask)
-  {
-    CRBEHAVIOUR_INIT(StandLookForwardTask) {}
-
-    void operator()(void)
-    {
-      CRBEHAVIOUR_LOOP()
-      {
-        commonSkills.activityStatus(BehaviorStatus::reStandStill);
-        commonSkills.standLookForward(true); // high
-        CR_YIELD();
-      }
-    }
-
-  private:
-    CommonSkills commonSkills  {env};
-  };
-
-  /// placeholder task that just stands and also sets the activity to placeholder
-  CRBEHAVIOUR(PlaceholderTask)
-  {
-    PlaceholderTask(BehaviourEnv& env, const char * name="PlaceholderTask") : CoroBehaviour(env, name) {}
-    // CRBEHAVIOUR_INIT(PlaceholderTask) {}
-
-    void operator()(void)
-    {
-      CRBEHAVIOUR_LOOP()
-      {
-        commonSkills.activityStatus(BehaviorStatus::rePlaceholder);
-        commonSkills.standLookForward(true); // high
-        CR_YIELD();
-      }
-    }
-
-  private:
-    CommonSkills commonSkills  {env};
-  };
-
-
-  /// placeholder task that just stands and also sets the activity to placeholder and succeeds after a short time
-  CRBEHAVIOUR(PlaceholderSuccessTask)
-  {
-    PlaceholderSuccessTask(BehaviourEnv& env, const char * name="PlaceholderSuccessTask") : CoroBehaviour(env, name) {}
-
-    void operator()(void)
-    {
-      CRBEHAVIOUR_BEGIN();
-
-      while (true)
-      {
-        commonSkills.activityStatus(BehaviorStatus::rePlaceholder);
-        commonSkills.standLookForward(true); // high
-        if (getCoroDuration() > SUCCESS_DURATION_MS)
-          CR_EXIT_SUCCESS();
-        else
-          CR_YIELD();
-      }
-    }
-
-  private:
-    const unsigned SUCCESS_DURATION_MS = 500;
-
-    CommonSkills commonSkills  {env};
-  };
-
 
 } // CoroBehaviour

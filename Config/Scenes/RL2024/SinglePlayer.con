@@ -1,0 +1,20 @@
+#call RL2024/inc/RL_settings
+cs RL2024
+call Includes/1vsInactives
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+# press any key to activate the joystick
+jc press 1 call Includes/Joystick
+jc press 2 call Includes/Joystick
+jc press 3 call Includes/Joystick
+jc press 4 call Includes/Joystick
+
+echo call KickOff/inc/kickOffAttack
+echo call KickOff/inc/kickOffDefend
+
+echo gc ready
+echo gc set 
+echo gc playing

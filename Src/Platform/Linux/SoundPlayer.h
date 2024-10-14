@@ -11,6 +11,8 @@
 #include "Platform/Thread.h"
 #include "Wave.h"
 
+#include "Tools/Streams/AutoStreamable.h"
+
 #include <alsa/asoundlib.h>
 #include <deque>
 #include <flite.h>
@@ -19,18 +21,29 @@
 #include <utility>
 #include <vector>
 
+
+
+STREAMABLE(SoundPlayerParams,
+{,
+  (float) ttsVolumeFactor, /* Increase text to speech volume by this factor (1.5 seems to be too high, results in cracking noise) */
+  (float) ttsDurationStretch, /* baseline stretch for all TTS - individual phrases may be stretched relative to this baseline */
+  (float) ttsPitch, /* Robot average voice pitch in Hz */
+  (float) ttsPitchStddev, /* The std dev of the pitch in Hz */
+});
+
 struct SoundRequest {
   bool isTextToSpeech;
-  float ttsDurationStretchFactor;
+  float stretchFactor; // tts
+  float pitchFactor; // tts
+  float pitchSdFactor; // tts
   std::string fileOrText;
+
   SoundRequest() = default;
   explicit SoundRequest(std::string fileName)
-  : isTextToSpeech(false), ttsDurationStretchFactor(0.f), fileOrText(std::move(fileName))
-  {};
-  SoundRequest(std::string text, float stretchFactor)
-  : isTextToSpeech(true), ttsDurationStretchFactor(stretchFactor), fileOrText(std::move(text))
-  {};
-  SoundRequest(const SoundRequest&) = default;
+      : isTextToSpeech(false), stretchFactor(0.f), pitchFactor(0.f), pitchSdFactor(0.f), fileOrText(std::move(fileName)){};
+  SoundRequest(std::string text, float stretchFactor, float pitchFactor, float pitchSdFactor)
+      : isTextToSpeech(true), stretchFactor(stretchFactor), pitchFactor(pitchFactor), pitchSdFactor(pitchSdFactor), fileOrText(std::move(text)){};
+  SoundRequest(const SoundRequest &) = default;
 };
 
 class SoundPlayer : public Thread
@@ -55,10 +68,12 @@ private:
   unsigned sampleRate = 16000; /**< Sample rate to playback. This variable will contain the frame rate the driver finally selected. */
   snd_pcm_uframes_t periodSize = 512; /**< Frames per period. */
 
-  float textToSpeechVolumeFactor = 1.4f; /** Increase text to speech volume by this factor (1.5 seems to be too high, results in cracking noise)  */
-  float textToSpeechDurationStretch; ///< baseline stretch to apply to all TTS - individual phrases will be stretched relative to this baseline
-  float textToSpeechPitch; ///< used to speak at a higher or lower pitch then the voice default (avg pitch in Hz)
-  float textToSpeechPitchStddev; ///< The std dev of the pitch in Hz
+  SoundPlayerParams params;
+
+  // float textToSpeechVolumeFactor = 1.4f; /** Increase text to speech volume by this factor (1.5 seems to be too high, results in cracking noise)  */
+  // float textToSpeechDurationStretch; ///< baseline stretch to apply to all TTS - individual phrases will be stretched relative to this baseline
+  // float textToSpeechPitch; ///< used to speak at a higher or lower pitch then the voice default (avg pitch in Hz)
+  // float textToSpeechPitchStddev; ///< The std dev of the pitch in Hz
 
 public:
   /**
@@ -76,7 +91,7 @@ public:
    * @param speed Use speed < 1 to talk slower and speed > 1 to talk faster.
    * @return The amount of elements in the play sound queue.
    */
-  static int say(const std::string& text, float speed = 1.f);
+  static int say(const std::string& text, float speed = 1.f, float pitchFactor = 1.f, float pitchSdFactor = 1.f);
 
   static bool isPlaying();
 

@@ -1,24 +1,12 @@
 #include "ObstacleModel.h"
 #include "Platform/SystemCall.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Modeling/RobotPose.h"
+#include "Representations/Communication/GameInfo.h"
 #include "Tools/Debugging/DebugDrawings.h"
 #include "Tools/Debugging/DebugDrawings3D.h"
 #include "Tools/Math/Approx.h"
 #include "Tools/Modeling/Obstacle.h"
 #include "Tools/Module/Blackboard.h"
-
-void ObstacleModel::operator>>(BHumanMessage& m) const
-{
-  std::sort(const_cast<std::vector<Obstacle>&>(obstacles).begin(), const_cast<std::vector<Obstacle>&>(obstacles).end(), [](const Obstacle& a, const Obstacle& b) {return a.center.squaredNorm() < b.center.squaredNorm(); });
-
-  Streaming::streamIt(*m.theBHumanStandardMessage.out, "theObstacleModel",  *this);
-}
-
-void ObstacleModel::operator<<(const BHumanMessage& m)
-{
-  Streaming::streamIt(*m.theBHumanStandardMessage.in, "theObstacleModel",  *this);
-}
 
 void ObstacleModel::verify() const
 {
@@ -60,11 +48,11 @@ void ObstacleModel::draw() const
   DECLARE_DEBUG_DRAWING("representation:ObstacleModel:fallen", "drawingOnField");
   DECLARE_DEBUG_DRAWING3D("representation:ObstacleModel", "robot");
 
-  const ColorRGBA ownColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("OwnTeamInfo") ?
-      static_cast<const OwnTeamInfo&>(Blackboard::getInstance()["OwnTeamInfo"]).fieldPlayerColor : TEAM_GREEN);
+  const ColorRGBA ownColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
+      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor : TEAM_GREEN);
 
-  const ColorRGBA opponentColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("OpponentTeamInfo") ?
-      static_cast<const OpponentTeamInfo&>(Blackboard::getInstance()["OpponentTeamInfo"]).fieldPlayerColor : TEAM_RED);
+  const ColorRGBA opponentColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
+      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).opponentTeam().fieldPlayerColor : TEAM_RED);
 
   ColorRGBA color;
   for(const auto& obstacle : obstacles)

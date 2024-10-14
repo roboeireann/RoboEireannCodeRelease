@@ -12,7 +12,6 @@
 
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamInfo.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -40,7 +39,6 @@ MODULE(BallPerceptor,
   REQUIRES(GameInfo),
   REQUIRES(ImageCoordinateSystem),
   REQUIRES(MotionInfo),
-  REQUIRES(OwnTeamInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamBehaviorStatus),
   PROVIDES(BallPercept),

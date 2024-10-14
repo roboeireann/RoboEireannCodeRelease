@@ -1,0 +1,20 @@
+# designed for clang-format 17.0 (default in vscode as of Oct 2023)
+BasedOnStyle: LLVM
+UseTab: Never
+IndentWidth: 2
+TabWidth: 2
+# outdent private, public, etc
+AccessModifierOffset: -2
+BreakBeforeBraces: Allman
+IndentCaseLabels: false
+ColumnLimit: 120
+
+NamespaceIndentation: All
+FixNamespaceComments: true
+
+# AlignConsecutiveAssignments: Consecutive
+AllowShortIfStatementsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLambdasOnASingleLine: All

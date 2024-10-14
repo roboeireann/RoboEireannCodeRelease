@@ -9,8 +9,7 @@
 #include "Modules/Infrastructure/InterThreadProviders/PerceptionProviders.h"
 #include "Modules/Infrastructure/LogDataProvider/LogDataProvider.h"
 
-#include "Representations/Communication/BHumanMessage.h"
-#include "Representations/Communication/TeamMessage2023.h"
+#include "Representations/Communication/TeamMessage2024.h"
 
 #include "Platform/SystemCall.h"
 #include "Platform/Thread.h"
@@ -30,6 +29,10 @@ Cognition::Cognition()
 {
   Blackboard::getInstance().alloc<UpperFrameInfo>("UpperFrameInfo").time = 100000;
   Blackboard::getInstance().alloc<LowerFrameInfo>("LowerFrameInfo").time = 100000;
+
+  InMapFile stream("cognition.cfg");
+  ASSERT(stream.exists());
+  stream >> params;
 }
 
 Cognition::~Cognition()
@@ -95,10 +98,19 @@ bool Cognition::beforeFrame()
 
 void Cognition::beforeModules()
 {
+  // if the modules do not finish executing in this number of ms the watchdog
+  // timer will fire and interrupt the process. Modules should complete in < 33 ms
+  // so 1 second should be more than enough time. If we exceed that, something
+  // is badly wrong.
+  if (params.watchdogEnabled)
+    watchdog.setTimeout(params.watchdogTimeout); // FIXME - SimRobot with 7v7 takes a long time to start up and a 1sec timeout causes the watchdog to fire
 }
 
 void Cognition::afterModules()
 {
+  // cancel the watchdog since we got here before it expired and shut us down
+  watchdog.cancelTimeout();
+
   Blackboard& blackboard = Blackboard::getInstance();
 
   // NOTE: in the following it seems the representations will exist whether the
@@ -106,18 +118,12 @@ void Cognition::afterModules()
   // needed to see which module has actually filled in the representation
   // (sendIfNeeded) in order to decide how to proceed
 
-  if (blackboard.exists("BHumanMessageOutputGenerator") &&
-      static_cast<const BHumanMessageOutputGenerator &>(blackboard["BHumanMessageOutputGenerator"]).sendIfNeeded)
-  {
-    BH_TRACE_MSG("before BHumanMessageOutputGenerator.sendIfNeeded()");
-    static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).sendIfNeeded();
-  }
-  else if (blackboard.exists("TeamMessage2023OutputGenerator") &&
-           static_cast<const TeamMessage2023OutputGenerator &>(blackboard["TeamMessage2023OutputGenerator"])
+  if (blackboard.exists("TeamMessage2024OutputGenerator") &&
+           static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"])
                .sendIfNeeded)
   {
-    BH_TRACE_MSG("before TeamMessage2023OutputGenerator.sendIfNeeded()");
-    static_cast<const TeamMessage2023OutputGenerator &>(blackboard["TeamMessage2023OutputGenerator"]).sendIfNeeded();
+    BH_TRACE_MSG("before TeamMessage2024OutputGenerator.sendIfNeeded()");
+    static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"]).sendIfNeeded();
   }
 }
 

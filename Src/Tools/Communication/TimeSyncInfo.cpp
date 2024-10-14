@@ -26,10 +26,10 @@ void TimeSyncInfo::updateGCInfo(uint8_t seqNumGC, unsigned timeReceivedGC, unsig
     return;
 
   // delete any timestamps that are now too old to be useful
-  if (oldestTimeReceivedGC && (Time::getTimeSince(oldestTimeReceivedGC, referenceTime) > GC_TIMEOUT))
+  if (oldestTimeReceivedGC && (Time::getTimeBetween(oldestTimeReceivedGC, referenceTime) > GC_TIMEOUT))
   {
     while (!gameControllerInfos.empty() &&
-           (Time::getTimeSince(gameControllerInfos.back().timeReceivedGC, referenceTime) > GC_TIMEOUT))
+           (Time::getTimeBetween(gameControllerInfos.back().timeReceivedGC, referenceTime) > GC_TIMEOUT))
       gameControllerInfos.pop_back();
 
     oldestTimeReceivedGC = gameControllerInfos.empty() ? 0 : gameControllerInfos.back().timeReceivedGC;

@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 BINARY="/home/nao/Config/roboeireann"
 LOGDIR="/home/nao/logging"
-DUMPFILE="/home/nao/redump.log"
+DUMPFILE="/home/nao/redump.trace"
 BACKGROUND=false
 DEBUG=false
 
@@ -66,17 +66,26 @@ else
 fi
 
 # Make log-names unique by numbering them.
-COUNTER=$(ls "${LOGDIR}" | sed -nE "s/^roboeireannd_\(([0-9]+)\).log$/\1/p" | sort -n | tail -n1)
-COUNTER=$(expr ${COUNTER} + 1)
-LOGFILE="${LOGDIR}/roboeireannd_(${COUNTER}).log"
+# RV: only support new form logfile names
+COUNTER=$(ls "${LOGDIR}" | sed -nE "s/^roboeireannd_([0-9]+).tlog$/\1/p" | sort -n | tail -n1)
+
+if [ -z $COUNTER ]; then
+  COUNTER="000"
+else
+  printf -v COUNTER "%03d" $(expr ${COUNTER} + 1)  
+fi
+
+LOGFILE="${LOGDIR}/roboeireannd_${COUNTER}.tlog"
 
 # Actually execute roboeireann.
 if ${DEBUG}; then
   gdb "${BINARY}"
 elif ${BACKGROUND}; then
-  "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' >"${LOGFILE}"
+  # "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' >"${LOGFILE}"
+  "${BINARY}" -w 2>&1 >"${LOGFILE}"
 else
-  "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' | tee "${LOGFILE}"
+  # "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' | tee "${LOGFILE}"
+  "${BINARY}" -w 2>&1 | tee "${LOGFILE}"
 fi
 
 # Remove leftovers.

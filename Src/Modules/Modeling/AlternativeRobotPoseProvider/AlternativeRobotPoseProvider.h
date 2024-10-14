@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/RobotInfo.h"
+
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
@@ -39,7 +39,6 @@ MODULE(AlternativeRobotPoseProvider,
   REQUIRES(Odometer),
   REQUIRES(PenaltyArea),
   REQUIRES(PenaltyMarkWithPenaltyAreaLine),
-  REQUIRES(RobotInfo),
   REQUIRES(SideInformation),
   PROVIDES(AlternativeRobotPoseHypothesis),
   DEFINES_PARAMETERS(

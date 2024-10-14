@@ -14,7 +14,7 @@
 
 STREAMABLE(PlayerRole,
 {
-  ENUM(RoleType,
+  ENUM(Type,
   {,
     none,
     goalkeeper,
@@ -27,6 +27,9 @@ STREAMABLE(PlayerRole,
     supporter2,
     supporter3,
     supporter4,
+    endOfLegacyRoles = supporter4,
+
+
   });
 
   /**
@@ -42,7 +45,7 @@ STREAMABLE(PlayerRole,
    * Compatibility function for 2019 behavior.
    * @return Whether the robot plays the ball.
    */
-  bool playsTheBall() const
+  bool isBallPlayer() const
   {
     return role == ballPlayer;
   }
@@ -53,9 +56,11 @@ STREAMABLE(PlayerRole,
    */
   int supporterIndex() const
   {
-    return role < firstSupporterRole ? -1 : (role - firstSupporterRole);
-  },
+    return ((firstSupporterRole <= role) && (role <= endOfLegacyRoles)) ? (role - firstSupporterRole) : -1;
+  }
+  
+  /******** streamable members follow (note comma at end of comment) ********/,
 
-  (RoleType)(none) role, /**< The role type. */
+  (Type)(none) role, /**< The role type. */
   (int)(0) numOfActiveSupporters, /**< The number of not penalized supporters (i.e. robots that have a supporterIndex >= 0). */
 });

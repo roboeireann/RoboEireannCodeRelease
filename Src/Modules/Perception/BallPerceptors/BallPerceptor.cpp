@@ -80,7 +80,7 @@ void BallPerceptor::update(BallPercept& theBallPercept)
 
   // Special ball handling for penalty goal keeper
   if((theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT || (theGameInfo.setPlay == SET_PLAY_PENALTY_KICK && theTeamBehaviorStatus.role.isGoalkeeper()))
-      && theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber && theMotionInfo.executedPhase == MotionPhase::keyframeMotion)
+      && !theGameInfo.isOurKick() && theMotionInfo.executedPhase == MotionPhase::keyframeMotion)
   {
     Vector2f inImageLowPoint;
     Vector2f inImageUpPoint;

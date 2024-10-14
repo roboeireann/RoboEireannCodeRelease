@@ -125,6 +125,7 @@ void WalkKickEngine::update(WalkKickGenerator& walkKickGenerator)
       kick.kickInterpolation = Rangef::ZeroOneRange().limit(confAngle / (walkKickVariant.kickLeg == Legs::left ? -theKickInfo[KickInfo::walkTurnLeftFootToRight].rotationOffset : -theKickInfo[KickInfo::walkTurnRightFootToLeft].rotationOffset));
     }
 
+    // TODO: could consider adding extra levels of imprecision here
     const DeviationValues dv = getForwardTurnKickDeviation(kick, lastExecutedStep, alignPrecisely, kickPoseShiftY);
 
     float xRangeMaxOffset = 0.f;

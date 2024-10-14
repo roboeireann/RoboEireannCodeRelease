@@ -97,7 +97,7 @@ void LEDHandler::setLeftEye(LEDRequest& ledRequest)
 
 void LEDHandler::setRightEye(LEDRequest& ledRequest)
 {
-  if(theTeamBehaviorStatus.role.playsTheBall())
+  if(theTeamBehaviorStatus.role.isBallPlayer())
     ledRequest.setEyeLeds(LEDRequest::right, LEDColor::RED);
   else if(theTeamBehaviorStatus.role.isGoalkeeper())
     ledRequest.setEyeLeds(LEDRequest::right, LEDColor::BLUE);
@@ -178,21 +178,24 @@ void LEDHandler::setHead(LEDRequest& ledRequest)
 
 void LEDHandler::setChestButton(LEDRequest& ledRequest)
 {
-  switch(theRobotInfo.mode)
+  switch(theGameInfo.playerMode)
   {
-    case RobotInfo::unstiff:
-      ledRequest.setChestLeds(LEDRequest::blinking, LEDColor::BLUE);
+    case GameInfo::unstiff:
+      ledRequest.setChestLeds(LEDRequest::slowDoubleBlink, LEDColor::BLUE);
       break;
-    case RobotInfo::calibration:
+    case GameInfo::calibration:
       ledRequest.setChestLeds(LEDRequest::on, LEDColor::MAGENTA);
       break;
-    case RobotInfo::active:
+    case GameInfo::active:
     default:
-      if (theRobotInfo.penalty != PENALTY_NONE)
+      if (theGameInfo.isPenalized())
         ledRequest.setChestLeds(LEDRequest::on, LEDColor::RED);
       else
         switch (theGameInfo.state)
         {
+          case STATE_STANDBY:
+            ledRequest.setChestLeds(LEDRequest::on, LEDColor::CYAN);
+            break;
           case STATE_READY:
             ledRequest.setChestLeds(LEDRequest::on, LEDColor::BLUE);
             break;
@@ -216,7 +219,7 @@ void LEDHandler::setLeftFoot(LEDRequest& ledRequest)
   // The foot button interface is obsolete, so we'll go with field player colours only
   // for now.
   // FIXME - potentially needs revision later.
-  switch(theOwnTeamInfo.fieldPlayerColor)
+  switch(theGameInfo.ourTeam().fieldPlayerColor)
   {
     case TEAM_ORANGE:
       ledRequest.setFootLeds(LEDRequest::left, LEDRequest::on, LEDColor::ORANGE_YELLOW); 
@@ -251,14 +254,14 @@ void LEDHandler::setLeftFoot(LEDRequest& ledRequest)
 void LEDHandler::setRightFoot(LEDRequest& ledRequest)
 {
   if (theGameInfo.state == STATE_INITIAL && theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT &&
-      theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+      theGameInfo.isOurKick())
     ledRequest.setFootLeds(LEDRequest::right, LEDRequest::on, LEDColor::GREEN);
   else if (theGameInfo.state == STATE_INITIAL && theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT &&
-           theGameInfo.kickingTeam != theOwnTeamInfo.teamNumber)
+           !theGameInfo.isOurKick())
     ledRequest.setFootLeds(LEDRequest::right, LEDRequest::on, LEDColor::BRIGHT_YELLOW);
   else if (theFrameInfo.getTimeSince(theGameInfo.timeLastPacketReceived) < gameControllerTimeOut &&
           theGameInfo.state <= STATE_SET &&
-          theGameInfo.kickingTeam == theOwnTeamInfo.teamNumber)
+          theGameInfo.isOurKick())
     ledRequest.setFootLeds(LEDRequest::right, LEDRequest::on, LEDColor::WHITE);
 }
 

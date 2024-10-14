@@ -1,0 +1,35 @@
+# for the visual ref, the location is default and the scenario is as follows
+cs REKickLengthCalibration
+
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+# switch off the game time
+dr debugDrawing3d:representation:GameInfo off
+dr debugDrawing3d:representation:GameInfo:scores off
+
+# switch off some automatic referee features
+ar placeBall penalizeIllegalPosition penalizeIllegalPositionInSet off
+
+# add in the key states stuff for head buttons
+vd representation:EnhancedKeyStates
+
+# set up the position for the first kick
+call RE/inc/next_kick_for_kick_length_calibration
+
+# help
+echo -- first:
+echo --   use gc playing (no need for ready or set) and then use poll
+echo --   to ensure the dr command is recognised
+echo -- then, for each kick:
+echo --   either use the dr line (or set the EnhancedKeyStates appropriately)
+echo --   to go ahead and kick. Finally use the call line to reposition the robot
+echo --   and ball for the next kick.
+echo
+echo gc playing
+echo poll
+echo
+echo dr behaviour:KickLengthCalibration:kickOnce on
+echo call RE/inc/next_kick_for_kick_length_calibration

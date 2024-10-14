@@ -5,6 +5,7 @@
  * (some parts adapted from the BH2019 code release HeadControl.cpp)
  *
  * @author: Rudi Villing
+ * @author: Aidan Colgan
  */
 
 #pragma once
@@ -91,6 +92,41 @@ namespace CoroBehaviour
       {
         const HeadTarget target = theLibLookActive.calculateHeadTarget(false, false, false, false);
         lookAtAngles(target.pan, target.tilt, target.speed, target.cameraControlMode, target.stopAndGoMode);
+      }
+    }
+
+
+    //Clone of lookAtBall That returns where it is looking towards
+
+    bool lookAtBallTurnDirection(bool mirrored = false, bool forceOwnEstimate = false)
+    {
+      const int OWN_BALL_TIMEOUTMS = 2000; /**< LookAtBall will use the team ball or look active if the ball hasn't been seen for this time. */
+      const int OWN_BALL_DISAPPEARED_TIMEOUTMS = 500; /**< LookAtBall will use the team ball or look active if the ball disappeared for this time. */
+
+      //Boolean if we should turn left or right
+      bool left = false;
+      const bool useOwnEstimate =
+          forceOwnEstimate || (theFieldBall.ballWasSeen(OWN_BALL_TIMEOUTMS) &&
+                               theFieldBall.timeSinceBallDisappeared <= OWN_BALL_DISAPPEARED_TIMEOUTMS);
+
+      if (useOwnEstimate || theTeamBallModel.isValid)
+      {
+        const Vector2f ballPosition =        
+            useOwnEstimate ? (mirrored ? env.toRobotCoordinates(env.toFieldCoordinates(theBallModel.estimate.position).rotated(pi))
+                                       : theBallModel.estimate.position)
+                           : (mirrored ? env.toRobotCoordinates(theTeamBallModel.position.rotated(pi))
+                                       : env.toRobotCoordinates(theTeamBallModel.position));
+                              
+        lookAtPoint(Vector3f(ballPosition.x(), ballPosition.y(), theBallSpecification.radius), 180_deg,
+                    HeadMotionRequest::autoCamera);
+        left = ballPosition.y() > 0; // Then left else right
+        return(left);
+      }
+      else
+      {
+        const HeadTarget target = theLibLookActive.calculateHeadTarget(false, false, false, false);
+        lookAtAngles(target.pan, target.tilt, target.speed, target.cameraControlMode, target.stopAndGoMode);
+        return(left);
       }
     }
 
@@ -182,6 +218,36 @@ namespace CoroBehaviour
     }
   };
 
+
+  //Look Left or Right Task
+
+  CRBEHAVIOUR(LookLeftOrRightTask)
+  {
+    CRBEHAVIOUR_INIT(LookLeftOrRightTask) {}
+
+    void operator()(bool lookLeft = true, Angle maxPan = 119.52_deg, Angle tilt = 18.91_deg, Angle speed = 100_deg)
+    {
+      CRBEHAVIOUR_BEGIN();
+
+      lookLeftOrRightSign = lookLeft ? 1.f : -1.f;
+
+      CR_WHILE(true, lookLeftRight(maxPan, tilt, speed));
+    }
+
+  private:
+    int lookLeftOrRightSign;
+
+    HeadSkills headSkills {env};
+
+    READS(JointAngles);
+    READS(HeadMotionInfo);
+
+
+    void lookLeftRight(Angle maxPan, Angle tilt, Angle speed)
+    {
+      headSkills.lookAtAngles(lookLeftOrRightSign * maxPan, tilt, speed, HeadMotionRequest::autoCamera);
+    }
+  };
 
   CRBEHAVIOUR(ScanSideToSideTask)
   {
