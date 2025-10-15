@@ -24,22 +24,29 @@ namespace CoroBehaviour
     // ------------------------------------------------------------------------
 
     // see BH2021 Activity.cpp
-    void activity(BehaviorStatus::Activity activity)
+    void recordActivity(BehaviorStatus::Activity activity)
     {
       theBehaviorStatus.activity = activity;
       theLibCheck.inc(LibCheck::activity);
     }
 
     // see BH2021 PassTarget.cpp
-    void passTarget(int passTarget, const Vector2f& ballTarget = Vector2f::Zero())
+    void recordPassTarget(int passTarget, const Vector2f& ballTarget = Vector2f::Zero())
     {
       theBehaviorStatus.passTarget = passTarget;
       theBehaviorStatus.shootingTo = ballTarget;
       theLibCheck.inc(LibCheck::passTarget);
     }
 
+    // for kicks that are not intended as a pass
+    void recordKick(const Vector2f& ballTarget = Vector2f::Zero())
+    {
+      theBehaviorStatus.shootingTo = ballTarget;
+      theLibCheck.inc(LibCheck::passTarget); // although not strictly a pass, we use this to prevent conflicts
+    }
+
     // see BH2021 RecordTargetAndSpeed.cpp
-    void walkingTo(const Vector2f& target, float speed = 1.f)
+    void recordWalkingTo(const Vector2f& target, float speed = 1.f)
     {
       ASSERT(speed >= 0.f);
       ASSERT(speed <= 1.f);

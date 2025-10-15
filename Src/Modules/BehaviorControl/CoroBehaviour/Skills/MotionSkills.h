@@ -7,7 +7,6 @@
  *
  * @author: Rudi Villing
  * @author: Andy Lee Mitchell
- * @author: Aidan Colgan
  */
 
 #pragma once
@@ -206,6 +205,13 @@ namespace CoroBehaviour
   {
     CRBEHAVIOUR_INIT(WalkToPoseTask) {}
 
+    void operator()(const Pose2f &target, float speed, Avoidance avoidance,
+                    bool keepTargetRotation, bool standAtTarget,
+                    HystThresholdsf positionThreshold, HystThresholdsa angleThreshold = {3_deg, 10_deg})
+    {
+      operator()(target, speed, avoidance, keepTargetRotation, standAtTarget, positionThreshold.toRange(), angleThreshold.toRange());
+    }
+
     void operator()(const Pose2f &target, float speed, Avoidance avoidance = AVOIDANCE_AUTO,
                     bool keepTargetRotation = false, bool standAtTarget = true,
                     Rangef positionThreshold = {20.f, 100.f}, Rangea angleThreshold = {3_deg, 10_deg})
@@ -225,7 +231,7 @@ namespace CoroBehaviour
       const bool obstacleContacted = footContact || leftArmContact || rightArmContact;
 
       const bool outsideOuterTargetThreshold =
-          (targetDistance > positionThreshold.max) && (fabs(target.rotation) > angleThreshold.max);
+          (targetDistance > positionThreshold.max) || (fabs(target.rotation) > angleThreshold.max);
       const bool insideInnerTargetThreshold =
           (targetDistance < positionThreshold.min) && (fabs(target.rotation) < angleThreshold.min);
 
@@ -239,6 +245,8 @@ namespace CoroBehaviour
         {
           CR_CHECKPOINT(walkFar);
           motionSkills.walkToPose(target, speedPose, getFarAvoidance(target, speedPose), keepTargetRotation);
+          ACTGRAPH_FMT("target: {}", target);
+          ACTGRAPH_FMT("keepTargetRotation: {}", keepTargetRotation);
           CR_YIELD();
         }
 
@@ -246,6 +254,8 @@ namespace CoroBehaviour
         {
           CR_CHECKPOINT(walkNear);
           motionSkills.walkToPose(target, speedPose, getNearAvoidance(target, avoidance), keepTargetRotation);
+          ACTGRAPH_FMT("target: {}", target);
+          ACTGRAPH_FMT("keepTargetRotation: {}", keepTargetRotation);
           CR_YIELD();
         }
 
@@ -256,15 +266,24 @@ namespace CoroBehaviour
           while (!outsideOuterTargetThreshold && !obstacleContacted)
           {
             // Note that the robot may already be standing in the right place, in which case we can just stand and exit
-            if (standAtTarget && (motionSkills.isStanding() || (getCheckpointDuration() > 500)))
+            if (standAtTarget && (motionSkills.isStanding() || (getCheckpointDuration() > params.standAfterTime)))
             {
               motionSkills.stand();
-              CR_EXIT_SUCCESS();
+              ACTGRAPH_FMT("target: {}", target);
+              ACTGRAPH_FMT("keepTargetRotation: {}", keepTargetRotation);
+              // CR_EXIT_SUCCESS();
+              CR_YIELD(); // if we specified stand at target we'll just do that rather than end the task
             }
-            else
+            else // don't stand yet
             {
               motionSkills.walkToPose(target, speedPose, getNearAvoidance(target, avoidance), keepTargetRotation);
-              if (getCheckpointDuration() > 500) // this handles the case where standAtTarget is false, but we've reached the target
+              ACTGRAPH_FMT("target: {}", target);
+              ACTGRAPH_FMT("keepTargetRotation: {}", keepTargetRotation);
+              ACTGRAPH_FMT("standAtTarget: {}", standAtTarget);
+
+              // after allowing a little time, we seem to have reached the target.
+              // Since we don't stand, we report success to our caller
+              if (!standAtTarget && (getCheckpointDuration() > params.successDelay))
                 CR_EXIT_SUCCESS();
               else
                 CR_YIELD();
@@ -319,6 +338,8 @@ namespace CoroBehaviour
       (HystThresholdsf)(900.f, 1000.f) activePathPlannerThresholds,  
       (unsigned)(1000) avoidanceTimeRough,
       (unsigned)(3000) avoidanceTime,
+      (unsigned)(500) standAfterTime, // stand after this much time has elapsed near target
+      (unsigned)(100) successDelay,
     });
 
     READS(RobotPose);
@@ -385,11 +406,20 @@ namespace CoroBehaviour
     MotionSkills motionSkills  {env};
     HeadSkills headSkills {env};
 
-
+    //See if this helps
+    LookLeftOrRightTask lookLeftOrRightTask {env};
     bool usingPathPlanner = false;
+    Pose2f reversePose;
+    //bool determine which side to rotate
+    //true is left, right is false
+    bool rotateLeft = false;
 
 
-
+    //LookAroundWalkDiagCode
+    Angle walkAngle;
+    Pose2f diagTarget;
+    //Look around for nearby opponents
+    LookLeftAndRightTask lookLeftAndRightTask {env};
 
     MotionRequest::ObstacleAvoidance getObstacleAvoidance(const Pose2f &target, const Pose2f& speed)
     {
@@ -406,12 +436,47 @@ namespace CoroBehaviour
                  : theLibWalk.calcObstacleAvoidance(target, /* rough: */ true, /* disableObstacleAvoidance */ false);
     }
 
+    //Function to check walk
+    // void getRotationDirection(const Pose2f &target)
+    // { //If target on the right side of pitch turn left
+    //   if(target.translation.y()<0)
+    //     rotateLeft = true;
+    //   else 
+    //     rotateLeft = false;
+    // }
 
+    Pose2f getReversePose(Vector2f tacticPosOnRelative)
+    {
+
+      //Ideally want to turn inward as more features to spot?
+      //Won't move just rotate
+      Vector2f tacticPosOnField = (theRobotPose * tacticPosOnRelative);
+
+      Vector2f BackPoseOnField = Vector2f(theFieldDimensions.xPosOwnGoal,tacticPosOnField.y());
+      
+      //At a later stage maybe can have more complex than 90 degree turn
+      //Angle angleBack = (BackPoseOnField-tacticPosOnField).angle();
+      //Change to 110?
+      Pose2f reversePose = Pose2f(rotateLeft ? 61_deg:-61_deg,tacticPosOnField.x(),tacticPosOnField.y());
+      return(reversePose);
+    }
+
+
+    Angle faceDiag(Vector2f tacticPosOnField)
+    {
+      //Useless I think
+      //22/01/24-Try with simpler constant forward angle (forwardAngle),23/01/24wrong as should be in robo relative co-ords
+      //Angle forwardAngle = (theFieldDimensions.xPosOpponentGroundLine <= 0 )? 0 : 3.14159;
+      Vector2f forwardPoseOnField = Vector2f(theFieldDimensions.xPosOpponentGroundLine,tacticPosOnField.y());
+      Angle angleForward = (theRobotPose.translation-tacticPosOnField).angle();
+      return(angleForward);
+      //return(forwardAngle);
+    }
   };
 
 
 
-//WalkToPoseAutoAvoidanceLookAroundTask
+//AC- Create New task WalkToPoseAutoAvoidanceLookAroundTask
 /**
  * Based on WalkToPoseAutoAvoidanceTask
  * Look Left and Right (Wide) whilst walking
@@ -433,6 +498,7 @@ namespace CoroBehaviour
         CR_CHECKPOINT(walk_to_tactic_pose);
           //Set Head motion to look around as backing up to see beside it
 
+          //headSkills.lookActive();//Doesn't see defender just looks at ball
           lookLeftAndRightTask();
           //Add Debugging Info for SimRobot
           ACTGRAPH_FMT("target = {}", target);
@@ -455,9 +521,17 @@ namespace CoroBehaviour
       (float)(1000.f) pathPlannerDistanceStart, /**< Hysteresis: If the target is further away than this distance, the path planner is used. */
       (float)(900.f) pathPlannerDistanceStop, /**< If the target is closer than this distance, LibWalk is used. */
       (float)(10000.f) frontWalkDurationMs, /**< How long to walk without checking behind-NEEDS TUNING*/
-      (float)(1600.f) checkBackDurationMs, /**< How long to spend looking behind -NEEDS TUNING*/ 
-      (float)(400.f) checkBehindThreshold, /**< How close to tacticPose before stop looking behind*/ 
-    });
+      (float)(1600.f) checkBackDurationMs, /**< How long to spend looking behind -NEEDS TUNING*/ //Preferable lloking back as long as takes dace forward timer
+      (float)(400.f) checkBehindThreshold, /**< How close to tacticPose before stop looking behind*/ //250 too small hysterisis occurs
+    });//1000 @ 90 too low, need at least 200ms
+       //45 degrees too small, see to the side
+       //60 degrees too small, see to the side back
+       //80 degrees just about too small, blindspot directly behind 
+       //90 degrees same as before just smaller blindspot
+       //perhaps in later iteration if have decent obstacle model only need turn 80,
+       //as know for certain nothing directly behind us .etc
+       //90 degrees,1600 ms ~ OK
+
     READS(RobotPose);
     READS(PathPlanner);
     READS(LibWalk);
@@ -483,6 +557,9 @@ namespace CoroBehaviour
     }
   };
 
+
+
+//AC- Task Finished
 
   CRBEHAVIOUR(WalkToPoseNoAvoidanceTask)
   {
@@ -539,6 +616,7 @@ namespace CoroBehaviour
       CRBEHAVIOUR_BEGIN();
 
       lastKickTimestamp = theMotionInfo.lastKickTimestamp;
+      
 
       while (true)
       {
@@ -553,6 +631,14 @@ namespace CoroBehaviour
         theMotionRequest.preStepAllowed = preStepAllowed;
         theMotionRequest.turnKickAllowed = turnKickAllowed;
         theLibCheck.inc(LibCheck::motionRequest);
+
+        ACTGRAPH_FMT("targetDirection: {:.1f} deg", toDegrees(targetDirection));
+        ACTGRAPH_FMT("kickType: {}", TypeRegistry::getEnumName(kickType));
+        ACTGRAPH_FMT("alignPrecisely: {}", alignPrecisely);
+        ACTGRAPH_FMT("kickPower: {:.3f}", kickPower);
+        ACTGRAPH_FMT("speed: {{{}, {}, {}}}", speed.rotation, speed.translation.x(), speed.translation.y());
+        ACTGRAPH_FMT("preStepAllowed: {}", preStepAllowed);
+        ACTGRAPH_FMT("turnKickAllowed: {}", turnKickAllowed);
 
         if (theMotionInfo.lastKickTimestamp != lastKickTimestamp)
           CR_EXIT_SUCCESS(); // lastKickTimestamp indicates that the kick is complete!

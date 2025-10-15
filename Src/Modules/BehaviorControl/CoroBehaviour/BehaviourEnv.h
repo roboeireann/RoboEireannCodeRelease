@@ -45,7 +45,7 @@ namespace CoroBehaviour
       { 
         representations.insert({std::type_index(typeid(representation)), &representation}); 
 
-        TLOGD(tlogger(), "add {}", TypeRegistry::demangle(typeid(representation).name()));
+        TLOGD(tlogger, "add {}", TypeRegistry::demangle(typeid(representation).name()));
       }
 
       void addModifiable(Streamable &representation)
@@ -53,14 +53,14 @@ namespace CoroBehaviour
         representations.insert({std::type_index(typeid(representation)), &representation});
         modifiables.insert({std::type_index(typeid(representation)), &representation});
 
-        TLOGD(tlogger(), "addModifiable {}", TypeRegistry::demangle(typeid(representation).name()));
+        TLOGD(tlogger, "addModifiable {}", TypeRegistry::demangle(typeid(representation).name()));
       }
 
     private:
       std::unordered_map<std::type_index, const Streamable*> representations;
       std::unordered_map<std::type_index, Streamable*> modifiables;
 
-      DECL_TLOGGER_FN(tlogger, "BehaviourEnv::RepresentationRegistry", TextLogging::INFO);
+      DECL_TLOGGER_VAR(tlogger, "BehaviourEnv::RepresentationRegistry", TextLogging::INFO);
 
       friend struct BehaviourEnv;
     };

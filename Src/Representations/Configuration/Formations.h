@@ -35,14 +35,33 @@ STREAMABLE(Formations,
 {
   ENUM(FormationId,
   {,
+    // custom formation (not defined in any formations.cfg file, e.g. for challenges)
+    customFormation,
+
+    // 3v3
+    kickoffForward020,
+    defendingKickoff020,
+    defending020,
+    attacking020,
+
+
     // 5v5
     kickoffForward121,
+    kickoffBackPass121,
     defendingKickoff121,
     defending121,
     attacking121,
 
-    // 7v7
+    // Champions Cup 5v5 (when GC indicates 7 players per team)
+    kickoffForward123,
+    kickoffBackPass123,
+    defendingKickoff123,
+    defending123,
+    attacking123,
+
+    // Champions Cup 7v7
     kickoffForward231,
+    kickoffBackPass231,
     defendingKickoff231,
     defending231,
     attacking231,
@@ -91,6 +110,10 @@ STREAMABLE(Formations,
     (Rangef) xScale, // the scaling that will be applied in min and max positions (scaling is 1.0 at zero shift)
   });
   // TODO - how to relate above to ball position, particularly for x
+
+  static bool isBack(FormationRole role) { return centreBack <= role && role <= fullBackL; }
+  static bool isMid(FormationRole role) { return centreMid <= role && role <= midL; }
+  static bool isForward(FormationRole role) { return forward <= role && role <= forwardL; }
 
   /***** separate header from streamable members, note comma at end *****/,
 

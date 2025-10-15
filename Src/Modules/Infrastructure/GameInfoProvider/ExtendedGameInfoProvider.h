@@ -13,6 +13,7 @@
 
 #include "Representations/BehaviorControl/BehaviorStatus.h"
 #include "Representations/Communication/GameInfo.h"
+#include "Representations/Configuration/GameConfig.h"
 
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/ExtendedGameInfo.h"
@@ -25,14 +26,15 @@ MODULE(ExtendedGameInfoProvider,
   REQUIRES(FallDownState),
   REQUIRES(FrameInfo),
   REQUIRES(GameInfo),
+  REQUIRES(GameConfig),
   REQUIRES(ReceivedGameControlData),
   PROVIDES(ExtendedGameInfo),
-  DEFINES_PARAMETERS(
+  LOADS_PARAMETERS(
   {,
-    (unsigned)(15000) timeBetweenWhistleAndGCPlaying, /**< The delay between the whistle and the playing signal from the GameController. [ms] */
-    (unsigned)(600000) fullHalfDuration, /**< The duration of one half of the game [ms]. */
-    (int)(12000) minPenaltyTime, /**< The minimum time a robot must be penalized to actually believe it [ms]. */
-    (int)(8000) minPenaltyTimeIP, /**< The minimum time a robot must be penalized for Illegal Position in Set to actually believe it [ms]. */
+    // (unsigned)(15000) timeBetweenWhistleAndGCPlaying, /**< The delay between the whistle and the playing signal from the GameController. [ms] */
+    // (unsigned)(600000) fullHalfDuration, /**< The duration of one half of the game [ms]. */
+    (int)(6000) minPenaltyTime, /**< The minimum time a robot must be penalized to actually believe it [ms]. */
+    (int)(6000) minPenaltyTimeIP, /**< The minimum time a robot must be penalized for Illegal Position in Set to actually believe it [ms]. */
   }),
 });
 

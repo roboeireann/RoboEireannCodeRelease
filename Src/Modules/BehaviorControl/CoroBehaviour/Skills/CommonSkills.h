@@ -31,14 +31,17 @@ namespace CoroBehaviour
 
     // from BehaviorStatusSkills
 
-    inline void activityStatus(BehaviorStatus::Activity activity) { statusSkills.activity(activity); }
+    inline void recordActivity(BehaviorStatus::Activity activity) { statusSkills.recordActivity(activity); }
 
-    inline void passTargetStatus(int passTarget, const Vector2f& ballTarget = Vector2f::Zero())
+    inline void recordPassTarget(int passTarget, const Vector2f& ballTarget = Vector2f::Zero())
     {
-      statusSkills.passTarget(passTarget, ballTarget);
+      statusSkills.recordPassTarget(passTarget, ballTarget);
     }
 
-    inline void walkingToStatus(const Vector2f& target, float speed = 1.f) { statusSkills.walkingTo(target, speed); }
+    inline void recordWalkingTo(const Vector2f &target, float speed = 1.f)
+    {
+      statusSkills.recordWalkingTo(target, speed);
+    }
 
     // from SoundSkills
 
@@ -95,6 +98,8 @@ namespace CoroBehaviour
 
     bool isOurTeamKick() { return theGameInfo.isOurKick(); }
 
+    bool isNoTeamKick() { return theGameInfo.isNoTeamKick(); }
+
     // coordinate systems
 
     // /**
@@ -124,6 +129,14 @@ namespace CoroBehaviour
     static bool isPointClose(const Vector2f& pos, float distanceThreshold = 100.f)
     {
       return (pos.squaredNorm() < sqr(distanceThreshold));
+    }
+
+    /**
+     * check if two points (vector2f) are close to one another
+     */
+    static bool arePointsClose(const Vector2f& pos1, const Vector2f& pos2, float distanceThreshold = 100.f)
+    {
+      return (pos2 - pos1).squaredNorm() < sqr(distanceThreshold);
     }
 
   private:

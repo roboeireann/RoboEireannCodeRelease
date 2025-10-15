@@ -1,0 +1,30 @@
+# for the visual ref, the location is default and the scenario is as follows
+cs RECameraCalibrationCheck
+
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+# switch off the game time
+dr debugDrawing3d:representation:GameInfo off
+dr debugDrawing3d:representation:GameInfo:scores off
+
+# switch off some automatic referee features
+ar ballOut placeBall penalizeIllegalPosition penalizeIllegalPositionInSet off
+
+
+# switch on localisation and player number info
+dr debugDrawing3d:representation:RobotPose
+dr debugDrawing3d:representation:GameInfo:player
+
+
+# help
+echo -- first:
+echo --   use gc playing (no need for ready or set)
+echo -- then:
+echo --   simply check that self localisation position is correct and 
+echo --   detected line features are projected onto the real lines
+echo --   on the field
+echo
+echo gc playing

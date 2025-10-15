@@ -4,6 +4,8 @@
  * Representation of best known teammate positions based on communicated
  * info and anything we know about their typical behaviour (normally just
  * based on the expected tactic pose)
+ * 
+ * Contains field poses.
  *
  * @author Rudi Villing
  */

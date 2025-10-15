@@ -11,14 +11,14 @@
 #include "Platform/Time.h"
 #include "Threads/Debug.h"
 #include "Tools/Framework/FrameExecutionUnit.h"
-#include "Tools/Logging/Logger.h"
+#include "Tools/Logging/LogfileLogger.h"
 #include "Tools/Math/Constants.h"
 
 #include "Representations/Infrastructure/CameraInfo.h"
 
 thread_local std::list<std::function<bool(InMessage& message)>> ModuleContainer::messageHandlers;
 
-ModuleContainer::ModuleContainer(const Settings& settings, const std::string& robotName, const Configuration& config, const std::size_t index, Logger* logger) :
+ModuleContainer::ModuleContainer(const Settings& settings, const std::string& robotName, const Configuration& config, const std::size_t index, LogfileLogger* logger) :
   ThreadFrame(settings, robotName),
   name(config()[index].name),
   priority(config()[index].priority),
@@ -79,6 +79,8 @@ void ModuleContainer::init()
   // Prepare first frame
   numberOfMessages = debugSender->getNumberOfMessages();
   OUTPUT(idFrameBegin, bin, getName());
+
+  executionUnit->initLogging(logger, getName());
 }
 
 bool ModuleContainer::main()

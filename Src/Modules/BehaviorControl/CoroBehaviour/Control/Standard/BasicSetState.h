@@ -26,7 +26,7 @@ namespace CoroBehaviour
     {
       CRBEHAVIOUR_LOOP()
       {
-        // commonSkills.activityStatus(BehaviorStatus::set);
+        // commonSkills.recordActivity(BehaviorStatus::set);
 
         if (theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
           headSkills.lookForward();

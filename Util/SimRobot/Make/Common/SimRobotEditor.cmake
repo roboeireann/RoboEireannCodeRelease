@@ -15,6 +15,9 @@ target_link_libraries(SimRobotEditor PRIVATE Qt5::Core Qt5::Gui Qt5::Widgets)
 target_link_libraries(SimRobotEditor PRIVATE SimRobotInterface)
 target_link_libraries(SimRobotEditor PRIVATE Flags::Default)
 
+target_compile_definitions(SimRobotEditor PRIVATE QT_NO_DEPRECATED_WARNINGS) # specifically for Qt5 in ubuntu 22.04+
+target_compile_options(SimRobotEditor PRIVATE -Wno-deprecated-declarations)
+
 source_group(TREE "${SIMROBOTEDITOR_ROOT_DIR}" FILES ${SIMROBOTEDITOR_SOURCES})
 
 add_library(SimRobotEditorInterface INTERFACE)

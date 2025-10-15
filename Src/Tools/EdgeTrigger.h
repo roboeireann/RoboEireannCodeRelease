@@ -57,7 +57,7 @@ STREAMABLE(EdgeTrigger,
   }
   
 
-  /***** separate header from streamable members, note comma at end of line *****/,
+  /* ----------------- separate header from streamable members (note comma at end) ------------------ */,
 
   (Value) value, // most recently updated value
   (Value) prevValue, // the value before the most recent update

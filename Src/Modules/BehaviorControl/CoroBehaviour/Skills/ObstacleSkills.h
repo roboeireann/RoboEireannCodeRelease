@@ -3,9 +3,7 @@
  * 
  * Skills related obstacle detection and avoidance etc
  * 
- * @author Rudi Villing
- * @author James Petri
- * @author Andy Lee Mitchell
+ * @author: Rudi Villing
  */
 
 #pragma once
@@ -114,6 +112,54 @@ namespace CoroBehaviour
     }
 
     
+    /**
+     * check if there are any obstacles located within a corridor around the 
+     * positive x-axis of a reference pose up to a certain max distance away.
+     * Use this to check if a corridor is free of opponents.
+     * 
+     * The reference pose could be theRobotPose, a pose
+     * constructed from a ball position, or a pose constructed at some other
+     * useful location. The key thing is that the x-axis of a pose points in
+     * the direction the pose is oriented (based on its rotation) and the
+     * corridor we check here is a certain range from right to left of that.
+     * 
+     *         ------------  ymax
+     *    pose *--->     corridor
+     *         ------------  ymin
+     * 
+     * @param refPose the reference pose to use. The corridor we check is oriented in same direction
+     *             as the pose (i.e. parallel to the positive x-axis of the pose). 
+     *             IMPORTANT: This refPose **must** be expressed in robot relative coordinates
+     * @param corridor the min and max y-value of the corridor (in refPose-relative coordinates) in mm.
+     *             The min y-value specifies the right hand boundary of the corridor
+     *             and the max y-valye specifies the left hand boundary.
+     * @param distance only opponents closer than this distance are considered (mm)
+     * @returns true if any opponent overlaps with this corridor up to the specified distance
+     */
+    bool obstaclesInCorridor(const Pose2f &refPose, Rangef corridor, float distance = 12000.0f)
+    {
+      Pose2f inversePose = refPose.inverse();
+
+      for (auto obstacle : theObstacleModel.obstacles)
+      {
+        if (/* (obstacle.type == Obstacle::opponent) && */ (isCloserThan(obstacle.center, distance)))
+        {
+          // transform obstacle from robot-relative to reference-pose-relative coordinates
+          Vector2f center = inversePose * obstacle.center;
+
+          // we'll assume the opponent is basically circular to simplify things
+          float radius = (obstacle.right - obstacle.left).norm() / 2;
+          Rangef obstacle(center.y()-radius, center.y()+radius);
+
+          if (obstacle.intersectionSizeWith(corridor) != 0)
+            return true; // overlapping obstacle found
+        }
+      }
+
+      return false; // all clear
+    }
+
+
     // populate sectors from a kick point (probably ball) in robot relative coords
     const std::list<SectorWheel::Sector>& populateKickSectors(const Vector2f& point, const Rangea& angleIgnore = Rangea(0,0))
     {
@@ -126,7 +172,10 @@ namespace CoroBehaviour
       // mark the goal
       Vector2f goalLeft {theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosLeftGoal - theFieldDimensions.goalPostRadius};
       Vector2f goalRight {theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosRightGoal + theFieldDimensions.goalPostRadius};
+      // Vector2f goalCenter {theFieldDimensions.xPosOpponentGroundLine, 0.f};
 
+      // sectorWheel.addSector(Rangea(theRobotPose.toRobotCoordinates(goalRight).angle(), theRobotPose.toRobotCoordinates(goalLeft).angle()), 
+      //   theRobotPose.toRobotCoordinates(goalCenter).norm(), SectorWheel::Sector::goal);
       sectorWheel.addSector(theRobotPose.toRobotCoordinates(goalLeft), theRobotPose.toRobotCoordinates(goalRight),
                             SectorWheel::Sector::goal);
 

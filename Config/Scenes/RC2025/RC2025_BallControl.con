@@ -1,0 +1,24 @@
+cs RC2025-BallControl
+
+call Includes/Normal
+call Includes/Views
+
+dr debugDrawing3d:representation:RobotPose
+dr debugDrawing3d:representation:GameInfo:player
+
+ar penalizeIllegalPosition off
+ar penalizeIllegalPositionInSet off
+ar switchToSet off
+ar switchToPlaying off
+
+
+robot all
+dr annotation
+vd representation:TeamBehaviorStatus
+vd representation:TeamData 
+
+echo call RC2025/inc/fastest_walk_remove_inactives
+
+
+
+

@@ -35,8 +35,10 @@ elif [ $# -ne 0 ]; then
   usage
 fi
 
-# Remove assertion dumps from previous runs.
-rm -f "${DUMPFILE}"
+if [ -f "${DUMPFILE}" ]; then
+  TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+  mv "${DUMPFILE}" "${DUMPFILE}.${TIMESTAMP}"
+fi
 
 # This should fix a freaky cygwin bug.
 if [ ! -x "${BINARY}" ]; then

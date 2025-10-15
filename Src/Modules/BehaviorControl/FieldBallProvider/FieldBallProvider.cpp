@@ -4,11 +4,18 @@
  * Provides the FieldBall for the Behavior
  *
  * @author Tim Laue
+ * @author Rudi Villing
  */
 
 #include "FieldBallProvider.h"
 #include "Tools/Math/Geometry.h"
 #include "Tools/Modeling/BallPhysics.h"
+
+#include "Tools/TextLogging.h"
+#include "Tools/FmtCommonTypes.h"
+
+
+DECL_TLOGGER(tlogger, "FieldBallProvider", TextLogging::INFO);
 
 MAKE_MODULE(FieldBallProvider, behaviorControl);
 
@@ -34,6 +41,7 @@ void FieldBallProvider::update(FieldBall& fieldBall)
 
   checkIfBallIsRollingTowardsAGoal(fieldBall);
   checkIfBallIsPassingOwnYAxis(fieldBall);
+  checkIfBallIsPassingOwnXAxis(fieldBall);
   checkIfBallIsInsideOwnPenaltyArea(fieldBall);
 }
 
@@ -60,10 +68,18 @@ void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
   fieldBall.intersectionPositionWithOwnYAxis = Vector2f::Zero();
   fieldBall.secsUntilIntersectsOwnYAxis = std::numeric_limits<float>::max();
 
+  fieldBall.intersectionPositionWithOwnYAxisAggressive = Vector2f::Zero();
+  fieldBall.secsUntilIntersectsOwnYAxisAggressive = std::numeric_limits<float>::max();
+
   const Vector2f& ballPosRel = theBallModel.estimate.position;
   const Vector2f& ballVelRel = theBallModel.estimate.velocity;
   if(ballVelRel.x() >= 0 || ballPosRel.x() < 0.f) // Ball does not move or moves away
     return;
+
+  const float FIXME_HACK_FACTOR = 0.95f; // FIXME - it appears that the update of the predicted end position
+                                    // gets out of sync with ball velocity such that predicted time to
+                                    // reach end pos becomes huge (which doesn't make sense).
+                                    // So we artifically shorten the distance we estimate time for 
   Vector2f intersection;
   if(Geometry::getIntersectionOfLines(Geometry::Line(ballPosRel, ballVelRel),
                                       Geometry::Line(Vector2f(0.f, 0.f), Vector2f(0.f, 1.f)), intersection))
@@ -75,9 +91,38 @@ void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
     if(distanceToIntersection < distanceToEndPosition)
     {
       fieldBall.intersectionPositionWithOwnYAxis = intersection;
-      fieldBall.secsUntilIntersectsOwnYAxis = BallPhysics::timeForDistance(ballVelRel, distanceToIntersection, theBallSpecification.friction);
+      fieldBall.secsUntilIntersectsOwnYAxis = BallPhysics::timeForDistance(
+          ballVelRel, distanceToIntersection * FIXME_HACK_FACTOR, theBallSpecification.friction);
+      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: distanceToIntersection < endPos");
     }
+    else if ((distanceToEndPosition + aggressiveEndPositionDistance) > distanceToIntersection)
+    {
+      fieldBall.intersectionPositionWithOwnYAxisAggressive = intersection;
+
+      float secsToEndPos = BallPhysics::timeForDistance(ballVelRel, distanceToEndPosition * FIXME_HACK_FACTOR,
+                                                        theBallSpecification.friction);
+      float secsEndPosToIntersection =
+          (distanceToIntersection - distanceToEndPosition) /
+          ballVelRel.norm(); // TODO hack (const velocity for diff between end point and intersection)
+      fieldBall.secsUntilIntersectsOwnYAxisAggressive = secsToEndPos + secsEndPosToIntersection;
+
+      TLOGD(
+          tlogger,
+          "checkIfBallIsPassingOwnYAxis: distToIntersect < endPos + aggr, distToEnd {}, ballVel {}, secToEnd {}, secExtra {}",
+          distanceToEndPosition, ballVelRel, secsToEndPos, secsEndPosToIntersection);
+    }
+    else if (-ballVelRel.x() > aggressiveMinVelocityX)
+    {
+      fieldBall.intersectionPositionWithOwnYAxisAggressive = intersection;
+      fieldBall.secsUntilIntersectsOwnYAxisAggressive =
+          distanceToEndPosition / ballVelRel.norm(); // TODO: HACK - ignore friction in order to get an estimate
+      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ballVel towards");
+    }
+    else
+      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ball will intersect y, but conditions not satisfied");
   }
+  else
+    TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ball does not intersect y");
 }
 
 

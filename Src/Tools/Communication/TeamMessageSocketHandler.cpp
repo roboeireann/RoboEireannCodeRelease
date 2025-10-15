@@ -30,8 +30,23 @@ void TeamMessageSocketHandler::startLocal(int port, unsigned localId)
 
   socket.setBlocking(false);
   VERIFY(socket.setBroadcast(false));
-  std::string group = SystemCall::getHostAddr();
-  group = "239" + group.substr(group.find('.'));
+  std::string hostAddr = SystemCall::getHostAddr();
+
+  // Default to a fixed multicast address from the "Organization-Local Scope" range
+  // This address is specifically for internal network use and doesn't rely on
+  // an active physical network interface.
+  std::string group = "239.255.0.1"; // default for loopback use
+
+  // check if there is a suitable network
+  // NOTE: for loopback to work in the absence of any other network, you may
+  // need to explicitly enable multicast on the loopback interface.
+  // You can call Make/Linux/enableLoopbackMulticast to do this temporarily.
+
+  // if (!hostAddr.empty() && (hostAddr.substr(0,3) != "127"))
+    group = "239" + hostAddr.substr(hostAddr.find('.'));
+
+  TLOGI(tlogger, "Default host address is '{}', so multicast group is '{}'", hostAddr, group);
+
   VERIFY(socket.bind("0.0.0.0", port));
   VERIFY(socket.setTTL(0)); //keep packets off the network. non-standard(?), may work.
   VERIFY(socket.joinMulticast(group.c_str()));
@@ -55,9 +70,16 @@ void TeamMessageSocketHandler::start(int port, const std::string& subnet)
 
   requestedSubnet = subnet;
   if (!setBroadcastTarget())
-    TLOGW(tlogger, "start: couldn't set broadcast address, requested {}, actual {}", requestedSubnet, actualBroadcastAddr);
+  {
+    if (++consecutiveStartErrors < 20)
+      TLOGW(tlogger, "start: couldn't set broadcast address, subnet '{}', broadcast '{}', port {}", requestedSubnet,
+            actualBroadcastAddr, port);
+  }
   else
+  {
+    consecutiveStartErrors = 0;
     TLOGI(tlogger, "start: started broadcast on {} : {}", actualBroadcastAddr, port);
+  }
 }
 
 bool TeamMessageSocketHandler::setBroadcastTarget()
@@ -85,7 +107,8 @@ bool TeamMessageSocketHandler::send(const TeamMessageBytes& outMessage)
   {
     if (!setBroadcastTarget())
     {
-      TLOGW(tlogger, "send port {}: couldn't set broadcast address", port);
+      if (++consecutiveSendErrors < 20)
+        TLOGW(tlogger, "send port {}: couldn't set broadcast address", port);
       return false;
     }
     else
@@ -95,14 +118,18 @@ bool TeamMessageSocketHandler::send(const TeamMessageBytes& outMessage)
   bool result = socket.write(reinterpret_cast<const char *>(outMessage.data), outMessage.size);
   if (!result)
   {
-    if (errno != prevErrno)
+    // if (errno != prevErrno)
+    if (++consecutiveSendErrors < 20)
     {
-      TLOGW(tlogger, "send port {}: problem sending teammate packet: {}", port, ErrorStr(errno).str());
-      prevErrno = errno;
+      TLOGW(tlogger, "send port {}: problem sending teammate packet: {} ({})", port, ErrorStr(errno).str(), errno);
+      // prevErrno = errno;
     }
   }
   else
+  {
+    consecutiveSendErrors = 0;
     TLOGD(tlogger, "send port {}: team message packet sent", port);
+  }
 
   return result;
 }
@@ -126,14 +153,16 @@ void TeamMessageSocketHandler::receive(ReceivedTeamMessageBytesBuffer& inBuffer)
     if (size <= 0)
     {
       if ((size < 0) && (errno != EAGAIN) && (errno != EWOULDBLOCK))
-        TLOGW(tlogger, "problem receiving teammate packet, {}", ErrorStr(errno).str());
+        if (++consecutiveReceiveErrors < 20)
+          TLOGW(tlogger, "problem receiving teammate packet, {} ({})", ErrorStr(errno).str(), errno);
 
       inBuffer.pop_back();
     }
     else
-    {
+    {      
       ASSERT(size <= static_cast<int>(sizeof(entry.data))); // should be impossible to fail
 
+      consecutiveReceiveErrors = 0;
       entry.size = size;
       entry.timeReceived = Time::getCurrentSystemTime();
       TLOGD(tlogger, "received a team message packet, size {}, timeReceived {}", entry.size, entry.timeReceived);

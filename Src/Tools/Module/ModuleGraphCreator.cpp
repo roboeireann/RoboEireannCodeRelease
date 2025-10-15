@@ -168,7 +168,8 @@ bool ModuleGraphCreator::calcShared(const Configuration& config, std::size_t ind
                                     std::vector<std::vector<const char*>>& received) const
 {
   // Checks if the representation is not also provided by default.
-  if(std::find(config.defaultRepresentations.begin(), config.defaultRepresentations.end(), representation) != config.defaultRepresentations.end())
+  if (std::find(config.defaultRepresentations.begin(), config.defaultRepresentations.end(), representation) !=
+      config.defaultRepresentations.end())
   {
     OUTPUT_ERROR(config()[index].name << ": " << representation << " is also provided by default!");
     return false;
@@ -194,7 +195,10 @@ bool ModuleGraphCreator::calcShared(const Configuration& config, std::size_t ind
           break;
       }
       if(provided)
+      {
+        TLOGD(tlogger, "Representation {} is provided by default", requirement.representation);
         continue;
+      }
 
       bool maybeAlias = false;
       int aliasThreadIndex = -1;
@@ -402,14 +406,14 @@ bool ModuleGraphCreator::sortProviders(const std::vector<std::string>& providedB
   nodes.reserve(providers[index].size());
   lookup.reserve(providers[index].size());
 
-  TLOGD(tlogger, "-----------------------------------------------\n");
-  TLOGD(tlogger, "modules for thread {}:\n", config()[index].name);
+  TLOGV(tlogger, "-----------------------------------------------\n");
+  TLOGV(tlogger, "modules for thread {}:\n", config()[index].name);
   for(const Provider& provider : providers[index])
   {
     nodes.push_back(provider);
     lookup[provider.representation] = &nodes.back();
 
-    TLOGD(tlogger, " Module {} provides {}\n", provider.moduleBase->name, provider.representation);
+    TLOGV(tlogger, " Module {} provides {}", provider.moduleBase->name, provider.representation);
   }
 
   // Add inverse dependencies to graph (provider -> providers that depend on the representation provided).  
@@ -447,12 +451,12 @@ bool ModuleGraphCreator::sortProviders(const std::vector<std::string>& providedB
       uniqueNodes.insert(&node);
 
     // list the module dependencies
-    TLOGD(tlogger, "-----------------------------------------------\n");
-    TLOGD(tlogger, "ModuleGraphCreator module dependencies for thread {}:\n", config()[index].name);
+    TLOGV(tlogger, "-----------------------------------------------\n");
+    TLOGV(tlogger, "ModuleGraphCreator module dependencies for thread {}:\n", config()[index].name);
 
     for(Node* node : uniqueNodes)
     {
-      TLOGD(tlogger, " {} depends on:\n", node->provider.moduleBase->name);
+      TLOGV(tlogger, " {} depends on:", node->provider.moduleBase->name);
 
       for(const auto& info : node->provider.moduleBase->getModuleInfo())
       {
@@ -463,9 +467,9 @@ bool ModuleGraphCreator::sortProviders(const std::vector<std::string>& providedB
         auto provider = lookup.find(info.representation);
 
         if (provider != lookup.end())
-          TLOGD(tlogger, "  {}.{}\n", provider->second->provider.moduleBase->name, info.representation);
+          TLOGV(tlogger, "  {}.{}\n", provider->second->provider.moduleBase->name, info.representation);
         else
-          TLOGD(tlogger, "  EXTERNALLY-PROVIDED.{}\n", info.representation);
+          TLOGV(tlogger, "  EXTERNALLY-PROVIDED.{}\n", info.representation);
       }
     }
   }

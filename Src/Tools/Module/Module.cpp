@@ -35,6 +35,8 @@ void loadModuleParameters(Streamable& parameters, const char* moduleName, const 
   TLOGD(tlogger, "loadModuleParameters for {} from '{}'", moduleName, name);
 
   InMapFile stream(name);
-  ASSERT(stream.exists());
+  if (!stream.exists())
+    TLOGF_ABORT(tlogger, "failed to loadModuleParameters for {} from '{}'", moduleName, name);
+    
   stream >> parameters;
 }

@@ -221,17 +221,17 @@ std::string ReceivedGameControlData::getStateString() const
         case SET_PLAY_NONE:
           return "Playing";
         case SET_PLAY_GOAL_KICK:
-          return "Goal Kick";
+          return "Playing (Goal Kick)";
         case SET_PLAY_PUSHING_FREE_KICK:
-          return "Pushing Free Kick";
+          return "Playing (Pushing Free Kick)";
         case SET_PLAY_CORNER_KICK:
-          return "Corner Kick";
+          return "Playing (Corner Kick)";
         case SET_PLAY_KICK_IN:
-          return "Kick In";
+          return "Playing (Kick In)";
         case SET_PLAY_PENALTY_KICK:
-          return "Penalty Kick";
+          return "Playing (Penalty Kick)";
         default:
-          return "Unknown";
+          return "Playing (Unknown Set Play)";
       }
     case STATE_FINISHED:
       return "Finished";

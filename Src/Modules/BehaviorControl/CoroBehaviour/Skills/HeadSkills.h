@@ -5,7 +5,6 @@
  * (some parts adapted from the BH2019 code release HeadControl.cpp)
  *
  * @author: Rudi Villing
- * @author: Aidan Colgan
  */
 
 #pragma once
@@ -96,7 +95,7 @@ namespace CoroBehaviour
     }
 
 
-    //Clone of lookAtBall That returns where it is looking towards
+    //AC-This is clone of lookAtBall THat returns where it is looking towards
 
     bool lookAtBallTurnDirection(bool mirrored = false, bool forceOwnEstimate = false)
     {
@@ -219,7 +218,9 @@ namespace CoroBehaviour
   };
 
 
-  //Look Left or Right Task
+  //AC-Look Left or Right Task
+  //For WalkToPoseAutoAvoidanceLookBackTask to look over shoulder
+
 
   CRBEHAVIOUR(LookLeftOrRightTask)
   {

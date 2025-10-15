@@ -116,8 +116,18 @@ STREAMABLE(Range,
 
   /**
    * Scales a value t with a range of tRange to this range.
+   * (The result is limited to this range)
    */
   T scale(T t, const Range<T>& tRange) const;
+
+  /**
+   * Inverse scales the value t with a range of tRange to this range.
+   * When t is the maximum of tRange, the inverse scaled result will be a minimum and 
+   * when t is the minimum of tRange, the inverse scaled result will be a maximum
+   * (The result is limited to this range)
+   */
+  T inverseScale(T t, const Range<T>& tRange) const;
+
 
   /**
    * The function returns the size of the range.
@@ -180,4 +190,10 @@ template<typename T>
 T Range<T>::scale(T t, const Range<T>& tRange) const
 {
   return limit(((t - tRange.min) / (tRange.max - tRange.min)) * (max - min) + min);
+}
+
+template<typename T>
+T Range<T>::inverseScale(T t, const Range<T>& tRange) const
+{
+  return limit(max - (max - min) * ((t - tRange.min) / (tRange.max - tRange.min)));
 }

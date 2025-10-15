@@ -107,7 +107,7 @@ void SoundPlayer::main()
   }
   VERIFY(!snd_pcm_close(handle));
 
-  TLOGI(tlogger, "finished run loop, ALSA close complete");
+  TLOGI(tlogger, "Sound player thread ended (ALSA close complete)");
 }
 
 void SoundPlayer::playWave(const Wave& wave)

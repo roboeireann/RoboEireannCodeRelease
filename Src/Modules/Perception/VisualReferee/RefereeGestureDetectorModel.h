@@ -10,8 +10,6 @@
 #pragma once
 
 
-// #include "Platform/Semaphore.h"
-#include "Platform/Thread.h"
 #include "Representations/Infrastructure/CameraImage.h"
 
 #include "DetectedGesture.h"
@@ -27,12 +25,7 @@ public:
   bool tryStartInference(const CameraImage& cameraImage);
   bool tryGetInferenceOutput(DetectedGesture::GestureOneHot &detectedGesture); // check this before tryProcessImage for max concurrency
 
-private:
-  DECLARE_SYNC;
-
-  Thread inferenceThread; ///< thread that will do the asynchronous inference
-  
-  enum { INITIALISING, IDLE, PROCESSING, RESULT } state = INITIALISING;
+private:  
   uint8_t *moveNetInput = nullptr;
   const float *moveNetOutput = nullptr;
   float *gestureInput = nullptr;

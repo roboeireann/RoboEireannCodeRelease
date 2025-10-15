@@ -77,6 +77,7 @@ static void sighandlerShutdown(int sig)
     if(run)
     {
       TLOGI(tlogger, "Caught (normal) termination/interrupt signal ({}) -- Shutting down executable...", Assert::getSignalName(sig));
+      TextLogging::requestAsyncOutput(false); // output any async log messages
       fflush(NULL); // flush all streams
     }
     run = false;
@@ -86,7 +87,16 @@ static void sighandlerShutdown(int sig)
 static void sighandlerHardShutdown(int sig)
 {
   TLOGE(tlogger, "Caught unexpected signal ({}) -- Hard shutdown of executable now!...", Assert::getSignalName(sig));
+  TextLogging::requestAsyncOutput(false); // output any async log messages
   fflush(NULL); // try to flush all streams
+
+  // NOTE: we manually set the signal handling back to default (e.g. for SIGABRT etc)
+  // because using SA_RESETHAND was allowing near simultaneous aborts on other threads
+  // to abort before we had cleaned up properly. With this scheme sometimes it
+  // might be second thread abort that actually causes the core dump etc, but
+  // I think that's OK.
+
+  signal(sig, SIG_DFL);
 
   raise(sig); // re-raise the signal for default handling - may dump core
 }
@@ -95,6 +105,7 @@ static void sighandlerRedirect(int sig)
 {
   Thread::sleep(100);
   TLOGI(tlogger, "sighandlerRedirect, caught {}, set run to false", Assert::getSignalName(sig));
+  TextLogging::requestAsyncOutput(false); // output any async log messages
   fflush(NULL); // try to flush all streams
   run = false;
 }
@@ -464,7 +475,8 @@ int main(int argc, char* argv[])
 
     // reset the handler to default as soon as we enter the signal handler
     // (This is only useful for signals which should dump core)
-    act.sa_flags = SA_RESETHAND;
+    // No longer used - see note in sighandlerHardShutdown for reason why
+    // act.sa_flags = SA_RESETHAND;
 
     // hard (non-graceful) shutdown with possible core dump
     act.sa_handler = sighandlerHardShutdown;
@@ -473,6 +485,9 @@ int main(int argc, char* argv[])
     sigaction(SIGSEGV,  &act, NULL);
     sigaction(SIGFPE,  &act, NULL);
     sigaction(SIGBUS,  &act, NULL);
+
+
+    TextLogging::requestAsyncOutput(true);
 
     roboeireannStart(settings);
 
@@ -484,12 +499,19 @@ int main(int argc, char* argv[])
 
   roboeireannStop();
   sitDown(true);
+
+  TextLogging::requestAsyncOutput(false);
+
   if (shutdownNAO)
   {
     TLOGI(tlogger, "Powering off the Nao now");
     fflush(NULL);
 
     Thread::sleep(500);
+
+    // to be sure to be sure...
+    TLOGI(tlogger, "power off");
+    fflush(NULL);
 
     static_cast<void>(!system("sudo systemctl poweroff &"));
   }

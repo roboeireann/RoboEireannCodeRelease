@@ -149,7 +149,7 @@ namespace CoroBehaviour
                                   .rotate(theKickInfo[kickType].rotationOffset)
                                   .translate(theKickInfo[kickType].ballOffset);
 
-      behaviorStatusSkills.walkingTo(kickPose.translation, 1.f);
+      behaviorStatusSkills.recordWalkingTo(kickPose.translation, 1.f);
 
       ACTGRAPH_FMT("kickType: {}", TypeRegistry::getEnumName(kickType));
       ACTGRAPH_FMT("targetDirection: {}", targetDirection.fmt());
@@ -186,7 +186,7 @@ namespace CoroBehaviour
             CR_CHECKPOINT(turnAfterKick);
             while (!(turnToAngleOdometryTask.isSuccess() || theFieldBall.ballWasSeen(getCheckpointDuration() - 300)))
             {
-              behaviorStatusSkills.walkingTo(kickPose.translation, 0.f);
+              behaviorStatusSkills.recordWalkingTo(kickPose.translation, 0.f);
 
               remainingRotation = turnToAngleOdometryTask(postKickRotation);
               headSkills.lookAtAngles(remainingRotation, 23_deg);
@@ -343,7 +343,7 @@ namespace CoroBehaviour
 
       const Pose2f dribblePose = Pose2f(targetDirection, theFieldBall.endPositionRelative);
 
-      behaviorStatusSkills.walkingTo(dribblePose.translation, 1.f);
+      behaviorStatusSkills.recordWalkingTo(dribblePose.translation, 1.f);
 
       ACTGRAPH_FMT("targetDirection: {}", targetDirection.fmt());
       ACTGRAPH_FMT("dribblePose: {}", dribblePose);

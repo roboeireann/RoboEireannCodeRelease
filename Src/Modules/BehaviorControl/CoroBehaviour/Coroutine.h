@@ -188,7 +188,7 @@ public: // this section should ideally be PRIVATE/PROTECTED but must be public f
       reset();
     else if (!checkPrevRun())
     {
-      // TLOGW(tlogger(), "missed a cycle: prev_run={}, prevFrame={}, currFrame={}", mCoroPrevRunTime,
+      // TLOGW(tloggerBC(), "missed a cycle: prev_run={}, prevFrame={}, currFrame={}", mCoroPrevRunTime,
       //         mEnv.getPrevFrameTime(), mEnv.getCurrentFrameTime());
       reset();
     }
@@ -238,7 +238,7 @@ private:
   std::string mCoroName;
   std::string mCheckpointName; // set by run after reset
 
-  DECL_TLOGGER_FN(tlogger, "BasicCoro", TextLogging::INFO)
+  // DECL_TLOGGER_FN(tloggerBC, "BasicCoro", TextLogging::INFO)
 
   /// did the coro run in either the prev tick or the current tick
   bool checkPrevRun() const
@@ -546,7 +546,7 @@ public:
 /**
  * await some stopCondition, executing some code on each tick until the condition is true
  * 
- * The condition is checked at the start of each tick (if resuming from the YIELD)
+ * The condition is checked at the **start** of each tick (if resuming from the YIELD)
  * and If the condition is true immediately the actionCode will *not* be executed at all
  * 
  * This is usually the right pattern to use, particularly if mapping from
@@ -592,6 +592,31 @@ public:
     actionCode;                                                                                                        \
     CR_YIELD();                                                                                                        \
   })
+
+/**
+ * repeat until some stopCondition, executing some code on each tick until the condition is true
+ * 
+ * The code is executed at least once and the condition is checked at the **after** the
+ * code is executed AND after yielding (i.e. at the start of the following tick).
+ * 
+ * @param stopCondition  condition on which to stop waiting. It is evaluated after running actionCode and yielding
+ * @param actionCode can be a single statement (no final semicolon) or block of code in braces
+ *                   but the code cannot contain the comma operator in either case
+ */
+#define CR_UNTIL(stopCondition, actionCode)                                                                            \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    actionCode;                                                                                                        \
+    CR_YIELD();                                                                                                        \
+  } while (!(stopCondition))
+
+/**
+ * repeat until some booleanAction has returned true to indicate completion.
+ * Identical CR_AWAIT_BOOL in practice.
+ */
+#define CR_UNTIL_BOOL CR_AWAIT_BOOL
+
+
 
 /**
  * call some action code once and yield.

@@ -19,6 +19,10 @@
 #include <QApplication>
 #include <QIcon>
 
+#include <cstdio>
+#include <sys/wait.h>
+
+
 #ifdef MACOS
 #include "Controller/Visualization/Helper.h"
 #define TOLERANCE (3.f * simStepLength)
@@ -34,10 +38,68 @@ SimRobot::Application* RoboCupCtrl::application = nullptr;
 DECL_TLOGGER(tlogger, "RoboCupCtrl", TextLogging::INFO);
 
 
+static void sighandlerSyncTextLogging(int sig)
+{
+  // if (sig == SIGABRT)
+  //   fprintf(stderr, "sighandlerSyncTextLogging: caught sigabort\n");
+
+  TLOGE(tlogger, "Caught unexpected signal ({})", Assert::getSignalName(sig));
+  TextLogging::requestAsyncOutput(false); // output any async log messages
+
+  // fprintf(stderr, "sighandlerSyncTextLogging: after requestAsyncOutput\n");
+
+  TLOGI(tlogger, "completed switch to synchronous text logging");
+  fflush(NULL); // try to flush all streams
+
+  // fprintf(stderr, "sighandlerSyncTextLogging: after flush\n");
+
+  // NOTE: we manually set the signal handling back to default (e.g. for SIGABRT etc)
+  // because using SA_RESETHAND was allowing near simultaneous aborts on other threads
+  // to abort before we had cleaned up properly. With this scheme sometimes it
+  // might be second thread abort that actually causes the core dump etc, but
+  // I think that's OK.
+
+  signal(sig, SIG_DFL);
+  raise(sig); // re-raise the signal for default handling - may dump core
+}
+
+static void replaceDefaultSignalHandling()
+{
+  struct sigaction act;
+
+  memset(&act, 0, sizeof(act));
+  // block all other signals while the handler is running
+  sigfillset(&act.sa_mask);
+
+  // reset the handler to default as soon as we enter the signal handler
+  // (This is only useful for signals which should dump core)
+  // See note in sighandlerSyncTextLogging for why this is not used any more
+  // act.sa_flags = SA_RESETHAND;
+
+  // hard (non-graceful) shutdown with possible core dump
+  act.sa_handler = sighandlerSyncTextLogging;
+  sigaction(SIGINT,  &act, NULL);
+  sigaction(SIGTERM, &act, NULL);
+  sigaction(SIGUSR1, &act, NULL);
+
+
+  sigaction(SIGALRM,  &act, NULL);
+  sigaction(SIGABRT,  &act, NULL);
+  sigaction(SIGSEGV,  &act, NULL);
+  sigaction(SIGFPE,  &act, NULL);
+  sigaction(SIGBUS,  &act, NULL);
+
+}
+
+
 RoboCupCtrl::RoboCupCtrl(SimRobot::Application& application)
 {
   Thread::nameCurrentThread("Main");
   TLOGI(tlogger, "thread has been named as Main");
+
+  TextLogging::requestAsyncOutput(true);
+
+  replaceDefaultSignalHandling();
 
   controller = this;
   RoboCupCtrl::application = &application;
@@ -162,6 +224,10 @@ bool RoboCupCtrl::compile()
 
 RoboCupCtrl::~RoboCupCtrl()
 {
+  TextLogging::requestAsyncOutput(false); // output any async log messages
+  TLOGI(tlogger, "Destructor - shutting down SimRobot");
+  fflush(NULL); // try to flush all streams
+
   qDeleteAll(views);
   SimulatedRobot::setBall(nullptr);
   Time::deinitialize();

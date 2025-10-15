@@ -3,7 +3,7 @@
 Copyright (c) 2023 RoboÉireann (RoboEireann)
 
 Preamble: This product includes software developed by B-Human 
-(see LicenceBHuman.md, http://www.b-human.de), and released in their 2021 code
+(see `LicenceBHuman.md`, http://www.b-human.de), and released in their 2021 code
 release. The terms of this licence do not apply to that software.
 
 Parts of this distribution were not developed by RoboÉireann or B-Human. 

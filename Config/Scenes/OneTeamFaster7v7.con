@@ -6,8 +6,8 @@ call Includes/PerceptOracle
 robot all
 
 # tmp
-dr debugDrawing3d:representation:SentTeamMessage2024 
-dr debugDrawing3d:module:TeamBehaviourModule2024:playerRole
+dr debugDrawing3d:representation:SentTeamMessage2025
+dr debugDrawing3d:behaviour:TeamBehaviourStatus:ballPlayer
 
 # robot robot1 robot5 - continue with robot all
 vfd worldState behaviour:TeamCoordination:formation

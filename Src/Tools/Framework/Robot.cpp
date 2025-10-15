@@ -27,8 +27,8 @@ Robot::Robot(const Settings& settings, const std::string& name) : name(name)
 
   push_back(new Debug(settings, name, config));
 
-  // Logger uses Global of Debug here
-  logger = new Logger(config);
+  // LogfileLogger uses Global of Debug here
+  logger = LogfileLogger::init(config);
 
   // start threads
   for(std::size_t i = 0; i < config().size(); i++)

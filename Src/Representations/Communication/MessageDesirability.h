@@ -30,6 +30,7 @@ STREAMABLE(MessageDesirability,
     uprightStatusChanged,
     standbyReadyGestureDetected,
     kickedSinceRestart,
+    setPlayRefereeGestureDetected,
   });
 
   ENUM(ReasonNotToSend,

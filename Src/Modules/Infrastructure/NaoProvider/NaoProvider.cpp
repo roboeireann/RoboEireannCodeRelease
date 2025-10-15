@@ -458,14 +458,14 @@ void NaoProvider::receivePacket()
         jointStiffnesses[jointMappings[i]] = MsgPack::write(0.f, p);
 
       // Determine addresses for LEDs
-      writeLEDs("REar", rightEarMappings, LEDRequest::chestRed - LEDRequest::earsRight0Deg, p);
-      writeLEDs("LEar", leftEarMappings, LEDRequest::earsRight0Deg - LEDRequest::earsLeft0Deg, p);
-      writeLEDs("Chest", chestMappings, LEDRequest::headRearLeft0 - LEDRequest::chestRed, p);
-      writeLEDs("LEye", leftEyeMappings, LEDRequest::faceRightRed0Deg - LEDRequest::faceLeftRed0Deg, p);
-      writeLEDs("REye", rightEyeMappings, LEDRequest::earsLeft0Deg - LEDRequest::faceRightRed0Deg, p);
-      writeLEDs("LFoot", leftFootMappings, LEDRequest::footRightRed - LEDRequest::footLeftRed, p);
-      writeLEDs("RFoot", rightFootMappings, LEDRequest::numOfLEDs - LEDRequest::footRightRed, p);
-      writeLEDs("Skull", skullMappings, LEDRequest::footLeftRed - LEDRequest::headRearLeft0, p);
+      writeLEDs("REar", rightEarMappings, LEDRequest::firstChestLED - LEDRequest::firstRightEarLED, p);
+      writeLEDs("LEar", leftEarMappings, LEDRequest::firstRightEarLED - LEDRequest::firstLeftEarLED, p);
+      writeLEDs("Chest", chestMappings, LEDRequest::firstHeadLED - LEDRequest::firstChestLED, p);
+      writeLEDs("LEye", leftEyeMappings, LEDRequest::firstRightEyeLED - LEDRequest::firstLeftEyeLED, p);
+      writeLEDs("REye", rightEyeMappings, LEDRequest::firstLeftEarLED - LEDRequest::firstRightEyeLED, p);
+      writeLEDs("LFoot", leftFootMappings, LEDRequest::firstRightFootLED - LEDRequest::firstLeftFootLED, p);
+      writeLEDs("RFoot", rightFootMappings, LEDRequest::numOfLEDs - LEDRequest::firstRightFootLED, p);
+      writeLEDs("Skull", skullMappings, LEDRequest::firstLeftFootLED - LEDRequest::firstHeadLED, p);
 
       packetToSendSize = static_cast<int>(p - packetToSend);
       ASSERT(packetToSendSize <= static_cast<int>(sizeof(packetToSend)));
@@ -529,7 +529,7 @@ void NaoProvider::sendPacket()
     {
       LEDRequest::LEDState state = theLEDRequest.ledStates[led];
       if (state == LEDRequest::on || (state == LEDRequest::blinking && blinkOn(NORMAL_PERIOD_MS, 0)) ||
-          (state == LEDRequest::blinking2 && blinkOn(NORMAL_PERIOD_MS, 0)) ||
+          (state == LEDRequest::blinking2 && blinkOn(NORMAL_PERIOD_MS, NORMAL_PERIOD_MS/2)) ||
           (state == LEDRequest::fastBlinking && blinkOn(FAST_PERIOD_MS, FAST_PERIOD_MS/2)) ||
           (state == LEDRequest::fastBlinking2 && blinkOn(FAST_PERIOD_MS, 0)) ||
           (state == LEDRequest::slowDoubleBlink && multiBlinkOn(MED_PERIOD_MS, 2, SLOW_PERIOD_MS, 0)) ||

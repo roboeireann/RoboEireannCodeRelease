@@ -13,6 +13,11 @@ dr debugDrawing3d:representation:GameInfo:scores off
 # switch off some automatic referee features
 ar placeBall penalizeIllegalPosition penalizeIllegalPositionInSet off
 
+# switch on localisation and player number info
+dr debugDrawing3d:representation:RobotPose
+dr debugDrawing3d:representation:GameInfo:player
+
+
 # add in the key states stuff for head buttons
 vd representation:EnhancedKeyStates
 

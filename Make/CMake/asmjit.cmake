@@ -11,6 +11,7 @@ if(BUILD_DESKTOP)
 endif()
 target_include_directories(asmjit SYSTEM PUBLIC "${ASMJIT_ROOT_DIR}")
 target_compile_definitions(asmjit PUBLIC ASMJIT_STATIC ASMJIT_BUILD_X86 ASMJIT_NO_BUILDER ASMJIT_NO_COMPILER ASMJIT_NO_LOGGING ASMJIT_NO_TEXT ASMJIT_NO_VALIDATION ASMJIT_NO_INTROSPECTION)
+target_compile_options(asmjit PRIVATE -Wno-bitwise-instead-of-logical)
 
 target_link_libraries(asmjit PRIVATE Flags::Default)
 

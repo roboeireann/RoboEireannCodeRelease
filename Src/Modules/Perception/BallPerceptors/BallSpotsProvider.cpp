@@ -78,13 +78,13 @@ void BallSpotsProvider::searchScanLines(BallSpots& ballSpots) const
             unsigned char luminanceRef = 0;
             unsigned char saturationRef = 0;
             int luminanceAverage = 0;
-            int saturationAverage = 0;
+            // int saturationAverage = 0;
             for(int i = region.range.lower; i < lowestYOfCurrentArea; i++)
             {
               const unsigned char luminance = theECImage.grayscaled[i][theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x];
               const unsigned char saturation = theECImage.saturated[i][theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x];
               luminanceAverage += luminance;
-              saturationAverage += saturation;
+              // saturationAverage += saturation;
               if(luminance > luminanceRef)
               {
                 luminanceRef = luminance;

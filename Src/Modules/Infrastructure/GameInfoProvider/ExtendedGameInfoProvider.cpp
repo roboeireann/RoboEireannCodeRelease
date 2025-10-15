@@ -26,7 +26,7 @@ void ExtendedGameInfoProvider::update(ExtendedGameInfo& extendedGameInfo)
      && SystemCall::getMode() != SystemCall::simulatedRobot)
   {
     extendedGameInfo.didNotHearWhistleThisTime = true;
-    timeWhenLastPlayingStarted = theFrameInfo.time - timeBetweenWhistleAndGCPlaying;
+    timeWhenLastPlayingStarted = theFrameInfo.time - theGameConfig.setToPlayingDelay;
   }
   else if(theGameInfo.state != gameStateLastFrame)
   {
@@ -71,7 +71,7 @@ void ExtendedGameInfoProvider::update(ExtendedGameInfo& extendedGameInfo)
   extendedGameInfo.walkingInFromSidelines =
       (theGameInfo.state == STATE_READY) &&
       ((gameStateBeforeCurrent == STATE_INITIAL) || (gameStateBeforeCurrent == STATE_STANDBY)) &&
-      (static_cast<unsigned int>(std::max<int>(theGameInfo.secsRemaining * 1000, 0)) > (fullHalfDuration - 20*1000) ||
+      (std::max<int>(theGameInfo.secsRemaining * 1000, 0) > ((theGameConfig.secsInHalf - 20) * 1000) ||
        gamePhaseBeforeCurrent == GAME_PHASE_TIMEOUT);
 
   extendedGameInfo.timeSinceLastPenaltyEnded = theGameInfo.isPenalized() ? 0 : theFrameInfo.getTimeSince(timeWhenLastPenaltyEnded);

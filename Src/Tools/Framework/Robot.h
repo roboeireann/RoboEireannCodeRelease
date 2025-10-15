@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Tools/Framework/ThreadFrame.h"
-#include "Tools/Logging/Logger.h"
+#include "Tools/Logging/LogfileLogger.h"
 #include <string>
 
 struct Settings;
@@ -23,7 +23,7 @@ class Robot : public ThreadList
 {
 private:
   std::string name; /**< The name of the robot. */
-  Logger* logger; /**< The logger for data from all threads. */
+  LogfileLogger* logger; /**< The logger for data from all threads. */
 
 public:
   /**

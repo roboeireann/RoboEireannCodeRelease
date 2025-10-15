@@ -63,6 +63,7 @@ MODULE(SelfLocator,
   REQUIRES(WorldModelPrediction),
   REQUIRES(SetupPoses),
   REQUIRES(StaticInitialPose),
+  REQUIRES(GroundTruthRobotPose),
   USES(MotionRequest),
   PROVIDES(RobotPose),
   PROVIDES(SelfLocalizationHypotheses),
@@ -186,6 +187,12 @@ private:
    * @return true, if both poses are similar
    */
   bool alternativeRobotPoseIsCompatibleToPose(const Pose2f& robotPose);
+
+  /** reset the samples to match theGroundTruthPose */
+  void updateSamplesFromGroundTruth(const RobotPose& robotPose, bool immediateUpdate);
+
+  /** reset the samples to match theGroundTruthPose */
+  void updateSamplesFromOverridePoseIfNeeded();
 
   /** Special handling for initializing samples at some game state transitions and in penalty shootout
    */

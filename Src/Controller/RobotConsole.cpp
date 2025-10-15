@@ -65,6 +65,9 @@ RobotConsole::RobotConsole(const Settings& settings, const std::string& robotNam
   logExtractor(logPlayer),
   dataViewWriter(&dataViews)
 {
+  if (settings.teamNumber == 2)
+    isLeftTeam = false;
+
   // this is a hack: call global functions to get parameters
   ctrl = static_cast<ConsoleRoboCupCtrl*>(RoboCupCtrl::controller);
   FOREACH_ENUM(MessageID, i)
@@ -879,6 +882,12 @@ bool RobotConsole::handleConsoleLine(const std::string& line)
     if(moveOp != noMove)
       return false;
     result = moveRobot(stream);
+  }
+  else if(command == "mvrp")
+  {
+    if(moveOp != noMove)
+      return false;
+    result = moveRobotSetRobotPose(stream);
   }
   else if(command == "mvb")
   {
@@ -2212,6 +2221,21 @@ bool RobotConsole::moveRobot(In& stream)
   }
   return true;
 }
+
+bool RobotConsole::moveRobotSetRobotPose(In& stream)
+{
+  if (moveRobot(stream))
+  {
+    std::unordered_map<std::string, size_t>::const_iterator found =
+        debugRequestTable.slowIndex.find("module:SelfLocator:updateFromGroundTruthOnce");
+    if (found != debugRequestTable.slowIndex.end())
+      handleConsole("dr module:SelfLocator:updateFromGroundTruthOnce");
+    return true;
+  }
+  else
+    return false;
+}
+
 
 bool RobotConsole::moveBall(In& stream)
 {

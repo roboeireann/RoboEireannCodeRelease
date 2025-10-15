@@ -15,6 +15,7 @@
 #include <vector>
 
 struct TfLiteInterpreter;
+struct TfLiteDelegate;
 
 class TFLiteHelperCopy
 {
@@ -33,7 +34,7 @@ public:
   uint8_t *getUint8InputTensor();
   int32_t *getInt32InputTensor();
   float *getFloatInputTensor();
-  std::vector<float> getFloatOutputTensor();
+  std::vector<float> getFloatOutputTensor(int outputIndex = 0);
   //const float *getFloatOutputTensor();
 
   size_t getInputTensorByteSize();
@@ -43,5 +44,6 @@ public:
   float *getResult();
 
 private:
-  TfLiteInterpreter *interpreter = nullptr;
+  TfLiteInterpreter* interpreter = nullptr;
+  TfLiteDelegate* delegate = nullptr;
 };

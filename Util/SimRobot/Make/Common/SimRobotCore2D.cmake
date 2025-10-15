@@ -11,6 +11,10 @@ set_property(TARGET SimRobotCore2D PROPERTY PDB_OUTPUT_DIRECTORY "${SIMROBOT_LIB
 set_property(TARGET SimRobotCore2D PROPERTY AUTOMOC ON)
 set_property(TARGET SimRobotCore2D PROPERTY AUTORCC ON)
 target_include_directories(SimRobotCore2D PRIVATE "${SIMROBOTCORE2D_ROOT_DIR}")
+
+target_compile_definitions(SimRobotCore2D PRIVATE QT_NO_DEPRECATED_WARNINGS) # specifically for Qt5 in ubuntu 22.04+
+target_compile_options(SimRobotCore2D PRIVATE -Wno-deprecated-declarations)
+
 target_link_libraries(SimRobotCore2D PRIVATE Qt5::Core Qt5::Gui Qt5::Svg Qt5::Widgets)
 target_link_libraries(SimRobotCore2D PRIVATE Eigen::Eigen)
 target_link_libraries(SimRobotCore2D PRIVATE Box2D::Box2D)

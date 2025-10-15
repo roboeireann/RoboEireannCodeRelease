@@ -13,14 +13,17 @@
 #include "Tools/TextLogging.h"
 
 #include <cstdio>
-#include <tensorflow/lite/c/c_api.h>
-
+#include <tflite_c_api.h>
+#include <tflite_c_api_xnnpack_delegate.h>
 
 DECL_TLOGGER(tlogger, "TFLiteHelper", TextLogging::INFO);
 
 TFLiteHelper::~TFLiteHelper() 
 {
   TfLiteInterpreterDelete(interpreter); 
+  if (delegate) {
+    TfLiteXNNPackDelegateDelete(delegate);
+  }
 }
 
 void TFLiteHelper::loadModelFromFile(std::string file, std::vector<int> inputDims, int numThreads)
@@ -28,9 +31,16 @@ void TFLiteHelper::loadModelFromFile(std::string file, std::vector<int> inputDim
   TfLiteModel *model = TfLiteModelCreateFromFile(file.c_str());
   VERIFY(model != nullptr);
 
+  // Create XNNPACK delegate
+  TfLiteXNNPackDelegateOptions xnnPackDelegateOption = TfLiteXNNPackDelegateOptionsDefault();
+  xnnPackDelegateOption.num_threads = numThreads;
+  delegate = TfLiteXNNPackDelegateCreate(&xnnPackDelegateOption);
+  VERIFY(delegate != nullptr);
+
   TfLiteInterpreterOptions *options = TfLiteInterpreterOptionsCreate();
   VERIFY(options != nullptr);
   TfLiteInterpreterOptionsSetNumThreads(options, numThreads);
+  TfLiteInterpreterOptionsAddDelegate(options, delegate);
 
   interpreter = TfLiteInterpreterCreate(model, options);
   VERIFY(interpreter != nullptr);
@@ -40,6 +50,33 @@ void TFLiteHelper::loadModelFromFile(std::string file, std::vector<int> inputDim
 
   VERIFY(TfLiteInterpreterAllocateTensors(interpreter) == kTfLiteOk);
   VERIFY(TfLiteInterpreterGetInputTensorCount(interpreter) == 1);
+
+  // INPUT TENSOR DEBUG CODE - DO NOT DELETE!!!!
+  // if (TfLiteInterpreterGetInputTensorCount(interpreter) > 0) {
+  //   TfLiteTensor *inputTensor = TfLiteInterpreterGetInputTensor(interpreter, 0);
+  //   int32_t numDims = TfLiteTensorNumDims(inputTensor);
+  //   TLOGI(tlogger, "Input Tensor numDims: {}", numDims);
+  //   for (int32_t i = 0; i < numDims; ++i) {
+  //     TLOGI(tlogger, "  Dim {}: {}", i, TfLiteTensorDim(inputTensor, i));
+  //   }
+
+  //   // Resize the input tensor
+  //   TLOGI(tlogger, "Resizing input tensor to dimensions: {}", inputDims.size());
+  //   for (size_t i = 0; i < inputDims.size(); ++i) {
+  //     TLOGI(tlogger, "  Input Dim {}: {}", i, inputDims[i]);
+  //   }
+  //   VERIFY(TfLiteInterpreterResizeInputTensor(interpreter, 0, inputDims.data(), static_cast<int32_t>(inputDims.size())) == kTfLiteOk);
+
+  //   // Check dimensions again after resizing
+  //   TLOGI(tlogger, "Input tensor dimensions after resizing:");
+  //   numDims = TfLiteTensorNumDims(inputTensor);
+  //   for (int32_t i = 0; i < numDims; ++i) {
+  //     TLOGI(tlogger, "  Dim {}: {}", i, TfLiteTensorDim(inputTensor, i));
+  //   }
+  // } else {
+  //   TLOGE(tlogger, "No input tensors found!");
+  // }
+
   VERIFY(TfLiteInterpreterGetOutputTensorCount(interpreter) == 1);
 
   VERIFY(TfLiteInterpreterResizeInputTensor(interpreter, 0, inputDims.data(), static_cast<int32_t>(inputDims.size())) == kTfLiteOk);
@@ -60,7 +97,7 @@ void TFLiteHelper::loadModelFromFile(std::string file, std::vector<int> inputDim
   VERIFY(outputTensor != nullptr);
   tensorType = TfLiteTensorType(outputTensor);
   numDims = TfLiteTensorNumDims(outputTensor);
-  TLOGI(tlogger, "InputTensor: type {}, numDims {} = ", tensorType, numDims);
+  TLOGI(tlogger, "OutputTensor: type {}, numDims {} = ", tensorType, numDims);
   for (int32_t i=0; i < numDims; i++)
     TLOGI(tlogger, "{} ", TfLiteTensorDim(outputTensor, i));
   TLOGI(tlogger, ", byteSize {}\n", TfLiteTensorByteSize(outputTensor));
@@ -71,9 +108,15 @@ void TFLiteHelper::loadModelFromArray(const void *modelData, size_t length, std:
   TfLiteModel *model = TfLiteModelCreate(modelData, length);
   VERIFY(model != nullptr);
 
+  TfLiteXNNPackDelegateOptions xnnPackDelegateOption = TfLiteXNNPackDelegateOptionsDefault();
+  xnnPackDelegateOption.num_threads = numThreads;
+  delegate = TfLiteXNNPackDelegateCreate(&xnnPackDelegateOption);
+  VERIFY(delegate != nullptr);
+
   TfLiteInterpreterOptions *options = TfLiteInterpreterOptionsCreate();
   VERIFY(options != nullptr);
   TfLiteInterpreterOptionsSetNumThreads(options, numThreads);
+  TfLiteInterpreterOptionsAddDelegate(options, delegate);
 
   interpreter = TfLiteInterpreterCreate(model, options);
   VERIFY(interpreter != nullptr);

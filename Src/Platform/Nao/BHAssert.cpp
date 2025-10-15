@@ -165,41 +165,42 @@ void Assert::logDump(bool toStderr, int termSignal)
 }
 
 
-const char* Assert::getSignalName(int signum)
-{
-  const char* signalNames[] =
-  {
-    "",
-    "sigHUP",
-    "sigINT",
-    "sigQUIT",
-    "sigILL",
-    "sigTRAP",
-    "sigABRT",
-    "sigBUS",
-    "sigFPE",
-    "sigKILL",
-    "sigUSR1",
-    "sigSEGV",
-    "sigUSR2",
-    "sigPIPE",
-    "sigALRM",
-    "sigTERM"
-  };
-
-  if (0 <= signum && signum < int(sizeof(signalNames) / sizeof(*signalNames)))
-    return signalNames[signum];
-  else
-  {
-    switch (signum)
-    {
-    case SIGUSR1:
-      return "sigUSR1";
-
-    default:
-      static char buf[20];
-      sprintf(buf, "signal %d", signum);
-      return buf;
-    }
-  }
-}
+// Now defined for Linux also so no need to repeat here
+// const char* Assert::getSignalName(int signum)
+// {
+//   const char* signalNames[] =
+//   {
+//     "",
+//     "sigHUP",
+//     "sigINT",
+//     "sigQUIT",
+//     "sigILL",
+//     "sigTRAP",
+//     "sigABRT",
+//     "sigBUS",
+//     "sigFPE",
+//     "sigKILL",
+//     "sigUSR1",
+//     "sigSEGV",
+//     "sigUSR2",
+//     "sigPIPE",
+//     "sigALRM",
+//     "sigTERM"
+//   };
+// 
+//   if (0 <= signum && signum < int(sizeof(signalNames) / sizeof(*signalNames)))
+//     return signalNames[signum];
+//   else
+//   {
+//     switch (signum)
+//     {
+//     case SIGUSR1:
+//       return "sigUSR1";
+// 
+//     default:
+//       static char buf[20];
+//       sprintf(buf, "signal %d", signum);
+//       return buf;
+//     }
+//   }
+// }

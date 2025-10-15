@@ -17,6 +17,7 @@ struct ModulePacket;
 template<typename T>
 class Receiver;
 class Thread;
+struct LogfileLogger;
 
 /**
  * @class FrameExecutionUnit
@@ -27,6 +28,20 @@ class FrameExecutionUnit
 {
 public:
   virtual ~FrameExecutionUnit() = default;
+
+
+  /**
+   * called during startup
+   * 
+   * If this execution unit is associated with the thread that has the GameInfo, 
+   * it will control the states of the logger. This function gives the execution
+   * unit a chance to store the Logger pointer also.
+   * 
+   * @param logger pointer to the logger (can be nullptr)
+   * @param threadName the name of the thread that will be passed to Logger::execute
+   * @return true if this thread has GameInfo and false otherwise
+   */
+  virtual bool initLogging([[maybe_unused]] LogfileLogger* logger, [[maybe_unused]] const std::string& threadName) { return false; }
 
   /**
    * The function is executed in every frame.

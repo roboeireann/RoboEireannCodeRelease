@@ -103,7 +103,7 @@ set -eu
 apt-get update
 apt-get dist-upgrade
 
-DEBIAN_FRONTEND=noninteractive apt-get install -y alsa beignet-opencl-icd gdb htop i2c-tools libusb-1.0-0 ocl-icd-libopencl1 openssh-server pciutils rsync ubuntu-minimal vim wpasupplicant
+DEBIAN_FRONTEND=noninteractive apt-get install -y alsa beignet-opencl-icd gdb htop i2c-tools iw libusb-1.0-0 net-tools ocl-icd-libopencl1 openssh-server pciutils rsync ubuntu-minimal valgrind vim wpasupplicant
 
 # wpa_supplicant does not need to run by itself, it will be started by netplan if necessary.
 systemctl disable wpa_supplicant.service

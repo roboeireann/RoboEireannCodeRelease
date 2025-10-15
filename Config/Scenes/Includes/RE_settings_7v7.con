@@ -1,6 +1,9 @@
 # location and scenario for 7v7 scenes
 
 # location
+# cl newLocation
+# cl MULabMedField2020
 
 # scenario
-cs RC2024-7v7
+# cs somescenario
+cs RC2025-Cup-7v7

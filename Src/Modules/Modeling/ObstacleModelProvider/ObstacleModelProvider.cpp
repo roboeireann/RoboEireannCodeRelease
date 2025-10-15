@@ -30,6 +30,12 @@ void ObstacleModelProvider::update(ObstacleModel& obstacleModel)
   if(clearAndFinish(obstacleModel))
     return;
 
+  if(theGameInfo.state == STATE_STANDBY)
+   maxDistance = 6000;
+  else
+   maxDistance = 4000;
+
+
   deleteObstacles(); // Delete old obstacles and obstacles that are no longer hypotheses.
   dynamic(); // Apply extended kalman filter prediction step to hypotheses.
   if(useArmContactModel)

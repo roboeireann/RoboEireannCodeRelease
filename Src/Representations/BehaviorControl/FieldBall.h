@@ -24,6 +24,9 @@ STREAMABLE(FieldBall,
    */
   bool ballWasSeen(int timeInterval = 500) const;
 
+  /** was our own ball or the team ball seen in the relevant interval? */
+  bool anyBallWasSeen(int timeInterval = 500) const;
+
   /**
    * Returns the ball's position in field coordinates. If ball has been
    * seen by the robot within the given timeout or the global team ball is invalid, this method will
@@ -105,8 +108,11 @@ STREAMABLE(FieldBall,
   (bool)(false) isRollingTowardsOwnGoal,                  /**< Yes, you guessed it */
   (bool)(false) isInsideOwnPenaltyArea,                   /**< Yes, you guessed it */
   (float)(0.f) distanceToOwnPenaltyArea,                  /**< Yes, you guessed it. If the ball is inside the area, member is set to 0.f. If the position is unknown, member is set to -1.f.*/
-  (Vector2f)(Vector2f::Zero()) intersectionPositionWithOwnYAxis,          /**< The position (in local coordinates) at which a rolling ball will pass the robot. Vector2f::Zero(), if this will not happen. */
+  (Vector2f)(Vector2f::Zero()) intersectionPositionWithOwnYAxis,          /**< The position (in local coordinates) at which a rolling ball will (maybe) pass the robot. Vector2f::Zero(), if this will definitely not happen. */
   (float)(std::numeric_limits<float>::max()) secsUntilIntersectsOwnYAxis, /**< The time (in seconds, not ms!!) until a rolling ball will pass the robot. float::max, if this will not happen. */
+  (Vector2f)(Vector2f::Zero()) intersectionPositionWithOwnYAxisAggressive,          /**< as above, but checking more aggressively for possible intercepts. */
+  (float)(std::numeric_limits<float>::max()) secsUntilIntersectsOwnYAxisAggressive, /**< as above, but checking more aggressively for possible intercepts. */
+  // (float)(std::numeric_limits<float>::max()) secsUntilMaybeIntersectsOwnYAxis, /**< same as previous item, but works with balls that might just fall short */
   (Vector2f)(Vector2f::Zero()) intersectionPositionWithOwnXAxis,          /**< The position (in local coordinates) at which a rolling ball will pass the robot. Vector2f::Zero(), if this will not happen. */
   (float)(std::numeric_limits<float>::max()) secsUntilIntersectsOwnXAxis, /**< The time (in seconds, not ms!!) until a rolling ball will pass the robot. float::max, if this will not happen. */
 });

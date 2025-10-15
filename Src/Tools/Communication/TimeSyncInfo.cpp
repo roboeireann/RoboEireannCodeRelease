@@ -15,41 +15,37 @@
 #include "Tools/TextLogging.h"
 
 
-DECL_TLOGGER(tlogger, "TimeSyncInfo", TextLogging::DEBUG);
+DECL_TLOGGER(tlogger, "TimeSyncInfo", TextLogging::INFO);
 
 
 void TimeSyncInfo::updateGCInfo(uint8_t seqNumGC, unsigned timeReceivedGC, unsigned referenceTime)
 {
   // ignore duplicate packets (or when no new packet has been received)
-  if (!gameControllerInfos.empty() && ((gameControllerInfos.front().seqNumGC == seqNumGC) ||
+  if (!gameControllerInfos.empty() && ((gameControllerInfos.front().seqNumGC == seqNumGC) &&
                                        (gameControllerInfos.front().timeReceivedGC == timeReceivedGC)))
     return;
 
   // delete any timestamps that are now too old to be useful
-  if (oldestTimeReceivedGC && (Time::getTimeBetween(oldestTimeReceivedGC, referenceTime) > GC_TIMEOUT))
+  while (!gameControllerInfos.empty() &&
+          (Time::getTimeBetween(gameControllerInfos.back().timeReceivedGC, referenceTime) > GC_TIMEOUT))
   {
-    while (!gameControllerInfos.empty() &&
-           (Time::getTimeBetween(gameControllerInfos.back().timeReceivedGC, referenceTime) > GC_TIMEOUT))
-      gameControllerInfos.pop_back();
-
-    oldestTimeReceivedGC = gameControllerInfos.empty() ? 0 : gameControllerInfos.back().timeReceivedGC;
+    TLOGV(tlogger, "updateGCInfo: removing old GC seqNum {} that is {} ms old", gameControllerInfos.back().seqNumGC,
+          Time::getTimeBetween(gameControllerInfos.back().timeReceivedGC, referenceTime));
+    gameControllerInfos.pop_back();
   }
 
   // add in the new GC packet info
   gameControllerInfos.push_front(GCInfo(seqNumGC, timeReceivedGC));
 
-  // if (tlogger.isEnabled(TextLogging::VERBOSE))
-  unsigned timeNow = Time::getCurrentSystemTime();
-  TLOGV(tlogger, "updateGCInfo: time {} ({:#032b})", timeNow, timeNow);
-
-  TLOGV(tlogger, "updateGCInfo: gameControllerInfos = {}", fmt::join(gameControllerInfos.begin(), gameControllerInfos.end(), ","));
+  TLOGD(tlogger, "updateGCInfo: frameTime {}, timeReceiveGC {}, gameControllerInfos seqNums {}", referenceTime,
+        timeReceivedGC, fmt::join(gameControllerInfos.begin(), gameControllerInfos.end(), ","));
 }
 
 
 void TimeSyncInfo::updateTeammateInfo(int teammatePlayerNumber, unsigned teammateTimestamp, uint8_t teammateSeqNumGC,
                                       unsigned teammateTimeReceivedGC)
 {
-  const int teammateIndex = teammatePlayerNumber - Settings::lowestValidPlayerNumber;
+  const int teammateIndex = Settings::toPlayerIndex(teammatePlayerNumber);
   TeammateInfo& teammateInfo = teammateInfos[teammateIndex];
 
   // General algorithm:
@@ -89,8 +85,10 @@ void TimeSyncInfo::updateTeammateInfo(int teammatePlayerNumber, unsigned teammat
 
       if (abs(estLocalTimeDifference) > MAX_VALID_TIME_DIFF)
       {
-        TLOGD(tlogger, "updateTeammateInfo: *** could not sync teammate {}, estLocalTimeDifference {}",
-              teammatePlayerNumber, estLocalTimeDifference);
+        TLOGW(tlogger,
+              "updateTeammateInfo: *** could not sync teammate {}, estLocalTimeDifference {}, ref seqNum {} not in {}",
+              teammatePlayerNumber, estLocalTimeDifference, teammateSeqNumGC,
+              fmt::join(gameControllerInfos.begin(), gameControllerInfos.end(), ","));
 
         teammateInfo.invalidate();
       }
@@ -99,7 +97,9 @@ void TimeSyncInfo::updateTeammateInfo(int teammatePlayerNumber, unsigned teammat
     }
   }
 
-  // if we get this far we need to update the teammateInfo
+  // if we get this far
+  // (a) if the teammateInfo was valid, it is still valid (though it might be getting old and could be updated)
+  // (b) if the teammateInfo was invalid, we must update the teammateInfo if possible
   
   if (localTimeReceivedGC) // double check that we have the required info to update
   {
@@ -110,6 +110,8 @@ void TimeSyncInfo::updateTeammateInfo(int teammatePlayerNumber, unsigned teammat
   }
 
   if (!teammateInfo.isValid())
-    TLOGD(tlogger, "updateTeammateInfo: *** could not sync teammate {}, gameControllerInfos = {}", teammatePlayerNumber,
+    TLOGW(tlogger,
+          "updateTeammateInfo: *** could not sync teammate {}, ref seqNum {} not in {}",
+          teammatePlayerNumber, teammateSeqNumGC,
           fmt::join(gameControllerInfos.begin(), gameControllerInfos.end(), ","));
 }

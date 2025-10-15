@@ -53,7 +53,7 @@ class NaoProvider : public NaoProviderBase
   static const LEDRequest::LED leftEarMappings[LEDRequest::earsRight0Deg - LEDRequest::earsLeft0Deg]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
   static const LEDRequest::LED rightEarMappings[LEDRequest::chestRed - LEDRequest::earsRight0Deg]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
   static const LEDRequest::LED chestMappings[LEDRequest::headRearLeft0 - LEDRequest::chestRed]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
-  static const LEDRequest::LED skullMappings[LEDRequest::footLeftRed - LEDRequest::headRearLeft0]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
+  static const LEDRequest::LED skullMappings[LEDRequest::footLeftRed - LEDRequest::firstHeadLED]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
   static const LEDRequest::LED leftFootMappings[LEDRequest::footRightRed - LEDRequest::footLeftRed]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
   static const LEDRequest::LED rightFootMappings[LEDRequest::numOfLEDs - LEDRequest::footRightRed]; /**< Mappings from LoLA's LED indices to B-Human's LED indices. */
 

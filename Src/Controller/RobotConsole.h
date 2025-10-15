@@ -231,6 +231,7 @@ protected:
   enum MoveOp { noMove, movePosition, moveBoth, moveBallPosition } moveOp = noMove; /**< The move operation to perform. */
   Vector3f movePos = Vector3f::Zero(); /**< The position the robot is moved to. */
   Vector3f moveRot = Vector3f::Zero(); /**< The rotation the robot is moved to. */
+  bool isLeftTeam = true; ///< need to move robots and their self-localised robot pose
   bool jointCalibrationChanged = false; /**< Was the joint calibration changed since setting it for the local robot? */
 
   // Representations received
@@ -482,6 +483,7 @@ private:
   bool repoll(In& stream);
   bool moduleRequest(In&);
   bool moveRobot(In&);
+  bool moveRobotSetRobotPose(In&);
   bool moveBall(In&);
   bool view3D(In& stream);
   bool viewField(In& stream);

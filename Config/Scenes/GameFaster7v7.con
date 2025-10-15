@@ -4,10 +4,10 @@ call Includes/PerceptOracle
 call Includes/7v7
 
 robot all
-dr debugDrawing3d:representation:SentTeamMessage2024 
-dr debugDrawing3d:module:TeamBehaviourModule2024:playerRole
+# tmp
+dr debugDrawing3d:representation:SentTeamMessage2025
+dr debugDrawing3d:behaviour:TeamBehaviourStatus:ballPlayer
 
-# our team only
 robot robot1 robot2 robot3 robot4 robot5 robot6 robot7
 vfd worldState behaviour:TeamCoordination:formation
 vfd worldState representation:TeamBallModel
@@ -16,7 +16,7 @@ vd representation:GameInfo
 vd representation:ExtendedGameInfo 
 vd representation:MessageDesirability 
 vd representation:TeamData
-vd representation:SentTeamMessage2024
+vd representation:SentTeamMessage2025
 vd representation:ActiveTactic
 
 robot robot1

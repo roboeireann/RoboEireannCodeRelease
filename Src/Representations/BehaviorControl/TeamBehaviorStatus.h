@@ -15,6 +15,22 @@
 #include "Tools/Streams/AutoStreamable.h"
 #include "Tools/Streams/Enum.h"
 
+/**
+ * @struct TeamplayStatus
+ * representation of teamplay such as passes, touches by teammates, etc.
+ */
+STREAMABLE(TeamPlayStatus,
+{
+  /******** streamable members follow (note comma at end of comment) ********/,
+
+  // (int)(-1) activePassKicker, ///< player who intends to pass (-1 for none)
+  // (int)(-1) activePassReceiver, ///< player who should receive the intended pass (-1 for none)
+  // // (int)(-1) prevPassReceiver, ///< the player number of the previous pass target (-1 for none)
+  // (int)(0) numPasses, ///< substantial pass attempts (ball travelled substantially)
+  (int)(0) numKickingRobotsSinceLastSetPlay, ///< a kicking robot executes one or more kicks, increment each time robot changes
+});
+
+
 STREAMABLE(TeamBehaviorStatus,
 {
   ENUM(TeamActivity,
@@ -35,7 +51,8 @@ STREAMABLE(TeamBehaviorStatus,
   (TimeToReachBall) timeToReachBall,
   (TeammateRoles) teammateRoles,
   (PlayerRole) role,
-  (PassStatus) passStatus,
+  (PassStatus) passStatus, // deprecated
+  (TeamPlayStatus) teamPlayStatus,
 });
 
 typedef TeamBehaviorStatus TeamBehaviourStatus; // alias with "correct" spelling

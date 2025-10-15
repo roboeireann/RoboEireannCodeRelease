@@ -33,7 +33,7 @@ namespace CoroBehaviour
 
       while (true)
       {
-        // commonSkills.activityStatus(BehaviorStatus::lookAroundAfterPenalty);
+        // commonSkills.recordActivity(BehaviorStatus::lookAroundAfterPenalty);
         lookLeftAndRightTask(startLeft);
         // commonSkills.stand();
         motionSkills.walkAtRelativeSpeed(Pose2f(0.f, 0.5f, 0.f));

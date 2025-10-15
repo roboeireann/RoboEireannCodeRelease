@@ -46,9 +46,7 @@ inline unsigned numBitsNeeded(unsigned value)
 class Writer
 {
 private:
-  // DECL_TLOGGER_FN(tlogger, "BitStreamCodec::Writer", TextLogging::VERBOSE);
-
-  TextLogger& tlogger = TextLogging::get("BitStreamCodec::Writer", TextLogging::INFO);
+  DECL_TLOGGER_VAR(tlogger, "BitStreamCodec::Writer", TextLogging::INFO);
 
 public:
   Writer(Byte *data, unsigned capacity) : mData(data), mCapacity(capacity) {}
@@ -56,6 +54,7 @@ public:
   void writeBits(unsigned value, std::size_t nbits, const char* name=nullptr)
   {
     ASSERT(((mBitIndex + nbits) / 8) <= mCapacity);
+    MAYBE_UNUSED(mCapacity);
     ASSERT(0 < nbits && nbits < (sizeof(value) * 8));
 
     TLOGV(tlogger, "writeBits: {:#32b}/{}{}", value & static_cast<unsigned>((1LL << nbits) - 1), nbits,
@@ -156,6 +155,7 @@ public:
   void readBits(unsigned& value, std::size_t nbits, const char* name=nullptr)
   {
     ASSERT(((mBitIndex + nbits) / 8) <= mSize);
+    MAYBE_UNUSED(mSize);
     ASSERT(nbits < (sizeof(value) * 8));
 
     // read into LSbit of LSByte upwards

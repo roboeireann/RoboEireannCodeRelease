@@ -82,6 +82,9 @@ if(APPLE)
 endif()
 
 target_compile_definitions(bush PRIVATE TARGET_TOOL)
+target_compile_definitions(bush PRIVATE QT_NO_DEPRECATED_WARNINGS)
+target_compile_options(bush PRIVATE -Wno-deprecated-declarations)
+
 
 target_link_libraries(bush PRIVATE Flags::Default)
 

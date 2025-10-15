@@ -14,6 +14,8 @@
 #include "Platform/WatchdogTimer.h"
 #include "Tools/Streams/AutoStreamable.h"
 
+struct LogfileLogger;
+
 /**
  * @class Cognition
  *
@@ -40,12 +42,15 @@ private:
 
   Params params;
   WatchdogTimer watchdog;
+
+  LogfileLogger* logger = nullptr;
   
 public:
   thread_local static bool isUpper; /**< The current frame picked is from the upper camera thread. */
 
   Cognition();
   ~Cognition();
+  bool initLogging(LogfileLogger* logger, const std::string& threadName) override;
   bool beforeFrame() override;
   void beforeModules() override;
   void afterModules() override;

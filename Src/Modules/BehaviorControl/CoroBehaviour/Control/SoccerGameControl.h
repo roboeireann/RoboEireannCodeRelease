@@ -18,6 +18,8 @@
 #include "Modules/BehaviorControl/CoroBehaviour/Skills/MotionSkills.h"
 #include "Modules/BehaviorControl/CoroBehaviour/Skills/ArmSkills.h"
 
+#include "Tools/TextLogging.h"
+
 namespace CoroBehaviour
 {
 
@@ -28,7 +30,16 @@ namespace CoroBehaviour
    */
   CRBEHAVIOUR(SoccerGameControlTask)
   {
-    CRBEHAVIOUR_INIT(SoccerGameControlTask) {}
+    CRBEHAVIOUR_INIT(SoccerGameControlTask) 
+    {
+      DECL_TLOGGER_VAR(tlogger, "SoccerGameControlTask", TextLogging::INFO);
+
+      TLOGI(tlogger, "standbyStateBehaviour: {}", params.standbyStateBehaviour);
+      TLOGI(tlogger, "standbyStateBehaviour: {}", params.readyStateBehaviour);
+      TLOGI(tlogger, "standbyStateBehaviour: {}", params.setStateBehaviour);
+      TLOGI(tlogger, "standbyStateBehaviour: {}", params.playingStateBehaviour);
+      TLOGI(tlogger, "standbyStateBehaviour: {}", params.returnFromPenalizedBehaviour);
+    }
 
     // void registerPossibleSubtasks() override
     // {
@@ -48,7 +59,7 @@ namespace CoroBehaviour
           CR_CHECKPOINT(getting_up);
           while (theFallDownState.state != FallDownState::upright)
           {
-            commonSkills.activityStatus(BehaviorStatus::fallen);
+            commonSkills.recordActivity(BehaviorStatus::fallen);
             commonSkills.lookForward();
             motionSkills.getUp();
             CR_YIELD();
@@ -69,30 +80,30 @@ namespace CoroBehaviour
           if (theGameInfo.state == STATE_INITIAL)
           {
             CR_CHECKPOINT(initial);
-            commonSkills.activityStatus(BehaviorStatus::initial);
+            commonSkills.recordActivity(BehaviorStatus::initial);
             commonSkills.standLookForward(true);
           }
           else if (theGameInfo.state == STATE_STANDBY)
           {
             CR_CHECKPOINT(standby);
-            commonSkills.activityStatus(BehaviorStatus::initial);
+            commonSkills.recordActivity(BehaviorStatus::initial);
             CALL_BASIC_CORO(params.standbyStateBehaviour); // the configured playing state behaviour
           }
           else if (theGameInfo.state == STATE_FINISHED)
           {
             CR_CHECKPOINT(finished);
-            commonSkills.activityStatus(BehaviorStatus::finished);
+            commonSkills.recordActivity(BehaviorStatus::finished);
             commonSkills.standLookForward(true);
           }
           else if (theGameInfo.state == STATE_SET)
           {
             CR_CHECKPOINT(set_state);
-            commonSkills.activityStatus(BehaviorStatus::set);
+            commonSkills.recordActivity(BehaviorStatus::set);
             CALL_BASIC_CORO(params.setStateBehaviour); // the configured set state behaviour
           }
           else
           {
-            commonSkills.activityStatus(BehaviorStatus::generalPlay);
+            commonSkills.recordActivity(BehaviorStatus::generalPlay);
 
             // we are not allowed move in the initial, finished, or set states, so
             // we only handle potential return from penalty (which may involve moving) here

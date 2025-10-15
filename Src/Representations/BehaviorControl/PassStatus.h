@@ -12,8 +12,8 @@
 #include <limits>
 
 /**
- * @struct TimeToReachBall
- * Representation of the Time to reach the ball
+ * @struct PassStatus
+ * representation of passes by a team
  */
 STREAMABLE(PassStatus,
 {,

@@ -28,6 +28,7 @@
 #include "Representations/Modeling/Whistle.h"
 #include "Representations/MotionControl/MotionInfo.h"
 #include "Representations/Perception/StandbyReadyGesture.h"
+#include "Representations/Perception/SetPlayRefereeGesture.h"
 
 #include "Tools/RingBuffer.h"
 #include "Tools/Math/BHMath.h"
@@ -52,6 +53,7 @@ MODULE(GameInfoProvider,
   REQUIRES(Whistle),
   REQUIRES(MotionInfo),
   REQUIRES(StandbyReadyGesture),
+  REQUIRES(SetPlayRefereeGesture),
 
   PROVIDES(GameInfo),
 
@@ -79,8 +81,18 @@ MODULE(GameInfoProvider,
     (bool) useBallInGoalCheck, /**< Consider ball position when checking whether a goal was announced. */
     (int) acceptBallInGoalDelay, /**< Max time (ms) since ball must have been seen in a goal, to accept as a valid goal when referee whistles */
 
+    // standbyReadyState gesture parameters
     (bool) useVisualReady, ///< whether to use the visual ready signal if it is detected
     (int) visualReadyMatchDuration, ///< The last time limit if a gesture detection was seen by other robots.
+
+    // setPlayRefereeGesture parameters
+    (bool) useSetPlayRefereeGesture, ///< whether to use setPlayRefereeGesture detections or not
+    (int) setPlayRefereeGestureCheckingDuration, /**< after this time (from start of set play) we no longer check 
+                                                      for any updates based on setPlayRefereeGesture.
+                                                      see SetPlayGestureDetector config for parameters
+                                                      related to gestures times also */
+    (int) setPlayRefereeGestureMatchDuration, ///< max age of teammate gesture detection (relative to now) to be considered
+
 
     // kickoff and set-play related parameters (originally from KickoffStateProvider)
     (int) ballOutOfCenterCircleCounterThreshold,   /**< The number of times the ball needs to be seen at a certain position */
@@ -152,7 +164,7 @@ private:
   // /** check if the ball has been moved in kickoff or a set play */
   // bool checkBallHasMoved();
   void updateKickoffAndSetPlayBallFree(GameInfo& gameInfo);
-  void startKickoff(GameInfo& gameInfo);
+  void startKickoff(GameInfo& gameInfo, bool becauseOfWhistle = false);
   void startSetPlay(GameInfo& gameInfo);
   void setBallFree(GameInfo& gameInfo);
 
@@ -167,6 +179,12 @@ private:
   bool checkVisualReadySignalled(GameInfo& gameInfo);
 
   void updateGuessedState(GameInfo& gameInfo);
+
+  /** check if this robot or any teammate detected the setPlayRefereeGesture */
+  SetPlayRefereeGesture::Gesture checkSetPlayRefereeGestureDetected(GameInfo& gameInfo);
+
+  /** update the guessed kicking team based on the setPlayRefereeGesture */
+  void updateGuessedKickingTeam(GameInfo& gameInfo); // also deals with restoring GC kicking team
 
   /**
    * Check whether at least one player received a Illegal-Motion-in-Set-penalty since the last

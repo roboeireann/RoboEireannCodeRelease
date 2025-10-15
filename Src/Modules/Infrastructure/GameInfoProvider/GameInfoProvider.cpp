@@ -23,6 +23,7 @@
  *   STATE_INITIAL - must be SET_PLAY_NONE
  *   STATE_READY
  *     SET_PLAY_NONE - walk to attack/defence kickoff positions
+ *                     Note: kicking team will be guessed after a goal is scored
  *     SET_PLAY_PENALTY_KICK - get into position for a penalty kick (30 seconds)
  * 
  *   STATE_SET
@@ -33,6 +34,7 @@
  * 
  *   STATE_PLAYING
  *     SET_PLAY_NONE - 15 secs after whistle to signal kickoff, or when a set play ends, play normally
+ *                     2025 Champions Cup: Note that kicking team changes to None as soon as ball is free
  *     SET_PLAY_PENALTY_KICK - 15 seconds after whistle to signal penalty, start if not already started, 15 more secs to complete
  *     SET_PLAY_PUSHING_FREE_KICK - 30 seconds (or first touch) until ball is free and set play ends
  *     SET_PLAY_KICK_IN - 30 seconds (or first touch) until ball is free and set play ends
@@ -40,18 +42,23 @@
  *     SET_PLAY_CORNER_KICK - 30 seconds (or first touch) until ball is free and set play ends
  * 
  * Whistle signals:
+ * 
  *   guessed STATE_PLAYING after STATE_SET 
- *     kickoff - 10 secs after whistle (or first touch) is ball free, 15 secons from whistle until 
+ *     kickoff - 10 secs after whistle (or 0 secs after first touch) until ball free, 15 seconds from whistle until 
  *               GC STATE_PLAYING unambiguously ends the kickoff
+ *               2025 Champions Cup: Note that kicking team changes to None as soon as ball is free
  *     penalty kick/penalty shootout kick - 15 secs after whistle, GC STATE_PLAYING is signalled and there are
  *                                          15 more secs to complete the kick
  *   guessed STATE_READY after STATE_PLAYING
  *     goal scored - 15 secs after the whistle, GC STATE_PLAYING switches to STATE_READY and the score changes
  * 
  * Visual signals:
+ * 
  *   guessed STATE_READY after STANDBY
  *     visually signalled ready - 30 seconds after the signal GC STATE_READY will be signalled and there will be
  *                                max 15 secs remaining to get positioned.
+ * 
+ *   guessed kickingTeam in SET_PLAY_KICK_IN, SET_PLAY_GOAL_KICK, SET_PLAY_CORNER_KICK and SET_PLAY_PENALTY_KICK
  * 
  * @author Rudi Villing
  */
@@ -68,9 +75,23 @@ MAKE_MODULE(GameInfoProvider, infrastructure);
 
 DECL_TLOGGER(tlogger, "GameInfoProvider", TextLogging::INFO);
 
+// convenience shorthand for outputting to text log and annotation simultaneously
+#define TLOGI_ANNOTATION(...)                                                                                           \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    TLOGI(tlogger, __VA_ARGS__);                                                                                       \
+    ANNOTATION_FMT("GameInfoProvider", __VA_ARGS__);                                                                   \
+  } while (0)
+
+
 
 void GameInfoProvider::update(GameInfo& theGameInfo)
 {
+  // uint_t prevState = theGameInfo.state;
+  // uint_t prevSetPlay = theGameInfo.setPlay;
+  // bool prevStateIsGuessed = theGameInfo.stateIsGuessed;
+  // int prevKickingTeam = KICKING_TEAM_NONE;
+
   if (!initialised)
   {
     resetGameInfo(theGameInfo);
@@ -107,6 +128,14 @@ void GameInfoProvider::update(GameInfo& theGameInfo)
   // if game controller inactive, check for manual states
   if (!theGameInfo.gcActive)
     handleManualStateButtons(theGameInfo);
+
+//   if ((theGameInfo.state != prevState) || (theGameInfo.stateIsGuessed != prevStateIsGuessed))
+//     TLOGI(tlogger, "state changed {}{} --> {}{}", prevState, std::string(prevStateIsGuessed ? " (guessed)" : ""),
+//           theGameInfo.state, std::string(theGameInfo.stateIsGuessed ? " (guessed)" : ""));
+// 
+//   if ((theGameInfo.setPlay != prevSetPlay) || (theGameInfo.kickingTeam != prevKickingTeam))
+//     TLOGI(tlogger, "set play changed {} (kickingTeam {}) --> {} (kickingTeam {})", prevSetPlay, std::string(prevStateIsGuessed ? " (guessed)" : ""),
+//           theGameInfo.state, std::string(theGameInfo.stateIsGuessed ? " (guessed)" : ""));
 }
 
 
@@ -134,6 +163,7 @@ void GameInfoProvider::updateGameInfoFromReceivedGameControlData(GameInfo& gameI
 
   // save values we might have guessed/overridden
   uint8_t state = gameInfo.state;
+  uint8_t kickingTeam = gameInfo.kickingTeam;
 
   static_cast<ReceivedGameControlData&>(gameInfo) = theReceivedGameControlData;
 
@@ -141,6 +171,7 @@ void GameInfoProvider::updateGameInfoFromReceivedGameControlData(GameInfo& gameI
   {
     // reapply our guesses and save the current GC values
     gameInfo.state = state;
+    gameInfo.kickingTeam = kickingTeam;
   }
 
   if (receivedGameStateTrigger.valueChanged())
@@ -324,13 +355,16 @@ void GameInfoProvider::updateBallMotion(GameInfo& gameInfo)
 }
 
 
-void GameInfoProvider::startKickoff(GameInfo& gameInfo)
+void GameInfoProvider::startKickoff(GameInfo& gameInfo, bool becauseOfWhistle)
 {
   gameInfo.ballFreeState = GameInfo::notFreeKickoff;
   kickoffStartTime = theFrameInfo.time;
   setPlayStartTime = 0;
 
   resetBallMotion();
+
+  TLOGI_ANNOTATION("start kickoff{}, state {}, kickingTeam={}", becauseOfWhistle ? " guessed from whistle" : "",
+                   gameInfo.getStateString(), gameInfo.kickingTeam);
 }
 
 void GameInfoProvider::startSetPlay(GameInfo& gameInfo)
@@ -340,6 +374,8 @@ void GameInfoProvider::startSetPlay(GameInfo& gameInfo)
   setPlayStartTime = theFrameInfo.time;
 
   resetBallMotion();
+
+  TLOGI_ANNOTATION("start Set Play, GC state {}, kickingTeam={}", gameInfo.getStateString(), gameInfo.kickingTeam);
 }
 
 void GameInfoProvider::setBallFree(GameInfo& gameInfo)
@@ -349,6 +385,8 @@ void GameInfoProvider::setBallFree(GameInfo& gameInfo)
   setPlayStartTime = 0;
   
   ballMoved = true;
+
+  TLOGI_ANNOTATION("ball free");
 }
 
 void GameInfoProvider::updateKickoffAndSetPlayBallFree(GameInfo& gameInfo)
@@ -364,7 +402,7 @@ void GameInfoProvider::updateKickoffAndSetPlayBallFree(GameInfo& gameInfo)
        (receivedGameStateTrigger.prevValue == STATE_STANDBY) || (receivedGameStateTrigger.prevValue == STATE_INITIAL)) &&
       (gameInfo.setPlay == SET_PLAY_NONE))
   {
-    startKickoff(gameInfo);
+    startKickoff(gameInfo, /* becauseOfWhistle */ false);
   }
   // have we just started a set play?
   else if (receivedSetPlayTrigger.valueChanged() && (receivedSetPlayTrigger.value != SET_PLAY_NONE))
@@ -407,7 +445,7 @@ void GameInfoProvider::updateEndOfGuessedState(GameInfo& gameInfo)
     timeWhenStateChanged = theFrameInfo.time;
     setBallFree(gameInfo);
 
-    ANNOTATION_FMT("GameInfoProvider", "GC state changed to {} => back to GC state", gameInfo.state);
+    TLOGI_ANNOTATION("GC state changed to {} => end guessed state", gameInfo.getStateString());
     return;
   }
   // Stop overriding when both game states match. -- TODO can this condition ever be true without the above being true first?
@@ -416,7 +454,7 @@ void GameInfoProvider::updateEndOfGuessedState(GameInfo& gameInfo)
     gameInfo.stateIsGuessed = false;
     // leave timeWhenStateChanged, ballFreeInfo alone
 
-    ANNOTATION_FMT("GameInfoProvider", "GC state {} now matches our guess", theReceivedGameControlData.state);
+    TLOGI_ANNOTATION("GC state {} matches our guess => end guessed state", gameInfo.getStateString());
   }
 
   // correct any whistle related mistakes
@@ -438,7 +476,7 @@ void GameInfoProvider::updateEndOfGuessedState(GameInfo& gameInfo)
       if (sayGuessedStateChange)
         SystemCall::say("Back to Game Controller playing state");
 
-      ANNOTATION("GameInfoProvider", "READY state guess was incorrect => back to GC PLAYING state {}");
+      TLOGI_ANNOTATION("Guessed READY state was incorrect => back to GC state {}", gameInfo.getStateString());
     }
     // check for wrong switch to PLAYING after guessed whistle in SET
     else if ((gameInfo.state == STATE_PLAYING) && (theReceivedGameControlData.state == STATE_SET) && anyIllegalMotion)
@@ -452,7 +490,7 @@ void GameInfoProvider::updateEndOfGuessedState(GameInfo& gameInfo)
       if (sayGuessedStateChange)
         SystemCall::say("Back to Game Controller set state");
 
-      ANNOTATION("GameInfoProvider", "illegal motion penalty => back to GC SET state");
+      TLOGI_ANNOTATION("Illegal Motion penalty => back to GC state {}", gameInfo.getStateString());
     }
   }
 
@@ -468,7 +506,7 @@ void GameInfoProvider::updateEndOfGuessedState(GameInfo& gameInfo)
       if (sayGuessedStateChange)
         SystemCall::say("Back to Game Controller standby state");
 
-      ANNOTATION("GameInfoProvider", "illegal motion penalty => back to GC STANDBY state");
+      TLOGI_ANNOTATION("Illegal Motion penalty in STANDBY/READY => back to GC state {}", gameInfo.getStateString());
     }
   }
 }
@@ -482,7 +520,7 @@ bool GameInfoProvider::checkVisualReadySignalled(GameInfo& gameInfo)
   if (theStandbyReadyGesture.isDetected ||
       (theFrameInfo.getTimeSince(theStandbyReadyGesture.frameTimeLastDetection) <= visualReadyMatchDuration))
     return true;
-  // detected by any teammate
+  // not detected by self, is it detected by any teammate
   else
   {
     for (Teammate* pTeammate : theTeamData.activeTeammates)
@@ -498,6 +536,41 @@ bool GameInfoProvider::checkVisualReadySignalled(GameInfo& gameInfo)
     return false;
   }
 }
+
+
+SetPlayRefereeGesture::Gesture GameInfoProvider::checkSetPlayRefereeGestureDetected(GameInfo& gameInfo)
+{
+  if ((gameInfo.kickingTeam != KICKING_TEAM_NONE) || (gameInfo.setPlay == SET_PLAY_NONE) ||
+      (theFrameInfo.getTimeSince(setPlayStartTime) > setPlayRefereeGestureCheckingDuration))
+    return SetPlayRefereeGesture::NONE;
+
+  // NOTE: the following code doesn't use any voting or consensus, but simply
+  // uses the first available gesture detection (by self or teammates)
+
+  // is detected by self?
+  if (theSetPlayRefereeGesture.detectedGesture != SetPlayRefereeGesture::NONE)
+    return theSetPlayRefereeGesture.detectedGesture;
+  // not detected by self, is it detected by any teammate?
+  else
+  {
+    for (Teammate* pTeammate : theTeamData.activeTeammates)
+    {
+      // skip this teammate unless it has a detected gesture
+      if (pTeammate->theSetPlayRefereeGesture.lastDetection == SetPlayRefereeGesture::NONE)
+        continue;
+
+      int timeSinceTeammateGestureDetected =
+          theFrameInfo.getTimeSince(pTeammate->theSetPlayRefereeGesture.frameTimeLastDetection);
+
+      if (timeSinceTeammateGestureDetected < setPlayRefereeGestureMatchDuration)
+        return pTeammate->theSetPlayRefereeGesture.detectedGesture;
+    }
+
+    // no teammate has a recent detection either
+    return SetPlayRefereeGesture::NONE;
+  }
+}
+
 
 
 
@@ -562,15 +635,14 @@ void GameInfoProvider::updateGuessedState(GameInfo& gameInfo)
 
     if (!isPenaltyKick)
     {
-      startKickoff(gameInfo);
-      TLOGI(tlogger, "Whistle detected => kickoff");
+      startKickoff(gameInfo, /* becauseOfWhistle */ true); // will text log the kickoff also
 
       if (sayGuessedStateChange)
         SystemCall::say("whistle Kickoff");
     }
     else 
     {
-      TLOGI(tlogger, "Whistle detected => playing");
+      TLOGI_ANNOTATION("Whistle detected => guessed state {}", gameInfo.getStateString());
       if (sayGuessedStateChange)
         SystemCall::say("whistle playing");
     }
@@ -593,6 +665,8 @@ void GameInfoProvider::updateGuessedState(GameInfo& gameInfo)
           "Whistle Goal for {}",
           TypeRegistry::getEnumName(static_cast<Settings::TeamColor>(
               gameInfo.isOurKick() ? gameInfo.ourTeam().fieldPlayerColor : gameInfo.opponentTeam().fieldPlayerColor))));
+
+    TLOGI_ANNOTATION("Guessed goal from whistle => guessed state {}", gameInfo.getStateString());
   }
   else if ((gameInfo.state == STATE_STANDBY) && checkVisualReadySignalled(gameInfo))
   {
@@ -600,7 +674,7 @@ void GameInfoProvider::updateGuessedState(GameInfo& gameInfo)
     gameInfo.state = STATE_READY;
     timeWhenStateChanged = theFrameInfo.time;
 
-    TLOGI(tlogger, "Visual ready signal detected => READY");
+    TLOGI_ANNOTATION("Ready referee gesture detected => guessed state READY");
 
     if (sayGuessedStateChange)
       SystemCall::say("visual ready");
@@ -612,6 +686,53 @@ bool GameInfoProvider::checkBallInGoal()
   //was in goal in the last 5 seconds
   return !useBallInGoalCheck || theBallInGoal.timeSinceLastInGoal <= acceptBallInGoalDelay;
 }
+
+
+void GameInfoProvider::updateGuessedKickingTeam(GameInfo& gameInfo)
+{
+  // determine if existing guessed kicking team should be overwritten with
+  // GC kicking team. This is only done during set plays
+
+  if (gameInfo.setPlay != SET_PLAY_NONE) // is there a set play active?
+  {
+    // only guess the kicking team if it hasn't been set yet
+    if (gameInfo.kickingTeam == KICKING_TEAM_NONE)
+    {
+      // the ref gesture points towards the team defending the set play, so the
+      // kicking team is the other side. The team playing from the left side is 
+      // teams[0] and while the team playing from the right side is teams[1].
+      switch (checkSetPlayRefereeGestureDetected(gameInfo))
+      {
+      case SetPlayRefereeGesture::TOWARDS_LEFT:
+        gameInfo.kickingTeam = gameInfo.teams[1].teamNumber; // set play with team playing from right kicking
+        TLOGI_ANNOTATION("Set Play referee gesture detected => state {}, kickingTeam={}", gameInfo.getStateString(), gameInfo.kickingTeam);
+        break;
+
+      case SetPlayRefereeGesture::TOWARDS_RIGHT:
+        gameInfo.kickingTeam = gameInfo.teams[0].teamNumber; // set play with team playing from left kicking
+        TLOGI_ANNOTATION("Set Play referee gesture detected => state {}, kickingTeam={}", gameInfo.getStateString(), gameInfo.kickingTeam);
+        break;
+
+      case SetPlayRefereeGesture::NONE:
+        break; // do nothing
+      }
+    }
+  }
+  else // no set play active
+  {
+    // if the state is guessed (e.g. in the guessed ready state after a whistle for a goal)
+    // we don't want to override the kicking team. Only override it when the state is not guessed any more.
+    if (!gameInfo.stateIsGuessed)
+    {
+      if (gameInfo.kickingTeam != theReceivedGameControlData.kickingTeam)
+      {
+        gameInfo.kickingTeam = theReceivedGameControlData.kickingTeam;
+        TLOGI_ANNOTATION("Restore GC kickingTeam, GC state {}, kickingTeam={}", gameInfo.getStateString(), gameInfo.kickingTeam);
+      }
+    }
+  }
+}
+
 
 
 void GameInfoProvider::handlePlayerModeButtons(GameInfo& gameInfo)
@@ -629,7 +750,7 @@ void GameInfoProvider::handlePlayerModeButtons(GameInfo& gameInfo)
       if(theEnhancedKeyStates.hitStreak[KeyStates::chest] == 1)
       { 
         resetGameInfo(gameInfo);
-        TLOGI(tlogger, "Chestbutton pressed => mode UNSTIFF --> ACTIVE, GC state {}", gameInfo.getStateString());       
+        TLOGI_ANNOTATION("Chestbutton pressed => mode UNSTIFF --> ACTIVE, GC state {}", gameInfo.getStateString());       
         gameInfo.playerMode = GameInfo::active;
         ignoreChestButton = true; // suppress the chest button in this cognition cycle -- see handleManualStateButtons
       }
@@ -642,9 +763,9 @@ void GameInfoProvider::handlePlayerModeButtons(GameInfo& gameInfo)
          theFrameInfo.getTimeSince(whenNotInFinishedState) > finishedToUnstiffDuration)
       {
         if (theFrameInfo.getTimeSince(whenNotInFinishedState) > finishedToUnstiffDuration)
-          TLOGI(tlogger, "in FINISHED state for long enough => mode ACTIVE --> UNSTIFF");
+          TLOGI_ANNOTATION("in FINISHED state for long enough => mode ACTIVE --> UNSTIFF");
         else      
-          TLOGI(tlogger, "head buttons pressed => mode ACTIVE --> UNSTIFF");
+          TLOGI_ANNOTATION("head buttons pressed => mode ACTIVE --> UNSTIFF");
 
         resetGameInfo(gameInfo);
         gameInfo.playerMode = GameInfo::unstiff;
@@ -654,7 +775,7 @@ void GameInfoProvider::handlePlayerModeButtons(GameInfo& gameInfo)
               theEnhancedKeyStates.pressedDuration[KeyStates::headFront] > calibrationHeadButtonPressDuration &&
               theEnhancedKeyStates.isPressedFor(KeyStates::chest, 1000u))
       {
-        TLOGI(tlogger, "front head and chest buttons pressed => mode ACTIVE --> CALIBRATION");
+        TLOGI_ANNOTATION("front head and chest buttons pressed => mode ACTIVE --> CALIBRATION");
 
         resetGameInfo(gameInfo);
         gameInfo.playerMode = GameInfo::calibration;
@@ -668,7 +789,7 @@ void GameInfoProvider::handlePlayerModeButtons(GameInfo& gameInfo)
           theEnhancedKeyStates.pressedDuration[KeyStates::headRear] > unstiffHeadButtonPressDuration) ||
          theBehaviorStatus.activity == BehaviorStatus::calibrationFinished)
       {
-        TLOGI(tlogger, "head buttons pressed => mode CALIBRATION --> UNSTIFF");
+        TLOGI_ANNOTATION("head buttons pressed => mode CALIBRATION --> UNSTIFF");
         
         resetGameInfo(gameInfo);
         gameInfo.playerMode = GameInfo::unstiff;
@@ -733,12 +854,18 @@ void GameInfoProvider::handleManualStateButtons(GameInfo& gameInfo)
   if (!ignoreChestButton && theEnhancedKeyStates.hitStreak[KeyStates::chest] == 1)
   {
     if (playerInfo.penalty == PENALTY_NONE)
+    {
       playerInfo.penalty = PENALTY_MANUAL; // Note that the first manual penalty doesn't yet switch the robot 
                                        // out of INITIAL state (if there is no GC)
+
+      TLOGI(tlogger, "Chestbutton pressed => PENALTY_MANUAL, GC state {}", gameInfo.getStateString());
+    }
     else
     {
       playerInfo.penalty = PENALTY_NONE;
       gameInfo.state = STATE_PLAYING;
+
+      TLOGI(tlogger, "Chestbutton pressed => PENALTY_NONE, GC state {}", gameInfo.getStateString());
     }
   }
 }

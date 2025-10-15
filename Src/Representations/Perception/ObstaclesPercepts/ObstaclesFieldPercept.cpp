@@ -45,7 +45,7 @@ void ObstaclesFieldPercept::draw() const
     for(const Obstacle& obstacle : obstacles)
     {
       const float radius = std::max((obstacle.left - obstacle.right).norm() / 2.f, 50.f);
-      CIRCLE("representation:ObstaclesFieldPercept:field", obstacle.center.x(), obstacle.center.y(), radius, 10, Drawings::solidPen,
+      CIRCLE("representation:ObstaclesFieldPercept:field", obstacle.center.x(), obstacle.center.y(), radius, 20, Drawings::solidPen,
              penColors[obstacle.type], Drawings::solidBrush, teamColors[obstacle.type]);
     }
   }

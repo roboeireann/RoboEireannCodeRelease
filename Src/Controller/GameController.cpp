@@ -33,15 +33,35 @@ void GameController::TeamMessageCounter::startLocal(int portIn)
   ASSERT(!port);
   port = portIn;
 
+  // FIXME: this code is almost the same as the TeamMessageSocketHAndler -
+  // should tidy to avoid duplication (and double bug fixing)
   socket.setBlocking(false);
   VERIFY(socket.setBroadcast(false));
-  std::string group = SystemCall::getHostAddr();
-  group = "239" + group.substr(group.find('.'));
+
+  std::string hostAddr = SystemCall::getHostAddr();
+
+  // Default to a fixed multicast address from the "Organization-Local Scope" range
+  // This address is specifically for internal network use and doesn't rely on
+  // an active physical network interface.
+  std::string group = "239.255.0.1"; // default for loopback use
+
+  // check if there is a suitable network
+  // NOTE: for loopback to work in the absence of any other network, you may
+  // need to explicitly enable multicast on the loopback interface.
+  // You can call Make/Linux/enableLoopbackMulticast to do this temporarily.
+
+  // if (!hostAddr.empty() && (hostAddr.substr(0,3) != "127"))
+    group = "239" + hostAddr.substr(hostAddr.find('.'));
+
+  TLOGI(tlogger, "TeamMessageCounter: Default host address is '{}', so multicast group is '{}'", hostAddr, group);
+
   VERIFY(socket.bind("0.0.0.0", port));
   VERIFY(socket.setTTL(0)); //keep packets off the network. non-standard(?), may work.
   VERIFY(socket.joinMulticast(group.c_str()));
   VERIFY(socket.setTarget(group.c_str(), port));
   socket.setLoopback(true);
+
+  TLOGI(tlogger, "TeamMessageCounter: started local multicast on {} : {}", group, port);
 }
 
 void GameController::TeamMessageCounter::receive()
@@ -64,7 +84,7 @@ void GameController::TeamMessageCounter::receive()
     {
       if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
       {
-        TLOGW(tlogger, "receive port {}, problem receiving teammate packet, {}", ErrorStr(errno).str());
+        TLOGW(tlogger, "receive port {}, problem receiving team comms packet, {}", port, ErrorStr(errno).str());
         ++invalidCount;
       }
     }

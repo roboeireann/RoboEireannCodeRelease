@@ -166,6 +166,22 @@ void OracledWorldModelProvider::update(GroundTruthRobotPose& groundTruthRobotPos
   computeRobotPose();
   static_cast<RobotPose&>(groundTruthRobotPose) = theRobotPose;
   groundTruthRobotPose.timestamp = theFrameInfo.time;
+
+  // this is useful to when positioning robots in the simulator if you want their coordinates
+  DEBUG_RESPONSE_ONCE("module:OracledWorldModelProvider:GroundTruthRobotPoseInSim")
+  {
+    Pose2f pose = groundTruthRobotPose;
+    const int teamNumber = Global::getSettings().teamNumber;
+    if (teamNumber == 1) // left side simulated team
+    {
+      pose.rotation = Angle::normalize(pose.rotation + pi);
+      pose.translation.x() = -pose.translation.x();
+      pose.translation.y() = -pose.translation.y();
+    }
+    OUTPUT_TEXT(fmt::format("GroundTruthRobotPose t{}-r{}: {:.0f} {:.0f} {:.0f}deg", teamNumber,
+                            Global::getSettings().playerNumber, pose.translation.x(), pose.translation.y(),
+                            pose.rotation.toDegrees()));
+  }
 }
 
 MAKE_MODULE(OracledWorldModelProvider, infrastructure);

@@ -15,7 +15,7 @@
 #include "Platform/Time.h"
 #endif
 
-DECL_TLOGGER(tlogger, "ModuleGraphRunner", TextLogging::INFO); // switch to DEBUG if you want output
+DECL_TLOGGER(tlogger, "ModuleGraphRunner", TextLogging::WARNING); // switch to DEBUG if you want output
 
 
 void ModuleGraphRunner::destroy()

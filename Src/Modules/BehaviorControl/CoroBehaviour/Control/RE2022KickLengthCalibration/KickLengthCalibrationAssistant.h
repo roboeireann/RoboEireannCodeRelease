@@ -71,7 +71,7 @@ namespace RE2022
       {
         gotoBallAndKickTask(/* angle */ 0, kickType, /* kickAlignPrecisely */ true, kickDistance,
                             /* preStepAllowed */ true,
-                            /* turnKickAllowed */ false);
+                            /* turnKickAllowed */ true);
         CR_YIELD();
       }
 
@@ -131,7 +131,7 @@ namespace RE2022
     void operator()(void)
     {
       // do this regardless of place within coro body
-      // commonSkills.activityStatus(BehaviorStatus::unknown);
+      // commonSkills.recordActivity(BehaviorStatus::unknown);
 
       CRBEHAVIOUR_BEGIN();
       

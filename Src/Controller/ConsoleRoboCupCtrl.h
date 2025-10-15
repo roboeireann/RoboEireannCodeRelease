@@ -51,6 +51,8 @@ private:
   BHToolBar toolBar; /**< The toolbar shown for this controller. */
   static constexpr float ballFriction = -0.35f; /**< The ball friction acceleration (2D only). */
 
+  // size_t sizeSlowIndex = 0;
+
 public:
   /**
    * @param application The interface to SimRobot.

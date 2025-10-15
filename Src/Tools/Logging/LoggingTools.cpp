@@ -14,7 +14,11 @@
  * We'll handle this form for older log files, but new log files will be like
  * the following example instead:
  *
- *   bev_bev_Default_RC2023__Dutch-Nao-Team_half1_p4__005.log
+ *   bev_bev_Default_RC2023__Dutch-Nao-Team_half1_p4__005_00.log
+ * 
+ * If the SimRobot facility to split a file is used, it will instead look like te following:
+ *
+ *   bev_bev_Default_RC2023__Dutch-Nao-Team_half1_p4__005_00__part_3.log
  *
  * Note the 'p' before the player number, the double underscore before the suffix
  * and the suffix doesn't use parentheses.
@@ -52,9 +56,9 @@ void LoggingTools::parseName(const std::string &logfileName, std::string *prefix
   static std::regex hbsl("([A-Za-z]+)_([A-Za-z]+)_([A-Za-z0-9-]+)_([A-Za-z0-9-]+)__");
   // regex for only thread, head name and body name
   static std::regex thb("([A-Za-z_]+)_([A-Za-z-]+)_([A-Za-z-]+)__");
-  // regex for identifier and player number and suffix (for old BH style log file names and ours)
+  // regex for identifier, player number, suffix at end of file name (for old BH style log file names and ours)
   static std::regex ipsOld("__([A-Za-z0-9_-]*)_([0-9]+)(_\\([0-9]+\\))?\\.");
-  static std::regex ips("__([A-Za-z0-9_-]*)_p([0-9]+)__([0-9]+(_[0-9]+)?)\\.");
+  static std::regex ips("__([A-Za-z0-9_-]*)_p([0-9]+)__([0-9]+(_[0-9]+)?)(_[A-Za-z0-9_-]+)?\\.");
   std::smatch match;
 
   TLOGI(tlogger, "logFileName: \"{}\"", logfileName);
@@ -111,10 +115,10 @@ void LoggingTools::parseName(const std::string &logfileName, std::string *prefix
   // the old BH one
   if (std::regex_search(logfileName, match, ips))
   {
-    ASSERT(match.size() == 5);
+    ASSERT(match.size() == 6);
 
-    TLOGI(tlogger, "identifier \"{}\", playerNumber \"{}\", suffix \"{}\", suffixExtra \"{}\"", 
-          std::string(match[1]), std::string(match[2]), std::string(match[3]), std::string(match[4]));
+    TLOGI(tlogger, "identifier \"{}\", playerNumber \"{}\", suffix \"{}\", suffixNum2 \"{}\", suffixOther \"{}\"", 
+          std::string(match[1]), std::string(match[2]), std::string(match[3]), std::string(match[4]), std::string(match[5]));
 
     if (identifier)
       *identifier = match[1];

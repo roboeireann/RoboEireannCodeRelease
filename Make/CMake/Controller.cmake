@@ -65,6 +65,10 @@ else()
   target_compile_options(Controller PRIVATE -Wno-return-stack-address -Wno-switch)
 endif()
 
+target_compile_definitions(Controller PRIVATE QT_NO_DEPRECATED_WARNINGS) # specifically for Qt5 in ubuntu 22.04+
+target_compile_options(Controller PRIVATE -Wno-deprecated-declarations)
+
+
 target_link_libraries(Controller PRIVATE Flags::Default)
 target_precompile_headers(Controller PRIVATE "${CONTROLLER_ROOT_DIR}/Tools/Precompiled/BHumanPch.h")
 

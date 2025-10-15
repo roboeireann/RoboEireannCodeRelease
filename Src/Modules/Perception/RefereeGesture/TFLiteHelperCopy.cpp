@@ -15,14 +15,17 @@
 #include "Platform/File.h"
 
 #include <cstdio>
-#include <tensorflow/lite/c/c_api.h>
-
+#include <tflite_c_api.h>
+#include <tflite_c_api_xnnpack_delegate.h>
 
 DECL_TLOGGER(tlogger, "TFLiteHelperCopy", TextLogging::INFO);
 
 TFLiteHelperCopy::~TFLiteHelperCopy() 
 {
-  TfLiteInterpreterDelete(interpreter); 
+  TfLiteInterpreterDelete(interpreter);
+  if (delegate) {
+    TfLiteXNNPackDelegateDelete(delegate);
+  }
 }
 
 void TFLiteHelperCopy::loadModelFromFile(std::string file, std::vector<int> inputDims, int numThreads)
@@ -30,9 +33,16 @@ void TFLiteHelperCopy::loadModelFromFile(std::string file, std::vector<int> inpu
   TfLiteModel *model = TfLiteModelCreateFromFile(file.c_str());
   VERIFY(model != nullptr);
 
+  // Add XNNPACK delegate for performance
+  TfLiteXNNPackDelegateOptions xnnPackDelegateOption = TfLiteXNNPackDelegateOptionsDefault();
+  xnnPackDelegateOption.num_threads = numThreads;
+  delegate = TfLiteXNNPackDelegateCreate(&xnnPackDelegateOption);
+  VERIFY(delegate != nullptr);
+
   TfLiteInterpreterOptions *options = TfLiteInterpreterOptionsCreate();
   VERIFY(options != nullptr);
   TfLiteInterpreterOptionsSetNumThreads(options, numThreads);
+  TfLiteInterpreterOptionsAddDelegate(options, delegate); // Add this line
 
   interpreter = TfLiteInterpreterCreate(model, options);
   VERIFY(interpreter != nullptr);
@@ -69,8 +79,6 @@ void TFLiteHelperCopy::loadModelFromFile(std::string file, std::vector<int> inpu
   //   TLOGE(tlogger, "No input tensors found!");
   // }
   
-  VERIFY(TfLiteInterpreterGetOutputTensorCount(interpreter) == 1);
-
   VERIFY(TfLiteInterpreterResizeInputTensor(interpreter, 0, inputDims.data(), static_cast<int32_t>(inputDims.size())) == kTfLiteOk);
   VERIFY(TfLiteInterpreterAllocateTensors(interpreter) == kTfLiteOk);
 
@@ -100,9 +108,16 @@ void TFLiteHelperCopy::loadModelFromArray(const void *modelData, size_t length, 
   TfLiteModel *model = TfLiteModelCreate(modelData, length);
   VERIFY(model != nullptr);
 
+  // Add XNNPACK delegate for performance
+  TfLiteXNNPackDelegateOptions xnnPackDelegateOption = TfLiteXNNPackDelegateOptionsDefault();
+  xnnPackDelegateOption.num_threads = numThreads;
+  delegate = TfLiteXNNPackDelegateCreate(&xnnPackDelegateOption);
+  VERIFY(delegate != nullptr);
+
   TfLiteInterpreterOptions *options = TfLiteInterpreterOptionsCreate();
   VERIFY(options != nullptr);
   TfLiteInterpreterOptionsSetNumThreads(options, numThreads);
+  TfLiteInterpreterOptionsAddDelegate(options, delegate); // Add this line
 
   interpreter = TfLiteInterpreterCreate(model, options);
   VERIFY(interpreter != nullptr);
@@ -145,9 +160,9 @@ float *TFLiteHelperCopy::getFloatInputTensor()
   return static_cast<float*>(TfLiteTensorData(inputTensor)); 
 }
 
-std::vector<float> TFLiteHelperCopy::getFloatOutputTensor() 
+std::vector<float> TFLiteHelperCopy::getFloatOutputTensor(int outputIndex) 
 { 
-    const TfLiteTensor* outputTensor = TfLiteInterpreterGetOutputTensor(interpreter, 0);
+    const TfLiteTensor* outputTensor = TfLiteInterpreterGetOutputTensor(interpreter, outputIndex);
     VERIFY(outputTensor != nullptr);
 
     // Log the actual tensor type

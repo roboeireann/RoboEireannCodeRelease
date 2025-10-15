@@ -14,6 +14,7 @@
 #include <vector>
 
 struct TfLiteInterpreter;
+struct TfLiteDelegate;
 
 class TFLiteHelper
 {
@@ -42,4 +43,5 @@ public:
 
 private:
   TfLiteInterpreter *interpreter = nullptr;
+  TfLiteDelegate* delegate = nullptr;
 };

@@ -77,7 +77,10 @@ private:
   unsigned localId = 0; /**< The id of a local team communication participant or 0 for normal udp communication. */
   std::string requestedSubnet;
   std::string actualBroadcastAddr;
-  int prevErrno = 0; ///< used to prevent spamming the log files with repeated errors
+  /// counters used to prevent spamming the log files with repeated errors
+  unsigned consecutiveSendErrors = 0;
+  unsigned consecutiveReceiveErrors = 0;
+  unsigned consecutiveStartErrors = 0;
 
   bool setBroadcastTarget();
 };

@@ -17,6 +17,12 @@ bool FieldBall::ballWasSeen(int timeInterval) const
   return timeSinceBallWasSeen <= timeInterval;
 }
 
+bool FieldBall::anyBallWasSeen(int timeInterval) const
+{
+  return (timeSinceBallWasSeen <= timeInterval) || (timeSinceTeamBallWasValid <= timeInterval);
+}
+
+
 Vector2f FieldBall::recentBallPositionOnField(const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
   ASSERT(ballSeenTimeout >= 0);
@@ -119,11 +125,50 @@ void FieldBall::draw() const
       FILLED_RECTANGLE("representation:FieldBall:global", x1, y1, x2, y2, 1, Drawings::solidPen, ColorRGBA(255, 0, 0), Drawings::solidBrush, ColorRGBA(255, 0, 0));
     }
   }
-  if(secsUntilIntersectsOwnYAxis != std::numeric_limits<float>::max() && intersectionPositionWithOwnYAxis != Vector2f::Zero())
+
+  if (secsUntilIntersectsOwnYAxis != std::numeric_limits<float>::max() &&
+      intersectionPositionWithOwnYAxis != Vector2f::Zero())
   {
-    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x(), intersectionPositionWithOwnYAxis.y(), 150, 20, Drawings::solidPen, ColorRGBA::blue);
-    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnYAxis.x() * 1.5f, intersectionPositionWithOwnYAxis.y() * 1.5f,
-         10, Drawings::dashedPen, ColorRGBA::red);
-    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x() * 1.5f, intersectionPositionWithOwnYAxis.y() * 1.5f, 250, ColorRGBA::blue, secsUntilIntersectsOwnYAxis);
+    ColorRGBA intersectionColor = ColorRGBA::blue;
+    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
+
+    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x(),
+          intersectionPositionWithOwnYAxis.y(), 40, 20, Drawings::solidPen, intersectionColor);
+    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnYAxis.x() * 1.5f,
+         intersectionPositionWithOwnYAxis.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
+    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x() * 1.5f,
+              intersectionPositionWithOwnYAxis.y() * 1.5f, 120, intersectionColor,
+              fmt::format("{:.3f} sec", secsUntilIntersectsOwnYAxis));
+  }
+
+  if (secsUntilIntersectsOwnYAxisAggressive != std::numeric_limits<float>::max() &&
+      intersectionPositionWithOwnYAxisAggressive != Vector2f::Zero())
+  {
+    ColorRGBA intersectionColor(0,150,220);
+    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
+
+    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnYAxisAggressive.x(),
+          intersectionPositionWithOwnYAxisAggressive.y(), 40, 20, Drawings::solidPen, intersectionColor);
+    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnYAxisAggressive.x() * 1.5f,
+         intersectionPositionWithOwnYAxisAggressive.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
+    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnYAxisAggressive.x() * 1.5f,
+              intersectionPositionWithOwnYAxisAggressive.y() * 1.5f, 120, intersectionColor,
+              fmt::format("{:.3f} sec", secsUntilIntersectsOwnYAxisAggressive));
+  }
+
+
+  if (secsUntilIntersectsOwnXAxis != std::numeric_limits<float>::max() &&
+      intersectionPositionWithOwnXAxis != Vector2f::Zero())
+  {
+    ColorRGBA intersectionColor(0, 150, 148);
+    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
+
+    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnXAxis.x(),
+          intersectionPositionWithOwnXAxis.y(), 30, 20, Drawings::solidPen, intersectionColor);
+    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnXAxis.x() * 1.5f,
+         intersectionPositionWithOwnXAxis.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
+    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnXAxis.x() * 1.5f,
+              intersectionPositionWithOwnXAxis.y() * 1.5f, 100, intersectionColor,
+              fmt::format("{:.3f} sec", secsUntilIntersectsOwnXAxis));
   }
 }

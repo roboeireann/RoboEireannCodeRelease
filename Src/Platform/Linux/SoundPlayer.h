@@ -44,7 +44,9 @@ struct SoundRequest {
   SoundRequest(std::string text, float stretchFactor, float pitchFactor, float pitchSdFactor)
       : isTextToSpeech(true), stretchFactor(stretchFactor), pitchFactor(pitchFactor), pitchSdFactor(pitchSdFactor), fileOrText(std::move(text)){};
   SoundRequest(const SoundRequest &) = default;
+  SoundRequest &operator=(const SoundRequest &); // for gcc-12 and later, cannot make =default here
 };
+inline SoundRequest &SoundRequest::operator=(const SoundRequest &) = default; 
 
 class SoundPlayer : public Thread
 {

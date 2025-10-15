@@ -49,10 +49,10 @@ void ObstacleModel::draw() const
   DECLARE_DEBUG_DRAWING3D("representation:ObstacleModel", "robot");
 
   const ColorRGBA ownColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
-      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor : TEAM_GREEN);
+      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor : TEAM_GREEN).alpha(0.6f);
 
   const ColorRGBA opponentColor = ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
-      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).opponentTeam().fieldPlayerColor : TEAM_RED);
+      static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).opponentTeam().fieldPlayerColor : TEAM_RED).alpha(0.6f);
 
   ColorRGBA color;
   for(const auto& obstacle : obstacles)
@@ -96,14 +96,18 @@ void ObstacleModel::draw() const
     CROSS("representation:ObstacleModel:centerCross", center.x(), center.y(), Obstacle::getRobotDepth(), 10, Drawings::solidPen, color);
 
     float obstacleRadius = (left - right).norm() * .5f;
-    Angle robotRotation = Blackboard::getInstance().exists("RobotPose") ? static_cast<const RobotPose&>(Blackboard::getInstance()["RobotPose"]).rotation : Angle();
+    Angle robotRotation = Blackboard::getInstance().exists("RobotPose")
+                              ? static_cast<const RobotPose &>(Blackboard::getInstance()["RobotPose"]).rotation
+                              : Angle();
     Vector2f frontRight(-Obstacle::getRobotDepth(), -obstacleRadius);
     frontRight = center + frontRight;
-    RECTANGLE2("representation:ObstacleModel:rectangle", frontRight, obstacleRadius * 2, obstacleRadius * 2, -robotRotation, 16, Drawings::PenStyle::solidPen, ColorRGBA::black, Drawings::solidBrush, color);
+    RECTANGLE2("representation:ObstacleModel:rectangle", frontRight, obstacleRadius * 2, obstacleRadius * 2,
+               -robotRotation, 16, Drawings::PenStyle::dashedPen, ColorRGBA::black, Drawings::solidBrush, color);
 
     LINE("representation:ObstacleModel:leftRight", center.x(), center.y(), left.x(), left.y(), 20, Drawings::dottedPen, color);
     LINE("representation:ObstacleModel:leftRight", center.x(), center.y(), right.x(), right.y(), 20, Drawings::dottedPen, color);
-    CIRCLE("representation:ObstacleModel:circle", center.x(), center.y(), obstacleRadius, 10, Drawings::dottedPen, color, Drawings::noBrush, color);
+    CIRCLE("representation:ObstacleModel:circle", center.x(), center.y(), obstacleRadius, 10, Drawings::dottedPen,
+           color, Drawings::noBrush, color);
     COVARIANCE_ELLIPSES_2D("representation:ObstacleModel:covariance", obstacle.covariance, center);
 
     if(obstacle.velocity.squaredNorm() > 0)

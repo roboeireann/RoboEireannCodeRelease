@@ -85,7 +85,7 @@ namespace CoroBehaviour
     {
       CRBEHAVIOUR_LOOP()
       {
-        // commonSkills.activityStatus(BehaviorStatus::rePlaceholder);
+        // commonSkills.recordActivity(BehaviorStatus::rePlaceholder);
         commonSkills.standLookForward(/* high */ true);
         CR_YIELD();
       }
@@ -111,7 +111,7 @@ namespace CoroBehaviour
     {
       CRBEHAVIOUR_LOOP()
       {
-        // commonSkills.activityStatus(BehaviorStatus::rePlaceholder);
+        // commonSkills.recordActivity(BehaviorStatus::rePlaceholder);
         commonSkills.standLookForward(/* high */ true);
         if (getCoroDuration() > SUCCESS_DURATION_MS)
           CR_EXIT_SUCCESS();

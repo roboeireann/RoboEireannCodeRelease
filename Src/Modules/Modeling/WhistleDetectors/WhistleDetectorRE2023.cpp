@@ -98,6 +98,19 @@ void WhistleDetectorRE2023::update(Whistle &theWhistle)
   bool validAudio = (!theAudioData.samples.empty() && (theAudioData.channels >= 1));
   bool detectWhistles = (theGameInfo.state == STATE_SET || theGameInfo.state == STATE_PLAYING);
 
+  DEBUG_RESPONSE_ONCE("module:WhistelDetectorRE2023:whistleNow")
+  {
+    if (detectWhistles)
+    {
+      ANNOTATION_FMT("Whistle", "Debug whistle has been signalled");
+      theWhistle.whistleDetected = true;
+      theWhistle.lastTimeWhistleDetected = theFrameInfo.time;
+      theWhistle.confidenceOfLastWhistleDetection = 0.9f;
+      theWhistle.channelsUsedForWhistleDetection = static_cast<unsigned char>(channelBuffers.size());
+      return;
+    }
+  }
+
   /* If not receiving audio input */
   if (!validAudio)
   {

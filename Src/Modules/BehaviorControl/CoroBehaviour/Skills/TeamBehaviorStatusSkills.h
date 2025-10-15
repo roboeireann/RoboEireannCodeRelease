@@ -26,31 +26,31 @@ namespace CoroBehaviour
 
     // see BH2021 Skills/Output/TeamBehaviorStatus/*
 
-    void teamActivity(TeamBehaviorStatus::TeamActivity teamActivity)
+    void recordTeamActivity(TeamBehaviorStatus::TeamActivity teamActivity)
     {
       theTeamBehaviorStatus.teamActivity = teamActivity;
       theLibCheck.inc(LibCheck::teamActivity);
     }
 
-    void timeToReachBall(const TimeToReachBall& timeToReachBall)
+    void recordTimeToReachBall(const TimeToReachBall& timeToReachBall)
     {
       theTeamBehaviorStatus.timeToReachBall = timeToReachBall;
       theLibCheck.inc(LibCheck::timeToReachBall);
     }
 
-    void teammateRoles(const TeammateRoles& teammateRoles)
+    void recordTeammateRoles(const TeammateRoles& teammateRoles)
     {
       theTeamBehaviorStatus.teammateRoles = teammateRoles;
       theLibCheck.inc(LibCheck::teammateRoles);
     }
 
-    void playerRole(const PlayerRole& playerRole)
+    void recordPlayerRole(const PlayerRole& playerRole)
     {
       theTeamBehaviorStatus.role = playerRole;
       theLibCheck.inc(LibCheck::role);
     }
 
-    void setPassStatus(const PassStatus &passStatus)
+    void recordPassStatus(const PassStatus &passStatus)
     {
       theTeamBehaviorStatus.passStatus = passStatus;
       // FIXME: add in a libcheck for this?

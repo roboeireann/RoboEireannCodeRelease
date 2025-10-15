@@ -9,8 +9,14 @@
 #include "Tools/Streams/InExpr.h"
 #include "Tools/Settings.h"
 
+#include "Tools/TextLogging.h"
+
 #include <unordered_map>
 #include <string>
+
+
+DECL_TLOGGER(tlogger, "ConfigurationDataProvider", TextLogging::INFO);
+
 
 thread_local ConfigurationDataProvider* ConfigurationDataProvider::theInstance = nullptr;
 

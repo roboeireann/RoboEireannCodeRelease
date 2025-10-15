@@ -27,8 +27,8 @@ STREAMABLE(ExtendedGameInfo,
   (int)(0) timeSinceSetStarted,              /**< Time since the current set state started (or 0 if not set) [ms]. */
   (unsigned)(0) timeWhenLastPlayingStarted,  /**< Timestamp when the last playing state started. */
   (int)(0) timeSincePlayingStarted,          /**< Time since the current playing state started (or 0 if not playing) [ms]. */
-  (unsigned)(0) timeWhenLastFreeKickStarted, /**< Timestamp when the last free kick started. */
-  (int)(0) timeSinceFreeKickStarted,         /**< Time since the last free kick started [ms]. */
+  (unsigned)(0) timeWhenLastFreeKickStarted, /**< Timestamp when the last free kick (any set play) started. */
+  (int)(0) timeSinceFreeKickStarted,         /**< Time since the last free kick (any set play) started [ms]. */
   (unsigned)(0) timeWhenLastFreeKickEnded,   /**< Timestamp when the last free kick ended. */
   (int)(0) timeSinceLastFreeKickEnded,       /**< Time since the last free kick ended [ms]. */
   (unsigned)(0) timeWhenLastCalibrationStarted, /**< Timestamp when robot last switched to Mode::calibration. */

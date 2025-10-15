@@ -82,6 +82,8 @@ void ThreadFrame::threadMain()
 {
   Thread::nameCurrentThread(robotName.empty() ? getName() : (robotName + "." + getName()));
 
+  TLOGI(tlogger, "*** threadMain started");
+
   if(SystemCall::getMode() == SystemCall::physicalRobot)
     setPriority(getPriority());
   else
@@ -105,6 +107,8 @@ void ThreadFrame::threadMain()
       wait();
   }
   terminate();
+
+  TLOGI(tlogger, "*** threadMain ended");
 }
 
 bool ThreadFrame::handleMessage(InMessage& message)

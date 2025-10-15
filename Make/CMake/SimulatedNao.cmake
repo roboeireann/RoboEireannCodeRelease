@@ -37,6 +37,8 @@ set_property(TARGET SimulatedNao PROPERTY LIBRARY_OUTPUT_DIRECTORY "${SIMROBOT_L
 set_property(TARGET SimulatedNao PROPERTY PDB_OUTPUT_DIRECTORY "${SIMROBOT_LIBRARY_DIR}")
 target_include_directories(SimulatedNao PRIVATE "${SIMULATEDNAO_ROOT_DIR}")
 target_include_directories(SimulatedNao PRIVATE $<$<PLATFORM_ID:Windows>:${PROJECTROOT_PREFIX}/Util/Buildchain/Windows/include>)
+target_link_libraries(SimulatedNao PRIVATE -lrt)
+target_link_libraries(SimulatedNao PRIVATE -lpthread)
 target_link_libraries(SimulatedNao PRIVATE Eigen::Eigen)
 target_link_libraries(SimulatedNao PRIVATE FFTW::FFTW FFTW::FFTWF)
 target_link_libraries(SimulatedNao PRIVATE libjpeg::libjpeg)

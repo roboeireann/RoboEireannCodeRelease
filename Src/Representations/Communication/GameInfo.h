@@ -11,6 +11,7 @@
 #include "Tools/Global.h"
 #include "Tools/Settings.h"
 #include "Tools/Streams/AutoStreamable.h"
+#include "Representations/Perception/SetPlayRefereeGesture.h"
 
 struct ReceivedGameControlData : public RoboCup::RoboCupGameControlData, public Streamable
 {
@@ -64,7 +65,9 @@ public:
   bool isPenalized() const { return playerInfo().isPenalized(); };
   bool isPenalized(uint8_t penalty) const { return playerInfo().isPenalized(penalty); };
 
-  bool isOurKick() const { return (kickingTeam == teams[ourTeamIndex()].teamNumber); } 
+  bool isOurKick() const { return (kickingTeam == ourTeam().teamNumber); } 
+  bool isOpponentKick() const { return (kickingTeam == opponentTeam().teamNumber); } 
+  bool isNoTeamKick() const { return (kickingTeam == KICKING_TEAM_NONE); }
 
   bool isPlayingLeftToRight() const { return teams[0].teamNumber == Global::getSettings().teamNumber; } 
 

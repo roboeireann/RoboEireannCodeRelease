@@ -19,6 +19,7 @@
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/Modeling/Whistle.h"
 #include "Representations/Perception/StandbyReadyGesture.h"
+#include "Representations/Perception/SetPlayRefereeGesture.h"
 
 #include "Tools/Streams/AutoStreamable.h"
 #include "Tools/Function.h"
@@ -65,6 +66,7 @@ STREAMABLE(Teammate, // COMMA public MessageHandler
   (BehaviorStatus) theBehaviorStatus,
   (Whistle) theWhistle, // partly guessed info
   (StandbyReadyGesture) theStandbyReadyGesture, // partly guessed info
+  (SetPlayRefereeGesture) theSetPlayRefereeGesture, // partly guessed info
   (TeamBehaviorStatus) theTeamBehaviorStatus, // DEPRECATED and mainly not used from 2024 onwards (only partially filled in when used)
   (ActiveTacticStatus) theActiveTacticStatus, // supersedes TeamBehaviorStatus
 });

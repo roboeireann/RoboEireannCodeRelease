@@ -30,6 +30,8 @@ MODULE(FieldBallProvider,
   {,
     (float)(300.f) opponentGoalpostYOffset,     /**< Assume that the opponent goal is a bit wider */
     (float)(300.f) ownGoalpostYOffset,          /**< Assume that the own goal is a bit wider */
+    (float)(500.f) aggressiveEndPositionDistance, ///< end position is near enough to consider intercept in aggressive mode
+    (float)(100.f) aggressiveMinVelocityX, ///< min velocity ball can have to predict an intercept in aggressive mode
   }),
 });
 

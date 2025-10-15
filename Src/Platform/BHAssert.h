@@ -57,13 +57,15 @@ public:
    * @param termSignal A signal that was emitted to terminate the roboeireann process
    */
   static void logDump(bool toStderr, int termSignal);
+#endif // TARGET_ROBOT
 
+#if defined TARGET_ROBOT || defined LINUX
   /**
    * get the signal name corresponding to a signal number
    */
   static const char* getSignalName(int signum);
-#endif // TARGET_ROBOT
 };
+#endif
 
 /**
  * ASSERT prints a message if \c cond is \c false and NDEBUG is not defined.

@@ -22,7 +22,7 @@
 #define fseek _fseeki64
 #endif
 
-DECL_TLOGGER(tlogger,"File",TextLogging::WARNING);
+DECL_TLOGGER(tlogger,"File",TextLogging::INFO);
 
 File::File(const std::string& name, const char* mode, bool tryAlternatives)
 {
@@ -55,11 +55,11 @@ File::File(const std::string& name, const char* mode, bool tryAlternatives)
         TLOGW(tlogger, "{} not found", name);
     }
 
-    if (tlogger.isEnabled(TextLogging::DEBUG))
+    if (tlogger.isEnabled(TextLogging::VERBOSE))
     {
       for (auto& nm : names)
       {
-        TLOG_USE(nm);
+        MAYBE_UNUSED(nm);
         TLOGD(tlogger, "  not at {}", nm);
       }
     }
@@ -67,7 +67,11 @@ File::File(const std::string& name, const char* mode, bool tryAlternatives)
   else if (tlogger.isEnabled(TextLogging::INFO))
   {
     if (!repeatedFile(fullName))
-      TLOGI(tlogger, "{} found at {}", name, fullName);
+#ifdef TARGET_ROBOT
+      TLOGI(tlogger, "opened {}", fullName);
+#else
+      TLOGD(tlogger, "opened {}", fullName);
+#endif
   }
 }
 
@@ -172,9 +176,9 @@ std::list<std::string> File::getConfigDirs()
 #ifndef TARGET_TOOL
   // The search paths in search order are:
   //
-  // - Config/Robots/someHead/someBody/
-  // - Config/Robots/someHead/Head/
-  // - Config/Robots/someBody/Body/
+  // - Config/Robots/someHead/someBody/       (config that depends on combination of head and body)
+  // - Config/Robots/someHead/Head/           (head specific config - independent of body)
+  // - Config/Robots/someBody/Body/           (body specific config - independent of head)
   //
   // - Config/Scenarios/someScenario/Locations/someLocation/Sim *** (someScenario can be Default)
   // - Config/Scenarios/someScenario/Locations/someLocation/        (someScenario can be Default)

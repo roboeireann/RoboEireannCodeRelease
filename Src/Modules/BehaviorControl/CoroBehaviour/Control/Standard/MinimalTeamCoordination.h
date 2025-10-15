@@ -27,8 +27,8 @@ namespace CoroBehaviour
     {
       CRBEHAVIOUR_LOOP()
       {
-        teamBehaviourStatusSkills.teamActivity(TeamBehaviorStatus::minimalTeam);
-        teamBehaviourStatusSkills.timeToReachBall(teamBehaviourStatusSkills.calcTimeToReachBallPosition());
+        teamBehaviourStatusSkills.recordTeamActivity(TeamBehaviorStatus::minimalTeam);
+        teamBehaviourStatusSkills.recordTimeToReachBall(teamBehaviourStatusSkills.calcTimeToReachBallPosition());
         updateTeammateRoles();
         updatePlayerRole();
         
@@ -51,7 +51,7 @@ namespace CoroBehaviour
 
     TeamBehaviorStatusSkills teamBehaviourStatusSkills {env};
 
-    DECL_TLOGGER_FN(tlogger, "MinimalTeamCoord", TextLogging::INFO)
+    DECL_TLOGGER_VAR(tlogger, "MinimalTeamCoord", TextLogging::INFO);
 
     /**
      * update the TeammateRoles part of the teamBehaviourStatus
@@ -75,11 +75,11 @@ namespace CoroBehaviour
       }
       else // copy the captains teamRoles
       {
-        TLOGD(tlogger(), "copy captainTeammate {}", captainTeammate->number);
+        TLOGD(tlogger, "copy captainTeammate {}", captainTeammate->number);
         teammateRoles = captainTeammate->theTeamBehaviorStatus.teammateRoles;
       }
 
-      teamBehaviourStatusSkills.teammateRoles(teammateRoles);
+      teamBehaviourStatusSkills.recordTeammateRoles(teammateRoles);
     }
 
     // get time to ball depending on whether the supplied teamBehaviourStatus
@@ -127,7 +127,7 @@ namespace CoroBehaviour
           if (!teammate.isPenalized && isGoalkeeper(teammate.number))
           {
             teammateRoles[teammate.number] = PlayerRole::goalkeeper;
-            TLOGD(tlogger(), "robot{}: assignRoles goalkeeper is {}", theGameInfo.playerNumber, teammate.number);
+            TLOGD(tlogger, "robot{}: assignRoles goalkeeper is {}", theGameInfo.playerNumber, teammate.number);
             break;
           }
         }
@@ -223,7 +223,7 @@ namespace CoroBehaviour
       }
 
 
-      TLOGD(tlogger(), "assignRoles: teammateRole.roles[1] = {}", teammateRoles.roles[1]);
+      TLOGD(tlogger, "assignRoles: teammateRole.roles[1] = {}", teammateRoles.roles[1]);
 
       // CRB_ANNOTATION_FMT("assignRoles: captain={}, striker={}, robot1 is {}\n", theGameInfo.playerNumber, strikerNumber, teammateRoles.roles[1]);
     }
@@ -243,7 +243,7 @@ namespace CoroBehaviour
 
       // CRB_ANNOTATION_FMT("playerRole: {}, numActiveSupporters={}\n", role.role, role.numOfActiveSupporters);      
 
-      teamBehaviourStatusSkills.playerRole(role);
+      teamBehaviourStatusSkills.recordPlayerRole(role);
     }    
   };
 

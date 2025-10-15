@@ -54,6 +54,10 @@ set_property(TARGET SimRobot PROPERTY XCODE_ATTRIBUTE_COPY_PHASE_STRIP "NO")
 set_property(TARGET SimRobot PROPERTY XCODE_GENERATE_SCHEME ON)
 
 target_include_directories(SimRobot PRIVATE "${SIMROBOT_ROOT_DIR}")
+
+target_compile_definitions(SimRobot PRIVATE QT_NO_DEPRECATED_WARNINGS) # specifically for Qt5 in ubuntu 22.04+
+target_compile_options(SimRobot PRIVATE -Wno-deprecated-declarations)
+
 target_link_libraries(SimRobot PRIVATE Qt5::Core Qt5::Gui Qt5::Svg Qt5::Widgets)
 if(APPLE)
   target_link_libraries(SimRobot PRIVATE Qt5::OpenGL)

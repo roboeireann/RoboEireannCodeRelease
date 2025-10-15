@@ -31,6 +31,7 @@ STREAMABLE(ActiveTacticStatus,
 /** more complete information that ActiveTacticStatus required for behaviour to execute */
 STREAMABLE_WITH_BASE(ActiveTactic, ActiveTacticStatus, 
 {
+  void draw() const;
 
   /******** streamable members follow (note comma at end of comment) ********/,
 

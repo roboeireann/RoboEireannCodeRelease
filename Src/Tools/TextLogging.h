@@ -16,11 +16,13 @@
 
 #include "Platform/Time.h"
 #include "Platform/BHAssert.h"
+#include "MacroCommon.h"
 
 #include "fmt/format.h"
 
 #include <sstream>
 #include <unordered_map>
+
 
 
 
@@ -78,15 +80,15 @@ public:
 // but needs to be public for access by the macros
 struct MacrosOnlyTextLogMsg_
 {
-  fmt::memory_buffer tmpFmt;
-  std::stringstream tmpStream;
+  fmt::memory_buffer msgFmt;
+  std::stringstream msgStream;
 
   template <typename S, typename... Args, typename Char = fmt::char_t<S> >
   void format(const S& formatStr, Args&&... args)
   {
     const auto& vargs = fmt::make_args_checked<Args...>(formatStr, args...);
-    fmt::vformat_to(tmpFmt, fmt::to_string_view(formatStr), vargs);
-    // fmt::format_to(tmpFmt, formatStr, std::forward<Args>(args)...);
+    fmt::vformat_to(msgFmt, fmt::to_string_view(formatStr), vargs);
+    // fmt::format_to(msgFmt, formatStr, std::forward<Args>(args)...);
   }
   
 };
@@ -148,13 +150,16 @@ public:
    * NOTE: this is really an internal use function for use by macros only
    * so don't call it directly
    */
-  static void macrosOnlyOutput_(TextLogger& logger, Level level, const MacrosOnlyTextLogMsg_& msg);
+  static void macrosOnlyOutput_(TextLogger& logger, Level level, MacrosOnlyTextLogMsg_&& msg);
+
+  static void requestAsyncOutput(bool asyncDesired = true);
 
 private:
   using Ptr = TextLogger*;
   using LoggerMap = std::unordered_map<std::string, Ptr>;
 
   static constexpr const char* levelStrings[7] = { "OFF", "FATAL", "ERROR", "W", "I", "D", "V" };
+
 
   // There is a subtle initialization order issue that requires us to
   // initialize on first use rather than assuming normal static initialization
@@ -178,6 +183,8 @@ private:
   // we break this function out so that we can include synchronization later
   // if needed
   static TextLogger& registerLogger(const std::string& name);
+
+  friend class TextLoggingHelper;
 };
 
 /**
@@ -232,11 +239,11 @@ private:
 #define TLOG_IMPL(logger_, lvl_, fmt_, ...)                                                                            \
   do                                                                                                                   \
   {                                                                                                                    \
-    if (logger_.isEnabled(lvl_))                                                                                       \
+    if (__builtin_expect(logger_.isEnabled(lvl_), false)) /* we optimise for loggers that are disabled */              \
     {                                                                                                                  \
       MacrosOnlyTextLogMsg_ msg_;                                                                                      \
       msg_.format((fmt_), ##__VA_ARGS__);                                                                              \
-      TextLogging::macrosOnlyOutput_(logger_, lvl_, msg_);                                                                      \
+      TextLogging::macrosOnlyOutput_(logger_, lvl_, std::move(msg_));                                                  \
     }                                                                                                                  \
   } while (0)
 
@@ -250,11 +257,11 @@ private:
 #define TLOG_IMPL_STREAM(logger_, lvl_, insertable_)                                                                   \
   do                                                                                                                   \
   {                                                                                                                    \
-    if (logger_.isEnabled(lvl_))                                                                                       \
+    if (__builtin_expect(logger_.isEnabled(lvl_), false)) /* we optimise for loggers that are disabled */              \
     {                                                                                                                  \
       MacrosOnlyTextLogMsg_ msg_;                                                                                      \
-      msg_.tmpStream << insertable_;                                                                                   \
-      TextLogging::macrosOnlyOutput_(logger_, lvl_, msg_);                                                             \
+      msg_.msgStream << insertable_;                                                                                   \
+      TextLogging::macrosOnlyOutput_(logger_, lvl_, std::move(msg_));                                                  \
     }                                                                                                                  \
   } while (0)
 
@@ -331,22 +338,28 @@ private:
 #endif // TLOG_DISABLED
 
 /**
- * Use this macro for variables that may be declared but unused if TLOG_DISABLED is defined
- */
-#define TLOG_USE(var_) (void)var_
-
-/**
  * Use this macro to declare access to a logger in a .cpp file
  */
 #define DECL_TLOGGER(varName_, loggerName_, level_) static TextLogger& varName_ = TextLogging::get(loggerName_, level_)
 
 /**
- * Use this macro declare access to a logger in a .h file at the file level
- * or as a member of a class
+ * Use this macro to declare access to logger as a member or local variable
+ * 
+ * This would typically be used to add a member variable to a class that only has a header file. Otherwise
+ * the DECL_TLOGGER macro which defines a static file level logger is a better solution
+ */
+#define DECL_TLOGGER_VAR(varName_, loggerName_, level_) TextLogger& varName_ = TextLogging::get(loggerName_, level_)
+
+/**
+ * Occasionally you might want to use this macro declare access to a logger in 
+ * a .h file at the file level or as a member of a class.
+ * However its usage should be rare and generally you should prefer DECL_TLOGGER_VAR
+ * unless the addition of a reference variable is impossible/difficult or somehow adds too much 
+ * overhead.
  */
 #define DECL_TLOGGER_FN(fnName_, loggerName_, level_)                                                                  \
   static TextLogger &fnName_()                                                                                         \
   {                                                                                                                    \
-    static TextLogger &tlogger = TextLogging::get(loggerName_, level_);                                                       \
+    static TextLogger &tlogger = TextLogging::get(loggerName_, level_);                                                \
     return tlogger;                                                                                                    \
   }

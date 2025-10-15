@@ -25,10 +25,10 @@ namespace CoroBehaviour
     {
       CRBEHAVIOUR_LOOP()
       {
-        teamBehaviourStatusSkills.teamActivity(TeamBehaviorStatus::noTeam);
-        teamBehaviourStatusSkills.timeToReachBall(TimeToReachBall());
-        teamBehaviourStatusSkills.teammateRoles(TeammateRoles());
-        teamBehaviourStatusSkills.playerRole(PlayerRole());
+        teamBehaviourStatusSkills.recordTeamActivity(TeamBehaviorStatus::noTeam);
+        teamBehaviourStatusSkills.recordTimeToReachBall(TimeToReachBall());
+        teamBehaviourStatusSkills.recordTeammateRoles(TeammateRoles());
+        teamBehaviourStatusSkills.recordPlayerRole(PlayerRole());
         
         CR_YIELD();
       }

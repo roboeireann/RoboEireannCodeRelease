@@ -64,11 +64,11 @@ void BallModel::draw() const
     const Vector2f& position(estimate.position);
     const Vector2f& velocity(estimate.velocity);
     CIRCLE("representation:BallModel",
-           position.x(), position.y(), 45, 0, // pen width
-           Drawings::solidPen, ColorRGBA::orange,
+           position.x(), position.y(), 45, 5, // pen width
+           Drawings::solidPen, ColorRGBA::orange.darker(0.3f),
            Drawings::solidBrush, ColorRGBA::orange);
     ARROW("representation:BallModel", position.x(), position.y(),
-          position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, ColorRGBA::orange);
+          position.x() + velocity.x(), position.y() + velocity.y(), 15, Drawings::solidPen, ColorRGBA::orange);
   }
 
   DEBUG_DRAWING("representation:BallModel:covariance", "drawingOnField")
@@ -81,17 +81,27 @@ void BallModel::draw() const
   {
     if(Blackboard::getInstance().exists("BallSpecification"))
     {
-      const BallSpecification& ballSpecification = static_cast<const BallSpecification&>(Blackboard::getInstance()["BallSpecification"]);
-      Vector2f position;
-      if(estimate.rotation == 0.f)
-        position = BallPhysics::getEndPosition(estimate.position, estimate.velocity, ballSpecification.friction);
+      const BallSpecification &ballSpecification =
+          static_cast<const BallSpecification &>(Blackboard::getInstance()["BallSpecification"]);
+      Vector2f endPosition;
+      if (estimate.rotation == 0.f)
+        endPosition = BallPhysics::getEndPosition(estimate.position, estimate.velocity, ballSpecification.friction);
       else
-        position = BallPhysics::getEndPositionRegardingRotation(estimate.position, estimate.velocity, estimate.rotation, ballSpecification.friction);
-      ColorRGBA violet = ColorRGBA(168, 25, 99, 220); //So you know what you see in the world state...
+        endPosition = BallPhysics::getEndPositionRegardingRotation(estimate.position, estimate.velocity,
+                                                                   estimate.rotation, ballSpecification.friction);
+
+      // ColorRGBA violet = ColorRGBA(168, 25, 99, 220); // So you know what you see in the world state...
+      ColorRGBA ballColor = ColorRGBA(255, 0, 192); // So you know what you see in the world state...
+      LINE("representation:BallModel:endPosition", estimate.position.x(), estimate.position.y(), endPosition.x(),
+           endPosition.y(), 5, Drawings::dottedPen, ballColor.alpha(0.5f));
       CIRCLE("representation:BallModel:endPosition",
-             position.x(),  position.y(), 45, 0, // pen width
-             Drawings::solidPen, ColorRGBA::black,
-             Drawings::solidBrush, violet);
+             endPosition.x(),  endPosition.y(), 15, 0, // pen width
+             Drawings::noPen, ballColor,
+             Drawings::solidBrush, ballColor);
+      CIRCLE("representation:BallModel:endPosition",
+             endPosition.x(),  endPosition.y(), 75, 15, // pen width
+             Drawings::dottedPen, ballColor,
+             Drawings::noBrush, ballColor);
     }
   }
 
@@ -112,7 +122,7 @@ void GroundTruthBallModel::draw() const
   {
     const Vector2f& position(estimate.position);
     const Vector2f& velocity(estimate.velocity);
-    ColorRGBA transparentOrange(255, 128, 0, 128);
+    ColorRGBA transparentOrange(255, 128, 0, 96);
     CIRCLE("representation:GroundTruthBallModel",
            position.x(), position.y(), 45, 4, // pen width
            Drawings::solidPen, ColorRGBA::gray,

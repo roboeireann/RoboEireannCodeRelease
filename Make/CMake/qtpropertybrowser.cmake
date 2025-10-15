@@ -14,6 +14,11 @@ target_include_directories(qtpropertybrowser SYSTEM INTERFACE "${QTPROPERTYBROWS
 target_compile_definitions(qtpropertybrowser PRIVATE $<$<PLATFORM_ID:Windows>:QT_QTPROPERTYBROWSER_EXPORT> $<$<PLATFORM_ID:Windows>:_SCL_SECURE_NO_WARNINGS>)
 target_compile_options(qtpropertybrowser PRIVATE $<$<PLATFORM_ID:Linux>:-Wno-return-stack-address>)
 
+target_compile_definitions(qtpropertybrowser PRIVATE QT_NO_DEPRECATED_WARNINGS) # specifically for Qt5 in ubuntu 22.04+
+target_compile_options(qtpropertybrowser PRIVATE -Wno-deprecated-declarations)
+
+
+
 target_link_libraries(qtpropertybrowser PRIVATE Flags::Default)
 
 source_group(TREE "${QTPROPERTYBROWSER_ROOT_DIR}" FILES ${QTPROPERTYBROWSER_SOURCES})

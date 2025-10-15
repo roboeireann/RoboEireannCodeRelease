@@ -213,6 +213,18 @@ if(BUILD_DESKTOP)
         IMPORTED_LOCATION_DEBUG "${PROJECTROOT_PREFIX}/Util/gtest/lib/${PLATFORM}/gtestd.lib"
         IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/gtest/lib/${PLATFORM}/gtest.lib")
   endif()
+
+  # add support for Catch2 library
+  add_library(Catch2::Catch2WithMain STATIC IMPORTED)
+  add_library(Catch2::Catch2 STATIC IMPORTED)
+  set_target_properties(Catch2::Catch2WithMain PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/Catch2/include")
+  set_target_properties(Catch2::Catch2 PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/Catch2/include")
+  if(${PLATFORM} STREQUAL Linux)
+    set_target_properties(Catch2::Catch2WithMain PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/Catch2/lib/${PLATFORM}/libCatch2Main.a")
+    set_target_properties(Catch2::Catch2 PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/Catch2/lib/${PLATFORM}/libCatch2.a")
+  endif()
+  set_target_properties(Catch2::Catch2WithMain PROPERTIES INTERFACE_LINK_LIBRARIES "Catch2::Catch2")
+
 endif()
 
 set(EIGEN_NAN_INITIALIZATION_CONDITION "$<NOT:$<CONFIG:Release>>")
@@ -329,40 +341,75 @@ if(BUILD_DESKTOP AND (${PLATFORM} STREQUAL Linux))
   set_target_properties(flite::flite PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/flite/lib/${PLATFORM}/libflite.a")
 endif()
 
-
-
-
-
 if(BUILD_NAO)
-  add_library(Nao::tflite::tflite_c_all_deps STATIC IMPORTED)
-  set_target_properties(Nao::tflite::tflite_c_all_deps PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/tflite/include")
-  set_target_properties(Nao::tflite::tflite_c_all_deps PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/lib/V6/libtflite_c_all_deps.a")
+  # Create individual library targets
+  add_library(tensorflow-lite STATIC IMPORTED)
+  add_library(ruy STATIC IMPORTED)
+  add_library(farmhash STATIC IMPORTED)
+  add_library(flatbuffers STATIC IMPORTED)
+  add_library(fft2d_fftsg STATIC IMPORTED)
+  add_library(fft2d_fftsg2d STATIC IMPORTED)
+  add_library(xnnpack STATIC IMPORTED)
+  add_library(cpuinfo STATIC IMPORTED)
+  add_library(pthreadpool STATIC IMPORTED)
 
-  # add_library(Nao::tflite::tflite STATIC IMPORTED)
-  # set_target_properties(Nao::tflite::tflite PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/tflite/include")
-  # set_target_properties(Nao::tflite::tflite PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/lib/V6/libtensorflowlite_c.a")
+  set(TFLITE_HEADERS_DIR "${PROJECTROOT_PREFIX}/Util/tflite")
+
+  set_target_properties(tensorflow-lite PROPERTIES 
+    IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libtensorflow-lite.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${TFLITE_HEADERS_DIR}") 
+  set_target_properties(ruy PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libruy.a")
+  set_target_properties(farmhash PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfarmhash.a")
+  set_target_properties(flatbuffers PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libflatbuffers.a")
+  set_target_properties(fft2d_fftsg PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfft2d_fftsg.a")
+  set_target_properties(fft2d_fftsg2d PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfft2d_fftsg2d.a")
+  set_target_properties(xnnpack PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libXNNPACK.a")
+  set_target_properties(cpuinfo PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libcpuinfo.a")
+  set_target_properties(pthreadpool PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libpthreadpool.a")
+
+  # Create the NAO-specific unified target that Nao.cmake expects
+  add_library(Nao::tflite::tflite_c_all_deps INTERFACE IMPORTED)
+  set_target_properties(Nao::tflite::tflite_c_all_deps PROPERTIES 
+    INTERFACE_INCLUDE_DIRECTORIES "${TFLITE_HEADERS_DIR}"
+    INTERFACE_LINK_LIBRARIES "tensorflow-lite;ruy;farmhash;flatbuffers;fft2d_fftsg;fft2d_fftsg2d;xnnpack;cpuinfo;pthreadpool")
 endif()
 
 if(BUILD_DESKTOP AND (${PLATFORM} STREQUAL Linux))
-  add_library(tflite::tflite_c_all_deps STATIC IMPORTED)
-  set_target_properties(tflite::tflite_c_all_deps PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/tflite/include")
-  set_target_properties(tflite::tflite_c_all_deps PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/lib/Linux/libtflite_c_all_deps.a")
+  # Create individual library targets
+  add_library(tensorflow-lite STATIC IMPORTED)
+  add_library(ruy STATIC IMPORTED)
+  add_library(farmhash STATIC IMPORTED)
+  add_library(flatbuffers STATIC IMPORTED)
+  add_library(fft2d_fftsg STATIC IMPORTED)
+  add_library(fft2d_fftsg2d STATIC IMPORTED)
+  add_library(xnnpack STATIC IMPORTED)
+  add_library(cpuinfo STATIC IMPORTED)
+  add_library(pthreadpool STATIC IMPORTED)
 
-  # add_library(tflite::tflite_c STATIC IMPORTED)
-  # set_target_properties(tflite::tflite_c PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/tflite/include")
-  # set_target_properties(tflite::tflite_c PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/lib/Linux/libtensorflowlite_c.a")
-  # add_library(tflite::tflite_lite STATIC IMPORTED)
-  # set_target_properties(tflite::tflite_lite PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/lib/Linux/libtensorflow-lite.a")
+  set(TFLITE_HEADERS_DIR "${PROJECTROOT_PREFIX}/Util/tflite")
 
-  # add_library(tflite_all INTERFACE)
-  # target_link_libraries(tflite_all INTERFACE
-  #   tflite::tflite_c
-  #   tflite::tflite_lite
-  # )
+  # Set library locations
+  set_target_properties(tensorflow-lite PROPERTIES 
+    IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libtensorflow-lite.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${TFLITE_HEADERS_DIR}") 
+  set_target_properties(ruy PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libruy.a")
+  set_target_properties(farmhash PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfarmhash.a")
+  set_target_properties(flatbuffers PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libflatbuffers.a")
+  set_target_properties(fft2d_fftsg PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfft2d_fftsg.a")
+  set_target_properties(fft2d_fftsg2d PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libfft2d_fftsg2d.a")
+  set_target_properties(xnnpack PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libXNNPACK.a")
+  set_target_properties(cpuinfo PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libcpuinfo.a")
+  set_target_properties(pthreadpool PROPERTIES IMPORTED_LOCATION "${PROJECTROOT_PREFIX}/Util/tflite/x64/libpthreadpool.a")
+
+  # REMOVE THIS LINE - it's the duplicate causing the problem:
+  # set_target_properties(tensorflow-lite PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${PROJECTROOT_PREFIX}/Util/tflite/include")
+
+  # Create the unified target that matches what NAO uses for compatibility
+  add_library(tflite::tflite_c_all_deps INTERFACE IMPORTED)
+  set_target_properties(tflite::tflite_c_all_deps PROPERTIES 
+    INTERFACE_INCLUDE_DIRECTORIES "${TFLITE_HEADERS_DIR}"
+    INTERFACE_LINK_LIBRARIES "tensorflow-lite;ruy;farmhash;flatbuffers;fft2d_fftsg;fft2d_fftsg2d;xnnpack;cpuinfo;pthreadpool")
 endif()
-
-
-
 
 
 if(NOT ${PLATFORM} STREQUAL macOSarm64)

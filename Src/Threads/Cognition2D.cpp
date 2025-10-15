@@ -10,7 +10,7 @@
 #include "Cognition2D.h"
 #include "Modules/Infrastructure/LogDataProvider/LogDataProvider.h"
 
-#include "Representations/Communication/TeamMessage2024.h"
+#include "Representations/Communication/TeamMessage2025.h"
 
 #include "Tools/Debugging/Debugging.h"
 #include "Tools/Settings.h"
@@ -42,11 +42,11 @@ void Cognition2D::afterModules()
   // needed to see which module has actually filled in the representation
   // (sendIfNeeded) in order to decide how to proceed
 
-  if (blackboard.exists("TeamMessage2024OutputGenerator") &&
-           static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"])
+  if (blackboard.exists("TeamMessage2025OutputGenerator") &&
+           static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"])
                .sendIfNeeded)
   {
-    BH_TRACE_MSG("before TeamMessage2024OutputGenerator.sendIfNeeded()");
-    static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"]).sendIfNeeded();
+    BH_TRACE_MSG("before TeamMessage2025OutputGenerator.sendIfNeeded()");
+    static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"]).sendIfNeeded();
   }
 }

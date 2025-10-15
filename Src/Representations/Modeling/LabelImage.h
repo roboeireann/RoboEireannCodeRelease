@@ -42,6 +42,8 @@ STREAMABLE(LabelImage,
     (Vector2f) upperLeft,
     (Vector2f) lowerRight,
     (Vector2f) center,
+    (int) jerseyColour,
+    (int) fallen,
     (float) distance, // mm
     (float) rotation, // radians
     (bool)(false) hidden,

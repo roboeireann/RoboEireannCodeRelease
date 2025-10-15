@@ -112,6 +112,11 @@ public:
   std::string getFullName() const { return fullName; }
 
   /**
+   * get the underlying file handle
+   */
+  void* getNativeFile() const { return stream; }
+
+  /**
    * The function returns the current BH directory,
    * e.g. /home/nao or <..>/B-Human
    * @return The current BHDir

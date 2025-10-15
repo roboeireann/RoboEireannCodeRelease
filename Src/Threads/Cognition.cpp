@@ -9,7 +9,9 @@
 #include "Modules/Infrastructure/InterThreadProviders/PerceptionProviders.h"
 #include "Modules/Infrastructure/LogDataProvider/LogDataProvider.h"
 
-#include "Representations/Communication/TeamMessage2024.h"
+#include "Representations/Communication/TeamMessage2025.h"
+
+#include "Representations/Infrastructure/LogfileLoggerStatus.h"
 
 #include "Platform/SystemCall.h"
 #include "Platform/Thread.h"
@@ -23,7 +25,7 @@ REGISTER_EXECUTION_UNIT(Cognition)
 
 thread_local bool Cognition::isUpper = false;
 
-DECL_TLOGGER(tlogger, "Cognition", TextLogging::DEBUG);
+DECL_TLOGGER(tlogger, "Cognition", TextLogging::INFO);
 
 Cognition::Cognition()
 {
@@ -39,6 +41,32 @@ Cognition::~Cognition()
 {
   Blackboard::getInstance().free("UpperFrameInfo");
   Blackboard::getInstance().free("LowerFrameInfo");
+}
+
+bool Cognition::initLogging(LogfileLogger* loggerIn, const std::string& threadName)
+{
+  (void)(threadName);
+  if (loggerIn)
+  {
+    if (logger)
+    {
+      TLOGD(tlogger, "initLogging called, but logger already set");
+      ASSERT(logger == loggerIn);
+    }
+    else
+    {
+      TLOGD(tlogger, "initLogging called, specifying logfileLogger managed by this thread");
+      logger = loggerIn;
+    }
+    // tell the logger that this thread has the GameInfo
+    // logger->setGameInfoThread(threadName);
+    return true;
+  }
+  else
+  {
+    TLOGD(tlogger, "initLogging called");
+    return false;
+  }
 }
 
 bool Cognition::beforeFrame()
@@ -98,6 +126,20 @@ bool Cognition::beforeFrame()
 
 void Cognition::beforeModules()
 {
+  Blackboard& blackboard = Blackboard::getInstance();
+  if (logger && blackboard.exists("LogfileLoggerStatus"))
+  {
+    LogfileLoggerStatus& logfileLoggerStatus = static_cast<LogfileLoggerStatus &>(blackboard["LogfileLoggerStatus"]);
+
+    LogfileLogger::State state;
+    size_t buffersToWrite;
+
+    logger->getStatus(state, buffersToWrite);
+
+    if (logfileLoggerStatus.updateStatus) // has the function been initialised by the module?
+      logfileLoggerStatus.updateStatus(state, static_cast<unsigned>(buffersToWrite));
+  }
+
   // if the modules do not finish executing in this number of ms the watchdog
   // timer will fire and interrupt the process. Modules should complete in < 33 ms
   // so 1 second should be more than enough time. If we exceed that, something
@@ -118,12 +160,12 @@ void Cognition::afterModules()
   // needed to see which module has actually filled in the representation
   // (sendIfNeeded) in order to decide how to proceed
 
-  if (blackboard.exists("TeamMessage2024OutputGenerator") &&
-           static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"])
+  if (blackboard.exists("TeamMessage2025OutputGenerator") &&
+           static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"])
                .sendIfNeeded)
   {
-    BH_TRACE_MSG("before TeamMessage2024OutputGenerator.sendIfNeeded()");
-    static_cast<const TeamMessage2024OutputGenerator &>(blackboard["TeamMessage2024OutputGenerator"]).sendIfNeeded();
+    BH_TRACE_MSG("before TeamMessage2025OutputGenerator.sendIfNeeded()");
+    static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"]).sendIfNeeded();
   }
 }
 

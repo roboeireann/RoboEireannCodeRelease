@@ -1,0 +1,111 @@
+// Anything that depends on the number of robots should have length 20, but changed to 7 for now
+// search for FIXME NUMROBOTS
+RobotStatus
+{
+  isPenalized: Boolean
+  isUpright: Boolean
+  timeWhenLastUpright: Timestamp(bits=8, shift=6, reference=relativePast)
+  sequenceNumbers: Integer(min=-1, max=14)[7] // seqNumbers wrap to 0 after 14 // FIXME NUMROBOTS
+}
+
+RobotPose
+{
+  rotation: Angle(bits=8) // Is also present in the SPLStandardMessage.
+  translation: Vector<Float(min=-32768, max=32767, bits=12)>(n=2) // Is also present in the SPLStandardMessage.
+  quality: Enum(type=RobotPose::LocalizationQuality)
+  covariance: Matrix<Float>(m=3, n=3, symmetric)
+  timestampLastJump: Timestamp(bits=8, shift=7, reference=relativePast, noclip)
+}
+
+BallModelSimplified
+{
+  lastPerception: Vector<Float(min=-32768, max=32767, bits=12)>(n=2)
+  position: Vector<Float(min=-32768, max=32767, bits=12)>(n=2) // Is also present in the SPLStandardMessage.
+  velocity: Vector<Float(min=-32768, max=32767, bits=12)>(n=2)
+  timeWhenLastSeen: Timestamp
+  timeWhenDisappeared: Timestamp
+  seenPercentage: Integer(min=0, max=50)
+}
+
+
+Whistle
+{
+  confidenceOfLastWhistleDetection: Float(min=0, max=2.55, bits=8)
+  // channelsUsedForWhistleDetection: Integer(min=0, max=4)
+  lastTimeWhistleDetected: Timestamp(bits=8, shift=6, reference=relativePast, noclip)
+}
+
+BehaviorStatus
+{
+  // activity: Enum(type=BehaviorStatus::Activity, uncompressed) // TODO: is this any use?
+  passTarget: Integer(min=-1, max=20)
+  // walkingTo: Vector<Float(min=-10000, max=10000, bits=8)>(n=2) // any use?
+  // speed: Float(min=-500.0, max=500.0, bits=10) // any use?
+  // shootingTo: Vector<Float(min=-10000, max=10000, bits=8)>(n=2) // any use?
+}
+
+TimeToReachBall
+{
+  timeWhenReachBall: Timestamp(bits=8, shift=6, reference=relativeFuture) // 64 ms resolution, 255 ticks => more than 16 s  
+  timeWhenReachBallStriker: Timestamp(bits=8, shift=6, reference=relativeFuture) // FIXME - delete?
+}
+
+TeammateRoles // how useful is this really?
+{
+  roles: Integer(min=-1, max=20)[:7] // FIXME NUMROBOTS
+  captain: Integer(min=-1, max=20)
+  timestamp: Timestamp(bits=8, shift=6, reference=relativePast)
+}
+
+PlayerRole
+{
+  role: Enum(type=PlayerRole::RoleType)
+}
+
+PassStatus // TODO simplify
+{
+  passKicker: Integer(min=-1, max=20)
+  passReceiver: Integer(min=-1, max=20)
+  numPasses: Integer(min=0, max=255) // try to count completed passes
+}
+
+TeamBehaviorStatus
+{
+  teamActivity: Enum(type=TeamBehaviorStatus::TeamActivity) // any use?
+  timeToReachBall: TimeToReachBall
+  teammateRoles: TeammateRoles
+  role: PlayerRole
+  passStatus: PassStatus
+}
+
+// Obstacle
+// {
+//   covariance: Matrix<Float>(m=2, n=2, symmetric)
+//   center: Vector<Float(min=-32768, max=32767, bits=16)>(n=2)
+//   left: Vector<Float(min=-32768, max=32767, bits=14)>(n=2)
+//   right: Vector<Float(min=-32768, max=32767, bits=14)>(n=2)
+//   lastSeen: Timestamp(bits=8, shift=6, reference=relativePast)
+//   type: Enum(type=Obstacle::Type)
+// }
+// 
+// ObstacleModel
+// {
+//   obstacles: Obstacle[:7] // FIXME NUMROBOTS
+// }
+
+FrameInfo
+{
+  time: Timestamp(bits=8, reference=relativePast)
+}
+
+TeamMessage
+{
+  theRobotStatus: RobotStatus
+  theRobotPose: RobotPose
+  theFrameInfo: FrameInfo
+  theBallModelSimplified: BallModelSimplified
+  theWhistle: Whistle
+  theBehaviorStatus: BehaviorStatus
+  theTeamBehaviorStatus: TeamBehaviorStatus
+  // theObstacleModel: ObstacleModel
+}

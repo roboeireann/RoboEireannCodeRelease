@@ -11,6 +11,8 @@
 #include "Platform/SystemCall.h"
 #include "Tools/Debugging/Annotation.h"
 #include "Tools/Math/Transformation.h"
+#include "Tools/MacroCommon.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -834,6 +836,7 @@ void ExpAutomaticCameraCalibrator::recordSampleConfiguration(const SampleConfigu
   for(const auto& sample : recordedSamples)
     recordedSampleTypes |= bit(sample->sampleType);
   ASSERT(sampleConfiguration.sampleTypes == recordedSampleTypes);
+  MAYBE_UNUSED(recordedSampleTypes);
 
   // Append the recorded samples to the array of all recorded samples.
   samples.insert(samples.end(),

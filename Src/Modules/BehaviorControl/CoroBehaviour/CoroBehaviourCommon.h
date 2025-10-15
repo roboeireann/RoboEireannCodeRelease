@@ -16,17 +16,10 @@
 // // REQUIRED by CoroBehaviourModule (and the coros it calls)
 
 #include "Representations/Configuration/BallSpecification.h"
-// #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Configuration/KickInfo.h"
-// #include "Representations/Configuration/RobotDimensions.h"
 
-// #include "Representations/Infrastructure/CameraStatus.h"
-// #include "Representations/Infrastructure/ExtendedGameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/JointAngles.h"
-// #include "Representations/Infrastructure/RobotHealth.h"
-// #include "Representations/Infrastructure/SensorData/JointSensorData.h"
-// #include "Representations/Infrastructure/SensorData/KeyStates.h"
 
 #include "Representations/MotionControl/HeadMotionInfo.h"
 #include "Representations/MotionControl/MotionInfo.h"
@@ -41,7 +34,6 @@
 #include "Representations/Sensing/ArmContactModel.h"
 #include "Representations/Sensing/FootBumperState.h"
 
-// #include "Representations/Perception/RefereeGesture.h"
 #include "Representations/Perception/StandbyReadyGesture.h"
 
 #include "Representations/Modeling/BallModel.h"
@@ -49,7 +41,6 @@
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/Modeling/BallDropInModel.h"
 #include "Representations/Modeling/TeammatesLocationModel.h"
-// #include "Representations/Modeling/TeamBallModel.h"
 
 #include "Representations/BehaviorControl/FieldBall.h"
 #include "Representations/BehaviorControl/Libraries/LibCheck.h"
@@ -58,20 +49,13 @@
 #include "Representations/BehaviorControl/PathPlanner.h"
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
 
-// #include "Representations/MotionControl/OdometryData.h"
+// PROVIDED by CoroBehaviourModule (and the coros it calls)
 
-// // PROVIDED by CoroBehaviourModule (and the coros it calls)
-
-// #include "Representations/BehaviorControl/ActivationGraph.h"
 #include "Representations/BehaviorControl/BehaviorStatus.h"
 
 #include "Representations/MotionControl/ArmMotionRequest.h"
 #include "Representations/MotionControl/HeadMotionRequest.h"
 #include "Representations/MotionControl/MotionRequest.h"
-
-// #include "Representations/Infrastructure/TeamTalk.h"
-
-// #include "Representations/Configuration/CalibrationRequest.h"
 
 
 // cards and skills compatibility

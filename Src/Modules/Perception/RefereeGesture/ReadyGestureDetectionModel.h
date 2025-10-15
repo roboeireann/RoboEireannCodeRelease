@@ -16,7 +16,8 @@
 #include <fmt/core.h>
 #include <chrono>
 #include "TFLiteHelperCopy.h"
-#include "tensorflow/lite/c/c_api.h"
+#include <tflite_c_api.h>
+#include <tflite_c_api_xnnpack_delegate.h>
 #include "Representations/Infrastructure/CameraImage.h"
 #include "Platform/Thread.h"
 

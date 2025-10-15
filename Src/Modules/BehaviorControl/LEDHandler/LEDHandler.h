@@ -11,17 +11,24 @@
 #pragma once
 
 #include "Representations/BehaviorControl/TeamBehaviorStatus.h"
-#include "Representations/Communication/GameInfo.h"
 
+#include "Representations/Communication/GameInfo.h"
 #include "Representations/Communication/TeamData.h"
+
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/LEDRequest.h"
 #include "Representations/Infrastructure/SensorData/SystemSensorData.h"
-#include "Representations/Modeling/BallModel.h"
-#include "Representations/Perception/FieldFeatures/FieldFeatureOverview.h"
-#include "Representations/Sensing/GroundContactState.h"
-#include "Tools/Module/Module.h"
 #include "Representations/Infrastructure/RobotHealth.h"
+#include "Representations/Infrastructure/LogfileLoggerStatus.h"
+
+#include "Representations/Modeling/BallModel.h"
+
+#include "Representations/Perception/FieldFeatures/FieldFeatureOverview.h"
+
+#include "Representations/Sensing/GroundContactState.h"
+
+#include "Tools/Module/Module.h"
+
 
 MODULE(LEDHandler,
 {,
@@ -35,6 +42,7 @@ MODULE(LEDHandler,
   REQUIRES(SystemSensorData),
   REQUIRES(TeamBehaviorStatus),
   REQUIRES(TeamData),
+  REQUIRES(LogfileLoggerStatus),
   PROVIDES(LEDRequest),
   DEFINES_PARAMETERS(
   {,

@@ -17,10 +17,19 @@
 #include "Representations/Sensing/GroundContactState.h"
 #include "Threads/Debug.h"
 
+#include "Tools/TextLogging.h"
+
+
+DECL_TLOGGER(tlogger, "LocalRobot", TextLogging::INFO);
+
+
 LocalRobot::LocalRobot(const Settings& settings, const std::string& robotName, Debug* debug) :
   RobotConsole(settings, robotName, connectReceiverWithRobot(debug), connectSenderWithRobot(debug)),
   updatedSignal(1)
 {
+  TLOGI(tlogger, "location = {}, scenario = {}, team {}, player {}", settings.location, settings.scenario,
+        settings.teamNumber, settings.playerNumber);
+
   mode = static_cast<ConsoleRoboCupCtrl*>(RoboCupCtrl::controller)->getMode();
   addPerRobotViews();
 

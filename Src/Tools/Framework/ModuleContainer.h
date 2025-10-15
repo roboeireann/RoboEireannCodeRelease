@@ -15,7 +15,7 @@
 
 class Debug;
 class FrameExecutionUnit;
-struct Logger;
+struct LogfileLogger;
 struct Settings;
 
 /**
@@ -39,7 +39,7 @@ private:
   ModuleGraphRunner moduleGraphRunner; /**< The solution manager handles the execution of modules. */
 
   int numberOfMessages = 0; /**< The number of debus messages at the beginning of a frame. */
-  Logger* logger; /**< Points to the only logger of this robot. */
+  LogfileLogger* logger; /**< Points to the only logger of this robot. */
 
 public:
   /**
@@ -49,7 +49,7 @@ public:
    * @param config The inital configuration of all threads.
    * @param index The index of this thread in the config.
    */
-  ModuleContainer(const Settings& settings, const std::string& robotName, const Configuration& config, const std::size_t index, Logger* logger);
+  ModuleContainer(const Settings& settings, const std::string& robotName, const Configuration& config, const std::size_t index, LogfileLogger* logger);
 
   /** The destructor frees the execution unit. */
   ~ModuleContainer();

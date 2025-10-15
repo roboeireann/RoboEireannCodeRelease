@@ -48,7 +48,9 @@ MODULE(WalkToBallAndKickEngine,
   PROVIDES(WalkToBallAndKickGenerator),
   DEFINES_PARAMETERS(
   {,
-    (Rangef)(Rangef(45.f, 60.f)) forwardFastYThreshold, /**< Relativ y ball position to kick foot. */
+    // align precisely alters rotation precision from 2 to 3 degrees, but doesn't alter x,y
+    // these val
+    (Rangef)(Rangef(40.f, 65.f)) forwardFastYThreshold, /**< Relativ y ball position to kick foot. (middle of foot is 50) */
     (Rangef)(Rangef(100.f, 215.f)) forwardFastXThreshold, /**< Relativ x ball position to kick foot. */
     (float)(240.f) forwardFastLongXMaxThreshold,  /**< Relativ max x ball position to kick foot. */
     (float)(50.f) maxBallVelocity,  /**< Max allowed ball velocity. TODO: or 150.f for some kicks? */

@@ -13,6 +13,7 @@
 #include "Tools/Math/Eigen.h"
 
 #include "Tools/TextLogging.h"
+#include "Tools/FmtCommonTypes.h"
 
 #include <algorithm>
 
@@ -67,7 +68,24 @@ void SelfLocator::update(RobotPose& robotPose)
 #endif
 
   DEBUG_RESPONSE_ONCE("module:SelfLocator:RobotPose")
-    OUTPUT_TEXT(fmt::format("TheRobotPose: {},{}",robotPose.translation.x(),robotPose.translation.y()));
+    OUTPUT_TEXT(fmt::format("TheRobotPose t{}-r{}: {:.0f} {:.0f} {:.0f}deg", theGameInfo.ourTeam().teamNumber,
+                            theGameInfo.playerNumber, robotPose.translation.x(), robotPose.translation.y(),
+                            robotPose.rotation.toDegrees()));
+
+  // this is useful to when positioning robots in the simulator if you want their coordinates
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:GroundTruthRobotPoseInSim")
+  {
+    Pose2f pose = theGroundTruthRobotPose;
+    if (theGameInfo.ourTeam().teamNumber == 1) // left side simulated team
+    {
+      pose.rotation = Angle::normalize(pose.rotation + pi);
+      pose.translation.x() = -pose.translation.x();
+      pose.translation.y() = -pose.translation.y();
+    }
+    OUTPUT_TEXT(fmt::format("GroundTruthRobotPose t{}-r{}: {:.0f} {:.0f} {:.0f}deg", theGameInfo.ourTeam().teamNumber,
+                            theGameInfo.playerNumber, pose.translation.x(), pose.translation.y(),
+                            pose.rotation.toDegrees()));
+  }
 
   /* Initialize variable(s) */
   sampleSetHasBeenReset = false;
@@ -79,16 +97,28 @@ void SelfLocator::update(RobotPose& robotPose)
   if(theCirclePercept.wasSeen)
     lastTimeCirclePerceptSeen = theFrameInfo.time;
 
-  // allow manual overriding of the self locator pose (normally in SimRobot)
-  overridePose.defendingHalf = DefendingHalf::none;
-  MODIFY_ONCE("selfLocator:overridePose", overridePose);
-
   /* Modify sample set according to certain changes of the game state:
    *  - Reset mirror in SET
    *  - Handling of penalty positions
    *  - ...
    */
   handleGameStateChanges();
+
+  // Modify samples according to ground truth (usually from simulator)
+  // If it is once, we match ground truth precisely.
+  // If it is continuous, we match ground truth to within a tolerance
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:updateFromGroundTruthOnce")
+    updateSamplesFromGroundTruth(robotPose, true);
+
+  DEBUG_RESPONSE("module:SelfLocator:updateFromGroundTruth")
+    updateSamplesFromGroundTruth(robotPose, false);
+
+  // allow manual overriding of the self locator pose from SimRobot
+  // @deprecated
+  overridePose.defendingHalf = DefendingHalf::none;
+  MODIFY_ONCE("selfLocator:overridePose", overridePose);
+  updateSamplesFromOverridePoseIfNeeded();
+
 
   /* Move all samples according to the current odometry.
    */
@@ -543,7 +573,29 @@ void SelfLocator::handleSideInformation()
   ANNOTATION("SelfLocator", "Mirrrrrrooaaaarred!");
 }
 
-void SelfLocator::handleGameStateChanges()
+
+void SelfLocator::updateSamplesFromGroundTruth(const RobotPose& robotPose, bool immediateUpdate)
+{
+  if (!immediateUpdate)
+  {
+    // check if we need an immediate update anyway due to current robotPose having diverged
+    // too far from the ground truth pose
+    immediateUpdate = ((theGroundTruthRobotPose.translation - robotPose.translation).squaredNorm() > sqr(250.f)) ||
+                      (std::abs(Angle::normalize(theGroundTruthRobotPose.rotation - robotPose.rotation)) > 20_deg);
+  }
+
+  if (immediateUpdate)
+  {
+    for(int i = 0; i < samples->size(); ++i)
+      samples->at(i).init(theGroundTruthRobotPose, penaltyShootoutPoseDeviation, nextSampleNumber++, 1.f);
+    sampleSetHasBeenReset = true;
+    idOfLastBestSample = -1;
+
+    TLOGI(tlogger, "updateSamplesFromGroundTruth: samples updated to {}", theGroundTruthRobotPose);
+  }
+}
+
+void SelfLocator::updateSamplesFromOverridePoseIfNeeded()
 {
   if (overridePose.defendingHalf != DefendingHalf::none)
   {
@@ -573,7 +625,12 @@ void SelfLocator::handleGameStateChanges()
     // OUTPUT_TEXT(fmt::format("Robot{} pose manually repositioned to SPL pose ({}deg, {},{}) = SimRobot {}", theGameInfo.playerNumber, p.rotation.toDegrees(),
     //                         p.translation.x(), p.translation.y(), mvCommand));
   }
-  else if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
+}
+
+
+void SelfLocator::handleGameStateChanges()
+{
+  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
   {
     // penalty shoot: if game state switched to playing reset samples to start position
     if((theExtendedGameInfo.gameStateLastFrame != STATE_PLAYING && theGameInfo.state == STATE_PLAYING) ||
@@ -595,7 +652,11 @@ void SelfLocator::handleGameStateChanges()
     timeOfLastReturnFromPenalty = theFrameInfo.time;
   }
   // If a penalty is over, reset samples to reenter positions
-  else if(theExtendedGameInfo.returnFromGameControllerPenalty || theExtendedGameInfo.returnFromManualPenalty || theExtendedGameInfo.startingCalibration)
+  // (Not for the first chestbutton transition from penalized/INITIAL to playing so that we can use
+  // the chest button to start in arbitrary parts of the field)
+  else if (theExtendedGameInfo.returnFromGameControllerPenalty ||
+           ((theExtendedGameInfo.gameStateLastFrame != STATE_INITIAL) && theExtendedGameInfo.returnFromManualPenalty) ||
+           theExtendedGameInfo.startingCalibration)
   {
     int startOfSecondHalfOfSampleSet = samples->size() / 2;
     // The first half of the new sample set is left of the own goal ...
@@ -625,10 +686,9 @@ void SelfLocator::handleGameStateChanges()
       samples->at(i).init(theStaticInitialPose.staticPoseOnField, manualPlacementPoseDeviation, nextSampleNumber++, 0.5f);
     sampleSetHasBeenReset = true;
   }
+
   if(sampleSetHasBeenReset)
-  {
     idOfLastBestSample = -1;
-  }
 }
 
 UKFRobotPoseHypothesis& SelfLocator::getMostValidSample()

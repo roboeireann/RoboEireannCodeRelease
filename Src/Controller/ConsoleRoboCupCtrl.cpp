@@ -571,6 +571,7 @@ void ConsoleRoboCupCtrl::help(In& stream)
     list("  mv <x> <y> <z> [<rotx> <roty> <rotz>] : Move the selected simulated robot to the given position.", pattern, true);
     list("  mvb <x> <y> <z> : Move the ball to the given position.", pattern, true);
   }
+  list("  mvrp <x> <y> [<rot>] : Move the selected simulated robot to the given position and update the robot pose (self localisation).", pattern, true);
   list("  poll : Poll for all available debug requests and drawings. ", pattern, true);
   list("  pr none | illegalBallContact | playerPushing | illegalMotionInSet | inactivePlayer | illegalPosition | leavingTheField | requestForPickup | localGameStuck | illegalPositionInSet | substitute | manual | unstiff | active | calibration : Set robot penalty or mode.", pattern, true);
   list("  save ? [<pattern>] | <key> [<path>] : Save debug data to a configuration file.", pattern, true);
@@ -813,6 +814,7 @@ void ConsoleRoboCupCtrl::createCompletion()
     "mv",
     "mvb",
     "mvo",
+    "mvrp",
     "poll",
     "robot all",
     "sc",
@@ -1007,6 +1009,16 @@ void ConsoleRoboCupCtrl::createCompletion()
     completion.insert(std::string("ar ") + name + " on");
     completion.insert(std::string("ar ") + name + " off");
   }
+
+  // Uncomment the following to see which debug requests etc have been registered
+  //
+  // if (debugRequestTable && (debugRequestTable->slowIndex.size() > sizeSlowIndex))
+  // {
+  //   sizeSlowIndex = debugRequestTable->slowIndex.size();
+  //   TLOGD(tlogger, "createCompletion: debugRequestTable.slowIndex has grown...");
+  //   for (const auto& i : debugRequestTable->slowIndex)
+  //     TLOGD(tlogger, "createCompletion:      slowIndex[{}] = {}", i.first, i.second);
+  // }
 
   currentCompletionIndex = completion.end();
 }

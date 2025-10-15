@@ -96,6 +96,8 @@ bool ReadyGestureDetectionModel::setImage(const CameraImage& cameraImage, const 
 
 void ReadyGestureDetectionModel::inferenceThreadMain() 
 {
+  Thread::nameCurrentThread("ReadyGestureInference");
+
   while(inferenceThread.isRunning())
   { 
     bool processRunning = false;

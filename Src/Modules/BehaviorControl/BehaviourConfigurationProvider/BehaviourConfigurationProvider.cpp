@@ -76,11 +76,23 @@ BehaviourConfigurationProvider::BehaviourConfigurationProvider()
 
       TLOGD(tlogger, "Loaded tactics");
     }
+
+
+    // read(theBehaviourParams, "Behaviour/behaviourParams.cfg");
+    theBehaviourParams = std::make_unique<BehaviourParams>();
+    {
+      InExprMapFile stream("Behaviour/behaviourParams.cfg", fieldSymbols);
+      ASSERT(stream.exists());
+      stream >> *theBehaviourParams;
+
+      TLOGD(tlogger, "Loaded BehaviourParams");
+    }
+
   }
+
 
   // other config files do not use field related symbols and can use default read functionality
 
-  read(theBehaviourParams, "Behaviour/behaviourParams.cfg");
 }
 
 BehaviourConfigurationProvider::~BehaviourConfigurationProvider()
