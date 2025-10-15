@@ -5,6 +5,7 @@
  *
  * @author Tim Laue
  * @author Rudi Villing
+ * @author Nathan Ewnetu
  */
 
 #include "FieldBallProvider.h"
@@ -43,6 +44,8 @@ void FieldBallProvider::update(FieldBall& fieldBall)
   checkIfBallIsPassingOwnYAxis(fieldBall);
   checkIfBallIsPassingOwnXAxis(fieldBall);
   checkIfBallIsInsideOwnPenaltyArea(fieldBall);
+  checkBallTimeToTarget(fieldBall);
+
 }
 
 void FieldBallProvider::checkIfBallIsRollingTowardsAGoal(FieldBall& fieldBall)
@@ -185,3 +188,45 @@ void FieldBallProvider::checkIfBallIsInsideOwnPenaltyArea(FieldBall& fieldBall)
       fieldBall.distanceToOwnPenaltyArea = (Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosRightPenaltyArea) - bp).norm();
   }
 }
+
+
+/**
+ * Check the time it will take for the ball to reach the target location
+ */
+void FieldBallProvider::checkBallTimeToTarget(FieldBall& fieldBall)
+{
+  const Vector2f& ballPosRel = theBallModel.estimate.position;
+  const Vector2f& ballVelRel = theBallModel.estimate.velocity;
+  const unsigned currentTime = theFrameInfo.time; // Get the current frame time
+
+  // Angle rHipPitch;
+  // Angle prevRHipPitch = 0.f;
+
+  // For verifying when max extent was in ReplayRobot
+
+//   rHipPitch = theJointAngles.angles[Joints::rHipPitch];
+//   const Angle targetPitch = -50_deg;
+//   const Angle threshold = 0.5_deg;
+// 
+//   if (theMotionInfo.isWalkPhaseInWalkKick)
+//   {
+//     // Detect the transition through the target value (more reliable)
+//     if (((prevRHipPitch > (targetPitch - threshold)) && (rHipPitch < (targetPitch - threshold))) ||
+//         (std::abs(rHipPitch - targetPitch) < threshold))
+//       OUTPUT_TEXT("[" << currentTime << "] Strike Point Detected at hip angle: " << rHipPitch);
+//   }
+//   prevRHipPitch = rHipPitch;
+
+  if (fieldBall.ballWasSeen())
+  {
+    OUTPUT_TEXT("[" << currentTime << "] Ball predicted position  x:" << ballPosRel.x());
+    OUTPUT_TEXT("Sim Ball velocity y:" << ballVelRel.y());
+  }
+
+
+  //If robot is moving, check the robotPose.rotation
+  if (theMotionInfo.executedPhase == MotionPhase::walk)
+  {
+    //OUTPUT_TEXT("[" << currentTime << "] Robot Pose Rotation: " << theRobotPose.rotation);
+  }
+} 

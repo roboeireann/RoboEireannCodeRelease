@@ -24,6 +24,7 @@
 #include "Representations/Sensing/RobotModel.h"
 #include "Representations/Sensing/TorsoMatrix.h"
 #include "Tools/Module/Module.h"
+#include "Tools/TextLogging.h"
 
 MODULE(WalkToBallAndKickEngine,
 {,
@@ -69,6 +70,7 @@ class WalkToBallAndKickEngine : public WalkToBallAndKickEngineBase
   float overrideKickPower = -1.f;
   bool lastPhaseWasKick = false;
   bool lastPhaseWasKickPossible = false;
+  DECL_TLOGGER_FN(kickLogger, "KICK_DEBUG", TextLogging::INFO);
   Vector2f lastStableBall = Vector2f(0.f, 0.f);
   /**
    * Creates the kick phase for the given request.

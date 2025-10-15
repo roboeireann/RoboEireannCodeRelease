@@ -20,5 +20,6 @@ namespace WalkKicks
     turnOut,
     forwardSteal,
     forwardAlternative,
+    ultraFast,
   });
 }

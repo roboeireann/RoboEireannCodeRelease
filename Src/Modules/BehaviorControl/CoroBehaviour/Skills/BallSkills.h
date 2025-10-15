@@ -5,6 +5,7 @@
  * 
  * @author: Rudi Villing
  * @author: Andy Lee Mitchell
+ * @author: Nathan Ewnetu
  * 
  * Note - many parts of this file are based on Skill implementations in the
  * BH2021 code release but re-written for the CoroBehaviour engine. 
@@ -138,16 +139,16 @@ namespace CoroBehaviour
      * @param ignoreObstacles always ignore obstacles if true, default behaviour if false
      * @param directionPrecision The allowed deviation of the direction in which the ball should go. 
      *                           If default, the WalkToBallAndKickEngine uses its own precision.
+     * @param movingBallKickRequest If true, the robot will kick the ball even if it is moving.
      */
     void operator()(Angle targetDirection, KickInfo::KickType kickType, bool alignPrecisely = true,
                     float length = std::numeric_limits<float>::max(), bool preStepAllowed = true,
                     bool turnKickAllowed = true, const Pose2f &speed = Pose2f(1.f, 1.f, 1.f),
                     bool ignoreObstacles = false,
-                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg))
+                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg),
+                    bool movingBallKickRequest = false)
     {
-      const Pose2f kickPose = Pose2f(targetDirection, theFieldBall.endPositionRelative)
-                                  .rotate(theKickInfo[kickType].rotationOffset)
-                                  .translate(theKickInfo[kickType].ballOffset);
+     const Pose2f kickPose = determineKickPose( movingBallKickRequest,targetDirection,kickType);
 
       behaviorStatusSkills.recordWalkingTo(kickPose.translation, 1.f);
 
@@ -161,18 +162,18 @@ namespace CoroBehaviour
         CR_WHILE(!ignoreObstacles && !goalieIgnoreObstacles(kickPose, false) && !shouldUseLibWalk(kickPose, false) &&
                       !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
-                            directionPrecision, kickPose, /* usePathPlanner: */ true, /* avoidObstacles: */ true));
+                            directionPrecision, kickPose, /* usePathPlanner: */ true, /* avoidObstacles: */ true, /* movingBallKickRequest:*/movingBallKickRequest));
 
         CR_CHECKPOINT(walkToBallNear);
         CR_WHILE(!ignoreObstacles && !goalieIgnoreObstacles(kickPose, false) && shouldUseLibWalk(kickPose, true) &&
                       !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
-                            directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ true));
+                            directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ true, /* movingBallKickRequest:*/movingBallKickRequest));
 
         CR_CHECKPOINT(walkToBallIgnoreObstacles);
         CR_WHILE((ignoreObstacles || goalieIgnoreObstacles(kickPose, true)) && !walkToBallAndKickTask.isSuccess(),
                   walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
-                            directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ false));
+                            directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ false, /* movingBallKickRequest:*/movingBallKickRequest));
 
         // has the ball been kicked?
         // FIXME: what should we do if it has not been kicked?
@@ -197,7 +198,7 @@ namespace CoroBehaviour
           // at this point we've turned if necessary so generate our final output and signal success
           CR_CHECKPOINT(kickComplete);
           walkToBall(targetDirection, kickType, alignPrecisely, length, preStepAllowed, turnKickAllowed, speed,
-                      directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ false);
+                      directionPrecision, kickPose, /* usePathPlanner: */ false, /* avoidObstacles: */ false, /* movingBallKickRequest:*/movingBallKickRequest);
           CR_EXIT_SUCCESS();
         }
       }
@@ -232,6 +233,29 @@ namespace CoroBehaviour
     Angle remainingRotation;
 
     /**
+     * Determine the kick pose based on the movingBallKickRequest
+     * @param movingBallKickRequest true if the robot should kick a moving ball 
+     * @param targetDirection The direction to which the ball should be kicked in robot-relative coordinates
+     * @param kickType The requested kick type
+     * @return The pose of the kick
+     */
+    Pose2f determineKickPose(bool movingBallKickRequest,Angle targetDirection,KickInfo::KickType kickType)
+    {
+      if(movingBallKickRequest){
+        Vector2f robotPosition = Vector2f(theFieldBall.positionRelative.x(), 0.f);
+        const Pose2f kickPose = Pose2f(targetDirection,robotPosition)
+                                  .rotate(theKickInfo[kickType].rotationOffset)
+                                  .translate(theKickInfo[kickType].ballOffset);
+        return kickPose;
+      }else{
+        const Pose2f kickPose = Pose2f(targetDirection, theFieldBall.endPositionRelative)
+                                  .rotate(theKickInfo[kickType].rotationOffset)
+                                  .translate(theKickInfo[kickType].ballOffset);
+        return kickPose;
+      } 
+    }
+
+    /**
      * return true if the robot is the goalie and should ignore obstacles now
      * @param started true if the robot is already ignoring obstacles, false otherwise
      */
@@ -257,9 +281,11 @@ namespace CoroBehaviour
     void walkToBall(Angle targetDirection, KickInfo::KickType kickType, bool alignPrecisely, float length,
                         bool preStepAllowed, bool turnKickAllowed, const Pose2f &speed,
                         const Rangea &directionPrecision, const Pose2f &kickPose,
-                        bool usePathPlanner, bool avoidObstacles)
+                        bool usePathPlanner, bool avoidObstacles, bool movingBallKickRequest)
     {
       const float kickPower = kickLengthToPower(kickType, length, targetDirection);
+      determineKickPose(movingBallKickRequest, targetDirection, kickType);
+
       auto obstacleAvoidance =
           usePathPlanner
               ? thePathPlanner.plan(theRobotPose * kickPose, speed)
@@ -269,7 +295,7 @@ namespace CoroBehaviour
 
       gotoBallHeadControlTask(kickPose.translation.norm(), /* lookAtKickTarget: */ true, kickTarget);
       walkToBallAndKickTask(targetDirection, kickType, alignPrecisely, kickPower, speed,
-                                obstacleAvoidance, preStepAllowed, turnKickAllowed, directionPrecision);
+                                obstacleAvoidance, preStepAllowed, turnKickAllowed, directionPrecision, movingBallKickRequest);
     }
 
     /**

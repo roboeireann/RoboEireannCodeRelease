@@ -69,6 +69,8 @@ STREAMABLE(MotionRequest,
   (bool)(true) preStepAllowed, /**< Is the InWalkKick allowed to have a preStep? */
   (bool)(true) turnKickAllowed, /**< Can the forward InWalkKick be executed with rotation? */
 
+  (bool)(false) movingBallKickRequest, /**< Whether the robot should kick a moving ball. */
+
   (KeyframeMotionRequest) keyframeMotionRequest, /**< The specific requested keyframe motion (only used if type is keyframeMotion). */
 
   (Pose2f) odometryData, /**< The odometry data when this request was created. */

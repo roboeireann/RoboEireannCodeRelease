@@ -56,6 +56,7 @@ STREAMABLE(KickRequest,
     stopBallEnd,
     kickForwardAndUp,
     // kicks up to here are loaded by the KickEngine
+    kickMovingBall,
     newKick,
     none,
   });

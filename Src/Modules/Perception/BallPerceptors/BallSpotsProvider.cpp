@@ -99,7 +99,7 @@ void BallSpotsProvider::searchScanLines(BallSpots& ballSpots) const
             if(!correctWithScanLeftAndRight(ballSpots.ballSpots.back(), circle, luminanceRef, saturationRef)
                || (currentLengthNeeded < minRadiusOfWantedRegion
                    && !checkGreenAround(ballSpots.ballSpots.back(), circle.radius, luminanceRef, saturationRef))
-               || isSpotClearlyInsideARobot(ballSpots.ballSpots.back(), circle.radius))
+               /*|| isSpotClearlyInsideARobot(ballSpots.ballSpots.back(), circle.radius)*/)
             {
               ballSpots.ballSpots.pop_back();
             }

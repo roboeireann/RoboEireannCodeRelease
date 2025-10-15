@@ -1,0 +1,33 @@
+cs REKickMovingBall
+
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+
+# Enable debug drawings
+dr debugDrawing3d:representation:RobotPose
+dr debugDrawing3d:representation:GameInfo:player
+
+# Disable some automatic behaviors
+ar penalizeIllegalPosition off
+ar penalizeIllegalPositionInSet off
+ar placeBall off
+ar placeBall penalizeIllegalPosition penalizeIllegalPositionInSet off
+ar switchToPlaying on
+
+
+# Enable visualizations for all robots
+robot all
+dr annotation
+
+# add in the key states stuff for head buttons
+vd representation:EnhancedKeyStates
+
+# Select robot3 for kicking
+#robot robot3
+
+# Select robot2 for predictMovingBall
+#robot robot2
+

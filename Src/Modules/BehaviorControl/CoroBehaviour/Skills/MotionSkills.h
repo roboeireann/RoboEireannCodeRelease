@@ -611,7 +611,7 @@ namespace CoroBehaviour
     void operator()(Angle targetDirection, KickInfo::KickType kickType, bool alignPrecisely, float kickPower,
                     const Pose2f &speed, const MotionRequest::ObstacleAvoidance &obstacleAvoidance,
                     bool preStepAllowed = true, bool turnKickAllowed = true,
-                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg))
+                    const Rangea &directionPrecision = Rangea(0_deg, 0_deg), bool movingBallKickRequest = false)
     {
       CRBEHAVIOUR_BEGIN();
 
@@ -630,6 +630,7 @@ namespace CoroBehaviour
         theMotionRequest.alignPrecisely = alignPrecisely;
         theMotionRequest.preStepAllowed = preStepAllowed;
         theMotionRequest.turnKickAllowed = turnKickAllowed;
+        theMotionRequest.movingBallKickRequest = movingBallKickRequest;
         theLibCheck.inc(LibCheck::motionRequest);
 
         ACTGRAPH_FMT("targetDirection: {:.1f} deg", toDegrees(targetDirection));

@@ -41,7 +41,8 @@
 #include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/BallControl.h"
 #include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/MostPasses.h"
 
-
+//Kickin' & Rollin Challenge
+#include "Modules/BehaviorControl/CoroBehaviour/Control/RE2025KickMovingBall/kickMovingBall.h"
 
 #include "Platform/BHAssert.h"
 #include "Platform/SystemCall.h"
@@ -367,6 +368,9 @@ void CoroBehaviourModule2025::registerEntryPointBehaviours()
   REGISTER_CORO(RE2022::KickLengthCalibrationAssistantTask);
   // kick tests
   REGISTER_CORO(RE2024::KickTestsAssistantTask);
+
+  //RE2025 Kickin-Rolling challenge
+  REGISTER_CORO(RE2025::MovingBallPlayerPlayingTask);
   
   TLOGD(tlogger, "behaviours registered with cororegistry");
 }

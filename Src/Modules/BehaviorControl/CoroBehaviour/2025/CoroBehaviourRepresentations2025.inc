@@ -50,6 +50,7 @@
   #include "Representations/MotionControl/MotionInfo.h"
   #include "Representations/MotionControl/WalkingEngineOutput.h"
   #include "Representations/MotionControl/ArmMotionInfo.h"
+  #include "Representations/MotionControl/WalkStepData.h"
 
   #include "Representations/Communication/GameInfo.h"
   
@@ -58,6 +59,7 @@
   #include "Representations/Sensing/FallDownState.h"
   #include "Representations/Sensing/ArmContactModel.h"
   #include "Representations/Sensing/FootBumperState.h"
+  #include "Representations/Sensing/FootSupport.h"
 
   #include "Representations/Modeling/BallModel.h"
   #include "Representations/Modeling/ObstacleModel.h"

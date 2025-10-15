@@ -42,6 +42,11 @@ STREAMABLE(KickInfo,
     walkForwardsRightAlternative,
     walkForwardsLeftAlternative,
 
+    kickMovingBallRight,
+    kickMovingBallLeft,
+    ultraFastRight,
+    ultraFastLeft,
+
     // kicks up to here are used by the KickView
     newKick,
   });

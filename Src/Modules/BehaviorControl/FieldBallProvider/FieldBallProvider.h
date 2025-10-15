@@ -17,6 +17,11 @@
 #include "Representations/Modeling/TeamBallModel.h"
 #include "Tools/Module/Module.h"
 
+#include "Representations/MotionControl/MotionInfo.h" // Include MotionInfo header
+#include "Representations/Infrastructure/JointAngles.h" // Include JointAngles header
+#include "Tools/RobotParts/Joints.h" // Include Joints header
+
+
 MODULE(FieldBallProvider,
 {,
   REQUIRES(BallModel),
@@ -25,7 +30,9 @@ MODULE(FieldBallProvider,
   REQUIRES(FrameInfo),
   REQUIRES(RobotPose),
   REQUIRES(TeamBallModel),
-  PROVIDES(FieldBall),
+  REQUIRES(MotionInfo),
+  REQUIRES(JointAngles),
+  PROVIDES(FieldBall), 
   DEFINES_PARAMETERS(
   {,
     (float)(300.f) opponentGoalpostYOffset,     /**< Assume that the opponent goal is a bit wider */
@@ -64,4 +71,7 @@ class FieldBallProvider : public FieldBallProviderBase
    * @param fieldBall The additional ball information for the behavior
    */
   void checkIfBallIsInsideOwnPenaltyArea(FieldBall& fieldBall);
+
+  //* Checks the time it will take for the ball to reach the target location
+  void checkBallTimeToTarget(FieldBall& fieldBall);
 };

@@ -132,7 +132,7 @@ void WalkKickEngine::update(WalkKickGenerator& walkKickGenerator)
     // the turn kick / the interpolation version between the forward and the turn kick might need this offset too.
     // TODO eval if the robot can execute the kick without falling, with the offsets
     if((walkKickVariant.walkKickType == WalkKicks::forwardLong || walkKickVariant.walkKickType == WalkKicks::forward))
-    {
+    { 
       Rangef maxAdditionalXRange(0.f, maxForward.max * (1.f - kick.kickInterpolation)); // for turn kicks, we do not want to start them far away
       // the robot can stand further away from the ball, if the previous step was bigger.
       xRangeMaxOffset += maxAdditionalXRange.limit(lastExecutedStep.translation.x() + maxForwardAcceleration);
@@ -143,11 +143,23 @@ void WalkKickEngine::update(WalkKickGenerator& walkKickGenerator)
     ballInRange &= ballModel.y() > dv.maxYDeviation.min && ballModel.y() < dv.maxYDeviation.max && ballModel.x() > xRange.x() && ballModel.x() < xRange.y();
     const Rangea precisionRangeWithDeviation(precisionRange.min - dv.maxAngleDeviation, precisionRange.max + dv.maxAngleDeviation);
     ballInRange &= precisionRangeWithDeviation.isInside(confAngle - walkKickVariant.direction);
+
+    if(theMotionRequest.movingBallKickRequest)
+    {
+              // For ultraFast, check if y-distance is > 180mm
+      if(std::abs(ballModel.x()) > 180.f)
+      {
+        // Ball is too far in Y direction, need to walk up first
+        ballInRange = false;
+        canKick = false;
+      }
+    }
+
     canKick &= ballInRange;
     if(canKick)
     {
       // Can the resulting step target be executed?
-      const int kickIndex = (kick.walkKickType == WalkKicks::forward || kick.walkKickType == WalkKicks::forwardLong) &&
+      const int kickIndex = (kick.walkKickType == WalkKicks::forward || kick.walkKickType == WalkKicks::forwardLong || kick.walkKickType == WalkKicks::ultraFast) &&
                             ((kick.kickLeg == Legs::left && isLeftPhase) || (kick.kickLeg == Legs::right && !isLeftPhase)) ? 1 : 0;
 
       // Get step targets
@@ -189,6 +201,7 @@ void WalkKickEngine::update(WalkKickGenerator& walkKickGenerator)
         maxClipRot.min = (1.f - kick.kickInterpolation) * maxClipRot.min + kick.kickInterpolation * refMaxClipRot.min;
         maxClipRot.max = (1.f - kick.kickInterpolation) * maxClipRot.max + kick.kickInterpolation * refMaxClipRot.max;
       }
+
       if(!canExecute(originalTargets, stepTargets, maxClipX, maxClipY, maxClipRot, kickPoseShiftY, kick.kickLeg != Legs::left) || forwardStealAbortCondition(kick))
         return false;
     }
@@ -217,7 +230,7 @@ void WalkKickEngine::update(WalkKickGenerator& walkKickGenerator)
     const bool isLeftPhase = theWalkGenerator.isNextLeftPhase(false, lastPhase);
 
     // Special handling for the forward and forwardLong kicks
-    kickIndex = ((currentKick.walkKickType == WalkKicks::forward && std::abs(currentKick.direction) < forwardPreStepSkipMaxKickAngle) || currentKick.walkKickType == WalkKicks::forwardLong) &&
+    kickIndex = ((currentKick.walkKickType == WalkKicks::forward && std::abs(currentKick.direction) < forwardPreStepSkipMaxKickAngle) || currentKick.walkKickType == WalkKicks::forwardLong || currentKick.walkKickType == WalkKicks::ultraFast) &&
                 ((currentKick.kickLeg == Legs::left && isLeftPhase) || (currentKick.kickLeg == Legs::right && !isLeftPhase)) ? 1 : 0;
 
     // TODO the kick can still be aborted in the pre step for some reason... I think. This results in a false sound
@@ -502,7 +515,7 @@ std::unique_ptr<MotionPhase> WalkKickEngine::createPhaseWithNextPhase(const Moti
     return std::unique_ptr<MotionPhase>();
   }
 
-  if(forwardStealAbortCondition(currentKick))
+  if(forwardStealAbortCondition(currentKick) && !theMotionRequest.movingBallKickRequest)
     return std::unique_ptr<MotionPhase>();
 
   // Ball was not seen for a too long time
@@ -539,7 +552,8 @@ std::unique_ptr<MotionPhase> WalkKickEngine::createPhaseWithNextPhase(const Moti
     maxClipRot.min = -maxClipBeforAbortForwardSteal.rotation;
     maxClipRot.max = maxClipBeforAbortForwardSteal.rotation;
   }
-  if(!canExecute(originalTargets, stepTargets, maxClipX, maxClipY, maxClipRot, currentKickPoseShiftY, currentKick.kickLeg != Legs::left))
+  
+  if(!canExecute(originalTargets, stepTargets, maxClipX, maxClipY, maxClipRot, currentKickPoseShiftY, currentKick.kickLeg != Legs::left) && !theMotionRequest.movingBallKickRequest)
   {
     if(kickIndex > 0 && !theWalkGenerator.wasLastPhaseInWalkKick(lastPhase) && (currentKick.walkKickType == WalkKicks::forward || currentKick.walkKickType == WalkKicks::forwardLong))
       OUTPUT_ERROR("WalkKickEngine: kick was aborted that should not have been aborted!");
