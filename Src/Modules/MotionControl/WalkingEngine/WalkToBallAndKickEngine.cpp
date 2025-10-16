@@ -69,6 +69,14 @@ void WalkToBallAndKickEngine::update(WalkToBallAndKickGenerator& walkToBallAndKi
         isInPositionForKick = -ballPosition.y() > forwardFastYThreshold.min && -ballPosition.y() < forwardFastYThreshold.max && ballPosition.x() < (motionRequest.kickType == KickInfo::forwardFastRightLong ? forwardFastLongXMaxThreshold : forwardFastXThreshold.max) && ballPosition.x() > forwardFastXThreshold.min;
         isInPositionForKick &= std::abs(targetDirection + theKickInfo[motionRequest.kickType].rotationOffset) < directionThreshold;
         break;
+      case KickInfo::forwardRightLonger:
+        isInPositionForKick = -ballPosition.y() > forwardLongerYThreshold.min && -ballPosition.y() < forwardLongerYThreshold.max && ballPosition.x() < (motionRequest.kickType == KickInfo::forwardRightLonger ? forwardFastLongXMaxThreshold : forwardLongerXThreshold.max) && ballPosition.x() > forwardLongerXThreshold.min;
+        isInPositionForKick &= std::abs(targetDirection + theKickInfo[motionRequest.kickType].rotationOffset) < directionThreshold;
+        break;
+      case KickInfo::forwardLeftLonger:
+        isInPositionForKick = ballPosition.y() > forwardLongerYThreshold.min && ballPosition.y() < forwardLongerYThreshold.max && ballPosition.x() < (motionRequest.kickType == KickInfo::forwardLeftLonger ? forwardFastLongXMaxThreshold : forwardLongerXThreshold.max) && ballPosition.x() > forwardLongerXThreshold.min;
+        isInPositionForKick &= std::abs(targetDirection + theKickInfo[motionRequest.kickType].rotationOffset) < directionThreshold;
+        break;
       case KickInfo::walkForwardsLeft:
       case KickInfo::walkForwardsLeftLong:
       case KickInfo::walkForwardsRight:
@@ -252,6 +260,30 @@ std::unique_ptr<MotionPhase> WalkToBallAndKickEngine::createKickPhase(const Moti
 
           const Vector3f strikeOut(kickFootX.x(), ball.y(), kickFootZ.x()), kickTo(kickFootX.y(), ball.y(), kickFootZ.y());
           const DynPoint dynRFoot2(Phase::rightFootTra, 2, strikeOut), dynRFoot3(Phase::rightFootTra, 3, kickTo);
+
+          d.push_back(dynRFoot2);
+          d.push_back(dynRFoot3);
+          break;
+        }
+        case KickRequest::kickForwardLonger:
+        {
+          if(ball.y() > 0.f)
+            ball.y() *= -1.f;
+          
+          // RoboCup 2021 shift. Should be based on internal sensor data
+          //ball.y() -= Rangef(0.f, 40.f).limit((ball.x() - 200.f)); //this is a hit correction factor
+          ball.y() -= 5.f; // this is a hit correction factor
+
+          //clipping
+          forwardFastYClipRange.clamp(ball.y());
+
+          const Vector2f kickFootX(-75.f, 75.f); // Wider range for longer kick
+          const Vector2f kickFootZ(-190.f + usePower * 20.f, -190.f + usePower * 10.f); // Slightly different heights
+
+          const Vector3f strikeOut(kickFootX.x(), ball.y(), kickFootZ.x());
+          const Vector3f kickTo(kickFootX.y(), ball.y(), kickFootZ.y());
+          const DynPoint dynRFoot2(Phase::rightFootTra, 2, strikeOut);
+          const DynPoint dynRFoot3(Phase::rightFootTra, 3, kickTo);
 
           d.push_back(dynRFoot2);
           d.push_back(dynRFoot3);

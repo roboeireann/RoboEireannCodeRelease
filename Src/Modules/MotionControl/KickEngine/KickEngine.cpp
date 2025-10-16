@@ -135,7 +135,7 @@ bool KickPhase::isDone(const MotionRequest& motionRequest) const
    */
   // kick finished or the kick was type none
   // to allow an abort for the kicks, the kick must be checked and the phaseNumber must be below the kicking phase (foot moves forward)
-  bool isKickForward = currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong;
+  bool isKickForward = currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong || currentKickRequest.kickMotionType == KickRequest::kickForwardLonger;
   const Legs::Leg legOfInterest = engine.theFootSupport.support > 0.f ? Legs::right : Legs::left;
   const bool earlyExitAllowed = (engine.theFootSupport.switched && data.phaseNumber >= data.currentParameters.keyframeEarlyExitAllowedSafe && data.currentParameters.keyframeEarlyExitAllowedSafe != -1// safe check
                                  && ((data.phaseNumber == data.currentParameters.keyframeEarlyExitAllowedSafe && data.phase > 0.8f && currentKickRequest.mirror == (legOfInterest == Legs::left)) || (data.phaseNumber > data.currentParameters.keyframeEarlyExitAllowedSafe))) || // make sure, we do not accept false switches
@@ -152,7 +152,7 @@ void KickPhase::calcJoints(const MotionRequest&, JointRequest& jointRequest, Pos
   jointRequest = jointRequestOutput;
   odometryOffset = data.odometryOutput;
   // while both feet are parallel to each other, the motion is still stable enough to allow perception stuff
-  if((currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong) && data.phaseNumber < 2)
+  if((currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong || currentKickRequest.kickMotionType == KickRequest::kickForwardLonger) && data.phaseNumber < 2)
     motionInfo.isMotionStable = true;
   else
     motionInfo.isMotionStable = false;

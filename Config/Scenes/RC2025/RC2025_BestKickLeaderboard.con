@@ -1,0 +1,20 @@
+# for the visual ref, the location is default and the scenario is as follows
+cs RC2025-BestKick
+
+call Includes/Normal
+
+# all views are defined in another script
+call Includes/Views
+
+# switch off the game time
+dr debugDrawing3d:representation:GameInfo off
+dr debugDrawing3d:representation:GameInfo:scores off
+
+# switch off some automatic referee features
+ar placeBall penalizeIllegalPosition penalizeIllegalPositionInSet off
+
+# add in the key states stuff for head buttons
+vd representation:EnhancedKeyStates
+
+
+

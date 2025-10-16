@@ -52,7 +52,9 @@ MODULE(WalkToBallAndKickEngine,
     // these val
     (Rangef)(Rangef(40.f, 65.f)) forwardFastYThreshold, /**< Relativ y ball position to kick foot. (middle of foot is 50) */
     (Rangef)(Rangef(100.f, 215.f)) forwardFastXThreshold, /**< Relativ x ball position to kick foot. */
-    (float)(240.f) forwardFastLongXMaxThreshold,  /**< Relativ max x ball position to kick foot. */
+    (Rangef)(Rangef(45.f, 50.f)) forwardLongerYThreshold,
+    (Rangef)(Rangef(140.f, 190.f)) forwardLongerXThreshold,
+    (float)(200.f) forwardFastLongXMaxThreshold,  /**< Relativ max x ball position to kick foot. */
     (float)(50.f) maxBallVelocity,  /**< Max allowed ball velocity. TODO: or 150.f for some kicks? */
     (Pose2f)(Pose2f(20_deg, 20.f, 10.f)) forwardStealStepPlanningThreshold, /**< Max needed step size for reach position for forwardSteal, to start V-Shape position. */
     (float)(100.f) kickPoseMaxYTranslation, /**< Kick pose y-Translation must be smaller than this threshold. */

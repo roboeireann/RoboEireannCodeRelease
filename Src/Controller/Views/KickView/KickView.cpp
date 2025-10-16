@@ -206,11 +206,16 @@ void KickViewHeaderedWidget::newButtonClicked()
 
 void KickViewHeaderedWidget::loadButtonClicked()
 {
+  /*
   char dirname[260];
   sprintf(dirname, "%s/Config/KickEngine/", File::getBHDir());
   fileName = QFileDialog::getOpenFileName(this, tr("Open Kick Motion"), dirname, tr("Kick Motion Config Files (*.kmc)"));
   QString name;
   name = fileName.remove(0, fileName.lastIndexOf("/", fileName.lastIndexOf("/") - 1) + 1);
+  */
+
+  QString name;
+  name = QString("/home/nathan/robocup/rematch/Config/KickEngine/kickForwardLonger.kmc");
 
   InMapFile stream(name.toUtf8().constData());
   if(stream.exists())

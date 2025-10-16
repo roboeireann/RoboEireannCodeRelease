@@ -155,7 +155,7 @@ bool KickEngineData::calcJoints(const InertialData& inertialData, JointRequest& 
     }
 
     if(phaseNumber < currentParameters.numberOfPhases && calcSideCorrection &&
-       (currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong))
+       (currentKickRequest.kickMotionType == KickRequest::kickForwardFast || currentKickRequest.kickMotionType == KickRequest::kickForwardFastLong || currentKickRequest.kickMotionType == KickRequest::kickForwardLonger))
     {
       // get feet pose
       const Vector3f leftRot = positions[Phase::leftFootRot];

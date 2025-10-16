@@ -40,6 +40,7 @@
 #include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/FastestWalk.h"
 #include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/BallControl.h"
 #include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/MostPasses.h"
+#include "Modules/BehaviorControl/CoroBehaviour/Control/RC2025Leaderboards/BestKickLeaderboard.h"
 
 
 
@@ -356,13 +357,15 @@ void CoroBehaviourModule2025::registerEntryPointBehaviours()
   REGISTER_CORO(RC2025::Leaderboards::FastestWalkTask);
   REGISTER_CORO(RC2025::Leaderboards::BallControlTask);
   REGISTER_CORO(RC2025::Leaderboards::MostPassesPlayingStateTask);
+  REGISTER_CORO(RC2025::Leaderboards::BestKickTask);
+
 
   // RE2025 Game specific tasks
   REGISTER_CORO(RE2025::StandbyStateTask);
   REGISTER_CORO(RE2025::ReadyStateTask);
   REGISTER_CORO(RE2025::PlayingStateTask);
   REGISTER_CORO(RE2025::PlayingStatePositioningTestTask);
-  
+
   // kick length calibration
   REGISTER_CORO(RE2022::KickLengthCalibrationAssistantTask);
   // kick tests
