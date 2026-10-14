@@ -63,6 +63,7 @@ private:
   void deleteRegisteredObject(RegisteredObject* registeredObject);
 
   void contextMenuEvent(QContextMenuEvent* event) override;
+  void changeEvent(QEvent* event) override;
 
 private slots:
   void itemActivated(const QModelIndex& index);
@@ -71,6 +72,4 @@ private slots:
 
   void openOrCloseObject();
   void expandOrCollapseObject();
-
-  void topLevelChanged(bool topLevel);
 };

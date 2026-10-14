@@ -1,0 +1,324 @@
+// WARNING: latest perceptors not integrated here
+// compare to threads.cfg first
+
+// thread config for RoboEireann behaviour 2026
+
+defaultRepresentations = [
+  GroundTruthRobotPose,
+  JointAnglePred,
+  JointPlay,
+  KickGenerator,
+  ObstaclesFieldPercept,
+  // ObstaclesImagePercept,
+  PhotoModeGenerator,
+  ReplayWalkRequestGenerator,
+
+  // 2025 Challenges and Leaderboards
+  BestKickState,
+  FastestWalkState,
+  RollingBallState,
+
+  // Nao stuff no longer used
+  BallHoldingState,
+  BodyContour,
+  CameraStatus,
+  // AutoExposureWeightTable,
+
+  // Nao lower camera stuff specifically
+  LowerFrameInfo,
+  OtherFieldBoundary,
+  OtherObstaclesPerceptorData,
+  OtherOdometryData,
+
+  // BH behaviour stuff not used
+  AgentStates, // FIXME tmp workaround for LibLookActiveProvider, IllegalAreaProvider
+  IllegalAreas, // FIXME tmp workaround for LibWalkProvider
+  IndirectKick, // FIXME tmp
+  ReceivedTeamMessages, // FIXME tmp workaround for ObstacleModelProvider, IndirectKickProvider
+  RefereeDetectionRequest, // FIXME tmp workaround
+  SentTeamMessage, // FIXME tmp workaround for TeamBallModelProvider
+  // SkillRequest,
+  StrategyStatus, // FIXME tmp workaround for LEDHandler, IllegalAreaProvider
+  TeamData, // FIXME tmp workaround for BallPerceptFilter
+  REStandbyReadyGesture,
+  // RESetPlayRefereeGesture,
+];
+threads = [
+  {
+    name = Upper;
+    priority = 0;
+    debugReceiverSize = 2800000;
+    debugSenderSize = 5200000;
+    debugSenderInfrastructureSize = 100000;
+    executionUnit = Perception;
+    representationProviders = [
+      {representation = BallPercept; provider = BallAndPenaltyMarkPerceptor;},
+      {representation = BallSpecification; provider = ConfigurationDataProvider;},
+      {representation = BallSpots; provider = TRTMultiPerceptor;},
+      {representation = CameraImage; provider = MIPICameraProvider;},
+      {representation = CameraInfo; provider = MIPICameraProvider;},
+      {representation = CameraIntrinsics; provider = MIPICameraProvider;},
+      {representation = CameraMatrix; provider = CameraMatrixProvider;},
+      {representation = CirclePercept; provider = LinePerceptor;},
+      {representation = ColorScanLineRegionsHorizontal; provider = ScanLineRegionizer;},
+      {representation = ColorScanLineRegionsVerticalClipped; provider = ScanLineRegionizer;},
+      {representation = ECImage; provider = ECImageProvider;},
+      {representation = FieldBoundary; provider = FieldBoundaryProvider;},
+      {representation = FieldDimensions; provider = ConfigurationDataProvider;},
+      {representation = FieldLineIntersections; provider = FieldLinesProvider;},
+      {representation = FieldLines; provider = FieldLinesProvider;},
+      {representation = FrameInfo; provider = MIPICameraProvider;},
+      {representation = ImageCoordinateSystem; provider = CoordinateSystemProvider;},
+      {representation = IntersectionsPercept; provider = IntersectionsProvider;},
+      {representation = JerseyClassifier; provider = JerseyClassifierProvider2020For2023;},
+      {representation = JPEGImage; provider = MIPICameraProvider;},
+      {representation = LinesPercept; provider = LinePerceptor;},
+      {representation = MeasurementCovariance; provider = LegacyMeasurementCovarianceProvider;},
+      // {representation = ObstaclesFieldPercept; provider = RobotDetector;}, // TODO
+      // {representation = ObstaclesImagePercept; provider = RobotDetector;}, // TODO
+      {representation = ObstaclesImagePercept; provider = TRTMultiPerceptor;},
+      // {representation = ObstaclesPerceptorData; provider = RobotDetector;}, // TODO
+      {representation = OdometryData; provider = ImageFrameProvider;},
+      {representation = OptionalCameraImage; provider = OptionalCameraImageProvider;},
+      {representation = OptionalECImage; provider = ECImageProvider;},
+      {representation = PenaltyMarkPercept; provider = BallAndPenaltyMarkPerceptor;},
+      {representation = PenaltyMarkRegions; provider = PenaltyMarkRegionsProvider;},
+      {representation = RelativeFieldColors; provider = RelativeFieldColorsProvider;},
+      {representation = RelativeFieldColorsParameters; provider = ConfigurationDataProvider;},
+      {representation = RobotCameraMatrix; provider = RobotCameraMatrixProvider;},
+      {representation = RobotDimensions; provider = ConfigurationDataProvider;},
+      {representation = ScanGrid; provider = ScanGridProvider;},
+    ];
+  }, {
+    name = Cognition;
+    priority = 1;
+    debugReceiverSize = 2000000;
+    debugSenderSize = 2000000;
+    debugSenderInfrastructureSize = 200000;
+    executionUnit = Cognition;
+    representationProviders = [
+      {representation = FrameInfo; provider = UpperFrameInfoProvider;},
+      {representation = OdometryData; provider = MotionProvider;}, // TODO check this provider for issues
+
+      {representation = AlternativeRobotPoseHypothesis; provider = AlternativeRobotPoseProvider;},
+      {representation = BallContactChecker; provider = BallContactCheckerProvider;},
+      {representation = BallDropInModel; provider = BallDropInLocator;},
+      {representation = BallInGoal; provider = BallInGoalTracker;},
+      {representation = BallLostModel; provider = BallLostProvider;},
+      {representation = BallModel; provider = BallStateEstimator;},
+      {representation = BallSearchParticles; provider = BallSearchParticlesProvider;},
+      {representation = BallSpecification; provider = ConfigurationDataProvider;},
+      {representation = BehaviorParameters; provider = ConfigurationDataProvider;},
+      {representation = CameraCalibration; provider = AutomaticCameraCalibrator;},
+      {representation = CameraCalibrationStatus; provider = AutomaticCameraCalibrator;},
+      {representation = CameraResolutionRequest; provider = AutomaticCameraCalibrator;},
+      {representation = CenterCircleWithLine; provider = CenterCircleWithLinePerceptor;},
+      {representation = ClearTarget; provider = ClearTargetProvider;},
+      {representation = CustomCalibrationLines; provider = CustomCalibrationLinesProvider;},
+      {representation = DamageConfigurationBody; provider = ConfigurationDataProvider;},
+      {representation = DamageConfigurationHead; provider = ConfigurationDataProvider;},
+      // {representation = DribbleTarget; provider = DribbleTargetProvider;}, // TODO
+      {representation = EnhancedKeyStates; provider = KeyStateEnhancer;},
+      {representation = ExpectedGoals; provider = ExpectedGoalsProvider;},
+      {representation = ExtendedGameState; provider = ExtendedGameStateProvider;},
+      {representation = FieldBall; provider = FieldBallProvider;},
+      {representation = FieldDimensions; provider = ConfigurationDataProvider;},
+      {representation = FieldInterceptBall; provider = FieldInterceptBallProvider;},
+      // {representation = FieldRating; provider = FieldRatingProvider;}, // TODO
+      {representation = FilteredBallPercepts; provider = BallPerceptFilter;},
+      {representation = FrameInfoEx; provider = FrameInfoExProvider;},
+      {representation = GameControllerData; provider = GameControllerDataProvider;},
+      {representation = GamePadEx; provider = GamePadExProvider;},
+      {representation = GameState; provider = GameStateProvider;},
+      {representation = GlobalOpponentsModel; provider = GlobalOpponentsTracker;},
+      {representation = GlobalTeammatesModel; provider = GlobalTeammatesTracker;},
+      {representation = HeadLimits; provider = ConfigurationDataProvider;},
+      // {representation = IllegalAreas; provider = IllegalAreaProvider;}, // TODO
+      {representation = IMUCalibration; provider = IMUCalibrationProvider;},
+      // {representation = IndirectKick; provider = IndirectKickProvider;},
+      {representation = JointLimits; provider = ConfigurationDataProvider;},
+      {representation = KickInfo; provider = ConfigurationDataProvider;},
+      {representation = LedRequestK1; provider = LedProviderK1;},
+      {representation = LibCheck; provider = LibCheckProvider;},
+      {representation = LibDemo; provider = LibDemoProvider;},
+      {representation = LibLookActive; provider = LibLookActiveProvider;},
+      {representation = LibPosition; provider = LibPositionProvider;},
+      {representation = LibWalk; provider = LibWalkProvider;},
+      {representation = LineCorrector; provider = HoughLineCorrector;},
+      {representation = ObstacleModel; provider = ObstacleModelProvider;},
+      {representation = Odometer; provider = OdometerProvider;},
+      {representation = PassEvaluation; provider = PassEvaluationProvider;},
+      {representation = PathPlanner; provider = PathPlannerProvider;},
+      {representation = PenaltyAreaAndGoalArea; provider = PenaltyAreaAndGoalAreaPerceptor;},
+      {representation = PenaltyMarkWithPenaltyAreaLine; provider = PenaltyMarkWithPenaltyAreaLinePerceptor;},
+      {representation = PerceptRegistration; provider = PerceptRegistrationProvider;},
+      {representation = RobotDimensions; provider = ConfigurationDataProvider;},
+      {representation = RobotHealth; provider = RobotHealthProvider;},
+      {representation = RobotPose; provider = SelfLocator;},
+      {representation = SelfLocalizationHypotheses; provider = SelfLocator;},
+      {representation = SetupPoses; provider = SetupPosesProvider;},
+      {representation = SideInformation; provider = SideInformationProvider;},
+      {representation = StaticInitialPose; provider = StaticInitialPoseProvider;},
+      {representation = TeamBallModel; provider = TeamBallModelProvider;},
+      {representation = WorldModelPrediction; provider = WorldModelPredictor;},
+
+      // BH behaviour and dependencies
+      // {representation = ActivationGraph; provider = SkillBehaviorControl;},
+      // {representation = AgentStates; provider = StrategyBehaviorControl;},
+      // {representation = ArmMotionRequest; provider = SkillBehaviorControl;},
+      // {representation = BehaviorStatus; provider = SkillBehaviorControl;},
+      // {representation = BHumanMessageOutputGenerator; provider = TeamMessageHandler;},
+      // {representation = CalibrationRequest; provider = SkillBehaviorControl;},
+      // {representation = HeadMotionRequest; provider = SkillBehaviorControl;},
+      // {representation = MotionRequest; provider = SkillBehaviorControl;},
+      // {representation = ReceivedTeamMessages; provider = TeamMessageHandler;},
+      // {representation = RefereeDetectionRequest; provider = SkillBehaviorControl;},
+      // {representation = SentTeamMessage; provider = TeamMessageHandler;},
+      // {representation = SkillRequest; provider = StrategyBehaviorControl;},
+      // {representation = StrategyStatus; provider = StrategyBehaviorControl;},
+      // {representation = TeamData; provider = TeamDataProvider;},
+
+      // RE specific modules
+      {representation = REGameConfig; provider = ConfigurationDataProvider;},      
+      {representation = REBehaviourParams; provider = REBehaviourConfigurationProvider;},
+      {representation = REFormations; provider = REBehaviourConfigurationProvider;},
+      {representation = RETactics; provider = REBehaviourConfigurationProvider;},
+      {representation = RETeammatesLocationModel; provider = RETeammatesLocator;},
+
+      // RE TeamComms 2025
+      {representation = RETeamData; provider = RETeamMessageHandler2025;},
+      {representation = RETeamMessage2025OutputGenerator; provider = RETeamMessageHandler2025;},
+      {representation = RESentTeamMessage2025; provider = RETeamMessageHandler2025;},
+      {representation = REMessageDesirability; provider = RETeamMessageHandler2025;},
+
+      // RE HybridBehaviour - not ready yet
+      // {representation = ActivationGraph; provider = REHybridBehaviourModule;},
+      // {representation = ArmMotionRequest; provider = REHybridBehaviourModule;},
+      // {representation = BehaviorStatus; provider = REHybridBehaviourModule;},
+      // {representation = CalibrationRequest; provider = REHybridBehaviourModule;},
+      // {representation = HeadMotionRequest; provider = REHybridBehaviourModule;},
+      // {representation = MotionRequest; provider = REHybridBehaviourModule;},
+      // {representation = TeamBehaviorStatus; provider = REHybridBehaviourModule;},
+      // {representation = REActiveTactic; provider = REHybridBehaviourModule;},
+
+      // RE CoroBehaviourModule2025 and TeamBehaviourModule2025
+      {representation = ActivationGraph; provider = CoroBehaviourModule2025;},
+      {representation = ArmMotionRequest; provider = CoroBehaviourModule2025;},
+      {representation = BehaviorStatus; provider = CoroBehaviourModule2025;},
+      {representation = CalibrationRequest; provider = CoroBehaviourModule2025;},
+      {representation = HeadMotionRequest; provider = CoroBehaviourModule2025;},
+      {representation = MotionRequest; provider = CoroBehaviourModule2025;},
+      {representation = TeamActivationGraph; provider = TeamBehaviourModule2025;},
+      {representation = TeamBehaviorStatus; provider = TeamBehaviourModule2025;},
+      {representation = REActiveTactic; provider = TeamBehaviourModule2025;},
+    ];
+  }, {
+    name = Motion;
+    priority = 20;
+    debugReceiverSize = 500000;
+    debugSenderSize = 130000;
+    debugSenderInfrastructureSize = 100000;
+    executionUnit = Motion;
+    representationProviders = [
+      {representation = ArmContactModel; provider = ArmContactModelProvider;},
+      {representation = ArmKeyFrameGenerator; provider = ArmKeyFrameEngine;},
+      {representation = ArmMotionInfo; provider = MotionEngine;},
+      {representation = BallSpecification; provider = ConfigurationDataProvider;},
+      {representation = CameraIntrinsics; provider = ConfigurationDataProvider;},
+      {representation = DamageConfigurationBody; provider = ConfigurationDataProvider;},
+      {representation = DamageConfigurationHead; provider = ConfigurationDataProvider;},
+      {representation = DiveGenerator; provider = KeyframeMotionEngine;},
+      {representation = DribbleGenerator; provider = DribbleEngine;},
+      {representation = EnergySaving; provider = EnergySavingProvider;},
+      {representation = FallDownState; provider = BoosterFallDownStateProvider;},
+      {representation = FallGenerator; provider = RestrictiveFallEngine;},
+      {representation = FieldDimensions; provider = ConfigurationDataProvider;},
+      {representation = FilteredCurrent; provider = FilteredCurrentProvider;},
+      {representation = FootBumperState; provider = FootBumperStateProvider;},
+      {representation = FootSupport; provider = ExtendedFootSupportProvider;},
+      {representation = FrameInfo; provider = BoosterK1Provider;},
+      {representation = FreeBallHoldingGenerator; provider = FreeBallHoldingEngine;},
+      {representation = FreezeGenerator; provider = FreezeEngine;},
+      {representation = FsrSensorData; provider = BoosterSolePressureStateProvider;},
+      {representation = GetUpGenerator; provider = RLGetUpEngine;}, // was: KeyframeMotionEngine
+      {representation = GamePad; provider = BoosterK1Provider;},
+      {representation = GroundContactState; provider = GroundContactDetector;},
+      {representation = GyroOffset; provider = GyroOffsetProvider;},
+      {representation = HeadLimits; provider = ConfigurationDataProvider;},
+      {representation = HeadMotionGenerator; provider = HeadMotionEngine;},
+      {representation = HeadMotionInfo; provider = MotionEngine;},
+      {representation = IMUValueState; provider = IMUValueStateProvider;},
+      {representation = InertialData; provider = InertialDataProvider;},
+      {representation = InertialSensorData; provider = InertialSensorDataProvider;},
+      {representation = InterceptBallGenerator; provider = InterceptBallProvider;},
+      {representation = InternalState; provider = InternalStateProvider;},
+      {representation = JointAngles; provider = JointAnglesProvider;},
+      {representation = JointCalibration; provider = ConfigurationDataProvider;},
+      {representation = JointLimits; provider = ConfigurationDataProvider;},
+      {representation = JointPlayTranslation; provider = JointPlayTranslationProvider;},
+      {representation = JointRequest; provider = MotionEngine;},
+      {representation = JointSensorData; provider = BoosterK1Provider;},
+      {representation = KeyframeMotionGenerator; provider = KeyframeMotionEngine;},
+      {representation = KeyframeMotionParameters; provider = ConfigurationDataProvider;},
+      {representation = KeyStates; provider = BoosterK1Provider;},
+      {representation = KickInfo; provider = ConfigurationDataProvider;},
+      {representation = MassCalibration; provider = ConfigurationDataProvider;},
+      {representation = ModifiedJointRequest; provider = ModifiedJointRequestProvider;},
+      {representation = MotionInfo; provider = MotionEngine;},
+      {representation = MotionRobotHealth; provider = MotionRobotHealthProvider;},
+      {representation = OdometryData; provider = MotionEngine;},
+      {representation = OdometryDataPreview; provider = OdometryDataPreviewProvider;},
+      {representation = OdometryTranslationRequest; provider = OdometryDataPreviewProvider;},
+      {representation = PrepareGenerator; provider = PrepareEngine;},
+      {representation = PointAtGenerator; provider = PointAtEngine;},
+      {representation = RawInertialSensorData; provider = BoosterK1Provider;},
+      {representation = RobotDimensions; provider = ConfigurationDataProvider;},
+      {representation = RobotModel; provider = RobotModelProvider;},
+      {representation = RobotSafetyState; provider = BoosterK1Provider;},
+      {representation = RobotStableState; provider = BoosterRobotStableStateProvider;},
+      {representation = SolePressureState; provider = SolePressureStateProvider;},
+      {representation = SpecialGenerator; provider = KeyframeMotionEngine;},
+      {representation = StandGenerator; provider = RERLWalkingEngine;},            // RLWalkingEngine for BHuman default walk
+      {representation = StaticJointPoses; provider = ConfigurationDataProvider;},
+      {representation = StiffnessSettings; provider = ConfigurationDataProvider;},
+      {representation = SystemSensorData; provider = BoosterK1Provider;},
+      {representation = TorsoMatrix; provider = TorsoMatrixProvider;},
+      {representation = WalkAtAbsoluteSpeedGenerator; provider = WalkAtSpeedEngine;},
+      {representation = WalkAtRelativeSpeedGenerator; provider = WalkAtSpeedEngine;},
+      {representation = WalkGenerator; provider = RERLWalkingEngine;},             // RLWalkingEngine for BHuman default walk
+      {representation = WalkingEngineOutput; provider = RERLWalkingEngine;},       // RLWalkingEngine for BHuman default walk
+      {representation = WalkKickGenerator; provider = WalkKickEngine;},
+      {representation = WalkLearner; provider = WalkLearnerProvider;},
+      {representation = WalkOutOfBallDirection; provider = WalkOutOfBallDirectionProvider;},
+      {representation = WalkStepData; provider = RERLWalkingEngine;},             // RLWalkingEngine for BHuman default walk
+      {representation = WalkToBallAndKickGenerator; provider = WalkToBallAndKickEngine;},
+      {representation = WalkToBallGenerator; provider = WalkToBallEngine;},
+      {representation = WalkToPoseGenerator; provider = WalkToPoseEngine;},
+    ];
+  }, {
+    name = Audio;
+    priority = 0;
+    debugReceiverSize = 500000;
+    debugSenderSize = 2000000;
+    debugSenderInfrastructureSize = 100000;
+    executionUnit = Audio;
+    representationProviders = [
+      {representation = AudioData; provider = REAudioProvider;},
+      {representation = DamageConfigurationHead; provider = ConfigurationDataProvider;},
+      {representation = FrameInfo; provider = REAudioProvider;},
+      {representation = Whistle; provider = REWhistleDetector;},
+    ];
+  }, {
+    name = Referee;
+    priority = 0;
+    debugReceiverSize = 500000;
+    debugSenderSize = 2000000;
+    debugSenderInfrastructureSize = 100000;
+    executionUnit = Referee;
+    representationProviders = [
+      {representation = FieldDimensions; provider = ConfigurationDataProvider;},
+      {representation = RefereeGesture; provider = RefereeGestureClassifier;},
+      {representation = RefereeSignal; provider = RefereeSignalDetector;},
+    ];
+  },
+];

@@ -13,7 +13,7 @@
 #include "Representations/Perception/ImagePreprocessing/ECImage.h"
 #include "Representations/Perception/ImagePreprocessing/RelativeFieldColors.h"
 #include "Representations/Perception/ImagePreprocessing/ScanGrid.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 MODULE(RelativeFieldColorsProvider,
 {,
@@ -37,7 +37,4 @@ class RelativeFieldColorsProvider : public RelativeFieldColorsProviderBase
    * @return The approximated average.
    */
   [[nodiscard]] float approximateAverage(const Image<PixelTypes::GrayscaledPixel>& image) const;
-
-private:
-  bool rfcParametersSet = false;
 };

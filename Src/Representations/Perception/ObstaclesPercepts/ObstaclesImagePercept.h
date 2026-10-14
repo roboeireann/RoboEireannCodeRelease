@@ -11,8 +11,8 @@
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
+#include "Math/Eigen.h"
 
 STREAMABLE(ObstaclesImagePercept,
 {
@@ -24,8 +24,7 @@ STREAMABLE(ObstaclesImagePercept,
     (int) right, /**< The right border of the obstacle in the image. This usually only includes the width at the lower end. */
     (bool) bottomFound, /**< Was the lower end of the obstacle found? Otherwise, it was hidden by the lower image border. */
     (bool) fallen, /**< Is the obstacle a player lying on the field? */
-    (int) jerseyColour, /**< The jersey colour of the obstacle, if applicable. */
-    (float)(1.f) probability,
+    (float)(1.f) confidence, /**< Confidence of the object prediction */
     (float)(-1.f) distance,
   });
 

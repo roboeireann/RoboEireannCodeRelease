@@ -7,10 +7,10 @@
  */
 
 #pragma once
-#include "Tools/Function.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Math/Geometry.h"
-#include "Tools/Streams/AutoStreamable.h"
+
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/Function.h"
 
 STREAMABLE(LibPosition,
 {
@@ -88,9 +88,9 @@ STREAMABLE(LibPosition,
   FUNCTION(bool(const Vector2f& position, const float offset)) isOutSideGoalFrame;
 
   /**
-   * Calculates the circle around an obstacle which occupies my target position.
-   * @param position The potential target position on the field
-   * @return The circle with the obstacle as center or radius 0 if none
+   * Determines whether the given position is near the post.
+   * @param position Absolute position on the field
+   * @return Whether the position is near the left and right post.
    */
-  FUNCTION(Geometry::Circle(const Vector2f& position)) getObstacleAtMyPositionCircle,
+  FUNCTION(std::tuple<bool, bool>(const Pose2f& position)) isNearPost,
 });

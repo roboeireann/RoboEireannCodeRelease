@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2017 The Qt Company Ltd.
 ** Copyright (C) 2016 Intel Corporation.
 ** Contact: https://www.qt.io/licensing/
 **
@@ -50,6 +50,10 @@ QT_BEGIN_NAMESPACE
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_GCC("-Wextra")
 
+#ifdef Q_CLANG_QDOC
+#  undef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
+#endif
+
 // High-level atomic integer operations
 template <typename T>
 class QAtomicInteger : public QBasicAtomicInteger<T>
@@ -57,15 +61,15 @@ class QAtomicInteger : public QBasicAtomicInteger<T>
 public:
     // Non-atomic API
 #ifdef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
-    constexpr QAtomicInteger(T value = 0) Q_DECL_NOTHROW : QBasicAtomicInteger<T>(value) {}
+    constexpr QAtomicInteger(T value = 0) noexcept : QBasicAtomicInteger<T>(value) {}
 #else
-    inline QAtomicInteger(T value = 0) Q_DECL_NOTHROW
+    inline QAtomicInteger(T value = 0) noexcept
     {
         this->_q_value = value;
     }
 #endif
 
-    inline QAtomicInteger(const QAtomicInteger &other) Q_DECL_NOTHROW
+    inline QAtomicInteger(const QAtomicInteger &other) noexcept
 #ifdef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
         : QBasicAtomicInteger<T>()
 #endif
@@ -73,45 +77,45 @@ public:
         this->storeRelease(other.loadAcquire());
     }
 
-    inline QAtomicInteger &operator=(const QAtomicInteger &other) Q_DECL_NOTHROW
+    inline QAtomicInteger &operator=(const QAtomicInteger &other) noexcept
     {
         this->storeRelease(other.loadAcquire());
         return *this;
     }
 
-#ifdef Q_QDOC
-    T load() const;
+#ifdef Q_CLANG_QDOC
+    T loadRelaxed() const;
     T loadAcquire() const;
-    void store(T newValue);
+    void storeRelaxed(T newValue);
     void storeRelease(T newValue);
 
     operator T() const;
     QAtomicInteger &operator=(T);
 
-    static Q_DECL_CONSTEXPR bool isReferenceCountingNative();
-    static Q_DECL_CONSTEXPR bool isReferenceCountingWaitFree();
+    static constexpr bool isReferenceCountingNative();
+    static constexpr bool isReferenceCountingWaitFree();
 
     bool ref();
     bool deref();
 
-    static Q_DECL_CONSTEXPR bool isTestAndSetNative();
-    static Q_DECL_CONSTEXPR bool isTestAndSetWaitFree();
+    static constexpr bool isTestAndSetNative();
+    static constexpr bool isTestAndSetWaitFree();
 
     bool testAndSetRelaxed(T expectedValue, T newValue);
     bool testAndSetAcquire(T expectedValue, T newValue);
     bool testAndSetRelease(T expectedValue, T newValue);
     bool testAndSetOrdered(T expectedValue, T newValue);
 
-    static Q_DECL_CONSTEXPR bool isFetchAndStoreNative();
-    static Q_DECL_CONSTEXPR bool isFetchAndStoreWaitFree();
+    static constexpr bool isFetchAndStoreNative();
+    static constexpr bool isFetchAndStoreWaitFree();
 
     T fetchAndStoreRelaxed(T newValue);
     T fetchAndStoreAcquire(T newValue);
     T fetchAndStoreRelease(T newValue);
     T fetchAndStoreOrdered(T newValue);
 
-    static Q_DECL_CONSTEXPR bool isFetchAndAddNative();
-    static Q_DECL_CONSTEXPR bool isFetchAndAddWaitFree();
+    static constexpr bool isFetchAndAddNative();
+    static constexpr bool isFetchAndAddWaitFree();
 
     T fetchAndAddRelaxed(T valueToAdd);
     T fetchAndAddAcquire(T valueToAdd);
@@ -159,7 +163,7 @@ public:
 #ifdef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
     constexpr
 #endif
-    QAtomicInt(int value = 0) Q_DECL_NOTHROW : QAtomicInteger<int>(value) {}
+    QAtomicInt(int value = 0) noexcept : QAtomicInteger<int>(value) {}
 };
 
 // High-level atomic pointer operations
@@ -168,14 +172,14 @@ class QAtomicPointer : public QBasicAtomicPointer<T>
 {
 public:
 #ifdef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
-    constexpr QAtomicPointer(T *value = 0) Q_DECL_NOTHROW : QBasicAtomicPointer<T>(value) {}
+    constexpr QAtomicPointer(T *value = nullptr) noexcept : QBasicAtomicPointer<T>(value) {}
 #else
-    inline QAtomicPointer(T *value = 0) Q_DECL_NOTHROW
+    inline QAtomicPointer(T *value = nullptr) noexcept
     {
-        this->store(value);
+        this->storeRelaxed(value);
     }
 #endif
-    inline QAtomicPointer(const QAtomicPointer<T> &other) Q_DECL_NOTHROW
+    inline QAtomicPointer(const QAtomicPointer<T> &other) noexcept
 #ifdef QT_BASIC_ATOMIC_HAS_CONSTRUCTORS
         : QBasicAtomicPointer<T>()
 #endif
@@ -183,36 +187,36 @@ public:
         this->storeRelease(other.loadAcquire());
     }
 
-    inline QAtomicPointer<T> &operator=(const QAtomicPointer<T> &other) Q_DECL_NOTHROW
+    inline QAtomicPointer<T> &operator=(const QAtomicPointer<T> &other) noexcept
     {
         this->storeRelease(other.loadAcquire());
         return *this;
     }
 
 #ifdef Q_QDOC
-    T *load() const;
     T *loadAcquire() const;
-    void store(T *newValue);
+    T *loadRelaxed() const;
+    void storeRelaxed(T *newValue);
     void storeRelease(T *newValue);
 
-    static Q_DECL_CONSTEXPR bool isTestAndSetNative();
-    static Q_DECL_CONSTEXPR bool isTestAndSetWaitFree();
+    static constexpr bool isTestAndSetNative();
+    static constexpr bool isTestAndSetWaitFree();
 
     bool testAndSetRelaxed(T *expectedValue, T *newValue);
     bool testAndSetAcquire(T *expectedValue, T *newValue);
     bool testAndSetRelease(T *expectedValue, T *newValue);
     bool testAndSetOrdered(T *expectedValue, T *newValue);
 
-    static Q_DECL_CONSTEXPR bool isFetchAndStoreNative();
-    static Q_DECL_CONSTEXPR bool isFetchAndStoreWaitFree();
+    static constexpr bool isFetchAndStoreNative();
+    static constexpr bool isFetchAndStoreWaitFree();
 
     T *fetchAndStoreRelaxed(T *newValue);
     T *fetchAndStoreAcquire(T *newValue);
     T *fetchAndStoreRelease(T *newValue);
     T *fetchAndStoreOrdered(T *newValue);
 
-    static Q_DECL_CONSTEXPR bool isFetchAndAddNative();
-    static Q_DECL_CONSTEXPR bool isFetchAndAddWaitFree();
+    static constexpr bool isFetchAndAddNative();
+    static constexpr bool isFetchAndAddWaitFree();
 
     T *fetchAndAddRelaxed(qptrdiff valueToAdd);
     T *fetchAndAddAcquire(qptrdiff valueToAdd);
@@ -255,7 +259,7 @@ inline void qAtomicAssign(T *&d, T *x)
 template <typename T>
 inline void qAtomicDetach(T *&d)
 {
-    if (d->ref.load() == 1)
+    if (d->ref.loadRelaxed() == 1)
         return;
     T *x = d;
     d = new T(*d);

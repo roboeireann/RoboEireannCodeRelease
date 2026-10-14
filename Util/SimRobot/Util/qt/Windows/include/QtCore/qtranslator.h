@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -55,24 +55,28 @@ class Q_CORE_EXPORT QTranslator : public QObject
 {
     Q_OBJECT
 public:
-    explicit QTranslator(QObject *parent = Q_NULLPTR);
+    explicit QTranslator(QObject *parent = nullptr);
     ~QTranslator();
 
     virtual QString translate(const char *context, const char *sourceText,
-                              const char *disambiguation = Q_NULLPTR, int n = -1) const;
+                              const char *disambiguation = nullptr, int n = -1) const;
 
     virtual bool isEmpty() const;
 
-    bool load(const QString & filename,
-              const QString & directory = QString(),
-              const QString & search_delimiters = QString(),
-              const QString & suffix = QString());
-    bool load(const QLocale & locale,
-              const QString & filename,
-              const QString & prefix = QString(),
-              const QString & directory = QString(),
-              const QString & suffix = QString());
-    bool load(const uchar *data, int len, const QString &directory = QString());
+    QString language() const;
+    QString filePath() const;
+
+    [[nodiscard]] bool load(const QString & filename,
+                            const QString & directory = QString(),
+                            const QString & search_delimiters = QString(),
+                            const QString & suffix = QString());
+    [[nodiscard]] bool load(const QLocale & locale,
+                            const QString & filename,
+                            const QString & prefix = QString(),
+                            const QString & directory = QString(),
+                            const QString & suffix = QString());
+    [[nodiscard]] bool load(const uchar *data, int len,
+                            const QString &directory = QString());
 
 private:
     Q_DISABLE_COPY(QTranslator)

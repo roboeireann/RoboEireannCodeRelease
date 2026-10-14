@@ -1,0 +1,71 @@
+#!/bin/bash
+basePath=$(dirname "$(which "$0")")
+CALL=
+FILELIST=
+while true; do
+  case $1 in
+    "")
+      break
+      ;;
+    "-target")
+      TARGET="$2"
+      shift
+      ;;
+    "-isysroot")
+      shift
+      ;;
+    "-filelist")
+      shift
+      FILELIST="$FILELIST$(cat "$1" | tr '\n' '|')"
+      CALL="$CALL $(sed <"$1" "s%\(.*\)%'\1'%" | tr '\n' ' ')"
+      ;;
+    /*.a)
+      FILELIST="$FILELIST$1|"
+      CALL="$CALL '$1'"
+      ;;
+    /*.o)
+      FILELIST="$FILELIST$1|"
+      CALL="$CALL '$1'"
+      ;;
+    "-o")
+      OUTPUT="$2"
+      CALL="$CALL '-o'"
+      ;;
+    "-F"*)
+      ;;
+    "-Xlinker")
+      shift
+      if [ "$1" == "-dependency_info" ]; then
+        shift
+        shift
+        INFO="$1"
+      fi
+      ;;
+    "-mmacosx-version-min="*)
+      ;;
+    "-Wl,-search_paths_first")
+      ;;
+    "-Wl,-headerpad_max_install_names")
+      ;;
+    *)
+      CALL="$CALL '$1'"
+      ;;
+  esac
+  shift
+done
+
+if [ ! -z "$INFO" ]; then
+  (
+    echo ""
+    echo "cctools-973.0.1"
+    echo -n "$FILELIST" | tr '|' '\n' | sed 's%^%|%' | tr '|' $'\x10'
+    echo -n $'\x40'
+    echo "$OUTPUT"
+  ) | tr '\n' '\0' >"$INFO"
+fi
+
+if [[ "$TARGET" == "x86_64"* ]]; then
+  bash -c "\"${basePath}/mold\" -nostdlib --hash-style=gnu --eh-frame-hdr -m elf_x86_64 -dynamic-linker=/lib64/ld-linux-x86-64.so.2 ../../Util/Buildchain/V6/lib/crt1.o ../../Util/Buildchain/V6/lib/crti.o ../../Util/Buildchain/V6/lib/crtbegin.o $CALL ../../Util/Buildchain/V6/lib/libstdc++.so.6.0.30 --start-group ../../Util/Buildchain/V6/lib/libm.so.6 --as-needed ../../Util/Buildchain/V6/lib/libmvec.so.1 --no-as-needed --end-group --start-group ../../Util/Buildchain/V6/lib/libgcc_s.so.1 ../../Util/Buildchain/V6/lib/libgcc.a --end-group ../../Util/Buildchain/V6/lib/libgcc.a --start-group ../../Util/Buildchain/V6/lib/libc.so.6 ../../Util/Buildchain/V6/lib/libc_nonshared.a --as-needed ../../Util/Buildchain/V6/lib/ld-linux-x86-64.so.2 --no-as-needed --end-group --start-group ../../Util/Buildchain/V6/lib/libgcc_s.so.1 ../../Util/Buildchain/V6/lib/libgcc.a --end-group ../../Util/Buildchain/V6/lib/libgcc.a ../../Util/Buildchain/V6/lib/crtend.o ../../Util/Buildchain/V6/lib/crtn.o"
+else
+  bash -c "\"${basePath}/mold\" -nostdlib --hash-style=gnu --eh-frame-hdr -m aarch64elf -dynamic-linker=/lib/ld-linux-aarch64.so.1 ../../Util/Buildchain/T1/lib/crt1.o ../../Util/Buildchain/T1/lib/crti.o ../../Util/Buildchain/T1/lib/crtbegin.o $CALL ../../Util/Buildchain/T1/lib/libstdc++.so.6.0.30 --start-group ../../Util/Buildchain/T1/lib/libm.so.6 --end-group --start-group ../../Util/Buildchain/T1/lib/libgcc_s.so.1 ../../Util/Buildchain/T1/lib/libgcc.a --end-group ../../Util/Buildchain/T1/lib/libgcc.a --start-group ../../Util/Buildchain/T1/lib/libc.so.6 ../../Util/Buildchain/T1/lib/libc_nonshared.a --as-needed ../../Util/Buildchain/T1/lib/ld-linux-aarch64.so.1 --no-as-needed --end-group --start-group ../../Util/Buildchain/T1/lib/libgcc_s.so.1 ../../Util/Buildchain/T1/lib/libgcc.a --end-group ../../Util/Buildchain/T1/lib/libgcc.a ../../Util/Buildchain/T1/lib/crtend.o ../../Util/Buildchain/T1/lib/crtn.o"
+fi

@@ -10,25 +10,29 @@
  */
 
 #include "CameraProvider.h"
+#include "NaoCamera.h"
 #include "Platform/SystemCall.h"
 #include "Platform/Thread.h"
 #include "Platform/Time.h"
-#include "Tools/Settings.h"
-#include "Tools/Streams/InStreams.h"
-#include "Tools/Debugging/Stopwatch.h"
-#include "Tools/Debugging/Annotation.h"
+#include "Framework/Settings.h"
+#include "Streaming/InStreams.h"
+#include "Debugging/Stopwatch.h"
+#include "Debugging/Annotation.h"
+#ifdef TARGET_ROBOT
+#include <MD5.h>
+#endif
 #include <cstdio>
 
-MAKE_MODULE(CameraProvider, infrastructure);
+MAKE_MODULE(CameraProvider);
 
 thread_local CameraProvider* CameraProvider::theInstance = nullptr;
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
 Semaphore CameraProvider::performingReset = Semaphore(1);
 bool CameraProvider::resetPending = false;
 #endif
 
 CameraProvider::CameraProvider()
-  : whichCamera(Thread::getCurrentThreadName() == "Upper" ?  CameraInfo::upper : CameraInfo::lower),
+  : whichCamera(Thread::getCurrentThreadName() == "Upper" ? CameraInfo::upper : CameraInfo::lower),
     cameraInfo(whichCamera)
 {
   VERIFY(readCameraIntrinsics());
@@ -37,7 +41,7 @@ CameraProvider::CameraProvider()
   theInstance = this;
   setupCamera();
 
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   headName = Global::getSettings().headName.c_str();
   headName.append(".wav");
   thread.start(this, &CameraProvider::takeImages);
@@ -48,7 +52,7 @@ CameraProvider::CameraProvider()
 
 CameraProvider::~CameraProvider()
 {
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   thread.announceStop();
   takeNextImage.post();
   thread.stop();
@@ -61,30 +65,41 @@ CameraProvider::~CameraProvider()
 
 void CameraProvider::update(CameraImage& theCameraImage)
 {
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
+  if ((whichCamera == CameraInfo::upper &&
+       theCameraResolutionRequest.resolutions[CameraInfo::lower] == CameraResolutionRequest::w1280h960f30 &&
+       theCameraResolutionRequest.resolutions[CameraInfo::upper] != CameraResolutionRequest::w1280h960f30) ||
+      (whichCamera == CameraInfo::lower &&
+       theCameraResolutionRequest.resolutions[CameraInfo::upper] == CameraResolutionRequest::w1280h960f30 &&
+       theCameraResolutionRequest.resolutions[CameraInfo::lower] != CameraResolutionRequest::w1280h960f30))
+    Thread::sleep(200);
   unsigned timestamp = static_cast<long long>(camera->getTimestamp() / 1000) > static_cast<long long>(Time::getSystemTimeBase())
                        ? static_cast<unsigned>(camera->getTimestamp() / 1000 - Time::getSystemTimeBase()) : 100000;
   if(camera->hasImage())
   {
     theCameraImage.setReference(cameraInfo.width / 2, cameraInfo.height, const_cast<unsigned char*>(camera->getImage()), std::max(lastImageTimestamp + 1, timestamp));
 
-    if(theCameraImage.timestamp - timestampLastRowChange > 3000)
+    if(whichCamera == CameraInfo::lower)
     {
-      timestampLastRowChange = theCameraImage.timestamp;
-      currentRow = Random::uniformInt(1, cameraInfo.height-2);
-      rowBuffer.clear();
-    }
-    std::string res = MD5().digestMemory(reinterpret_cast<unsigned char*>(theCameraImage[currentRow]), cameraInfo.width * sizeof(CameraImage::PixelType));
-    rowBuffer.push_front(res);
-
-    int appearances = 0;
-    for(auto i = rowBuffer.begin(); i != rowBuffer.end(); ++i)
-      if(*i == res && ++appearances > 25)
+      if(theCameraImage.timestamp - timestampLastRowChange > 3000)
       {
-        OUTPUT_ERROR("Probably encountered a distorted image!");
-        camera->resetRequired = true;
-        return;
+        timestampLastRowChange = theCameraImage.timestamp;
+        currentRow = Random::uniformInt(1, cameraInfo.height - 2);
+        rowBuffer.clear();
       }
+      std::string res = MD5().digestMemory(reinterpret_cast<unsigned char*>(theCameraImage[currentRow]), cameraInfo.width * sizeof(CameraImage::PixelType));
+      rowBuffer.push_front(res);
+
+      int appearances = 0;
+      for(auto i = rowBuffer.begin(); i != rowBuffer.end(); ++i)
+        if(*i == res && ++appearances > 25)
+        {
+          OUTPUT_ERROR("Probably encountered a distorted image (row " << currentRow << ", hash " << res << ")!");
+          ANNOTATION("CameraProvider", "Probably encountered a distorted image (row " << currentRow << ", hash " << res << ")!");
+          camera->resetRequired = true;
+          return;
+        }
+    }
   }
   else if(theCameraImage.isReference())
   {
@@ -109,12 +124,12 @@ void CameraProvider::update(CameraImage& theCameraImage)
 #else
   theCameraImage.setResolution(cameraInfo.width / 2, cameraInfo.height);
   theCameraImage.timestamp = Time::getCurrentSystemTime();
-#endif // CAMERA_INCLUDED
+#endif // TARGET_ROBOT
 }
 
 void CameraProvider::update(JPEGImage& jpegImage)
 {
-  jpegImage = theCameraImage;
+  jpegImage.fromCameraImage(theCameraImage, jpegQuality);
 }
 
 void CameraProvider::update(CameraInfo& cameraInfo)
@@ -129,14 +144,14 @@ void CameraProvider::update(CameraStatus& cameraStatus)
     if(cameraStatus.ok)
     {
       ANNOTATION("CameraProvider", "Could not acquire new image.");
-      SystemCall::playSound("sirene.wav");
-      SystemCall::say("Camera broken");
+      SystemCall::playSound("siren", true);
+      SystemCall::say("Camera broken", true);
     }
 #ifdef NDEBUG
     else if(!SystemCall::soundIsPlaying())
     {
-      SystemCall::playSound("sirene.wav");
-      SystemCall::say("Camera broken");
+      SystemCall::playSound("siren", true);
+      SystemCall::say("Camera broken", true);
     }
 #endif
   }
@@ -175,12 +190,12 @@ bool CameraProvider::processResolutionRequest()
       case CameraResolutionRequest::defaultRes:
         if(!readCameraResolution())
           cameraResolutionRequest.resolutions[whichCamera] = whichCamera == CameraInfo::upper
-                                                             ? CameraResolutionRequest::w640h480
-                                                             : CameraResolutionRequest::w320h240;
+                                                             ? CameraResolutionRequest::w640h480f30
+                                                             : CameraResolutionRequest::w320h240f30;
         return true;
-      case CameraResolutionRequest::w320h240:
-      case CameraResolutionRequest::w640h480:
-      case CameraResolutionRequest::w1280h960:
+      case CameraResolutionRequest::w320h240f30:
+      case CameraResolutionRequest::w640h480f30:
+      case CameraResolutionRequest::w1280h960f30:
         cameraResolutionRequest.resolutions[whichCamera] = theCameraResolutionRequest.resolutions[whichCamera];
         return true;
       default:
@@ -195,24 +210,7 @@ bool CameraProvider::processResolutionRequest()
 void CameraProvider::setupCamera()
 {
   // set resolution
-  switch(cameraResolutionRequest.resolutions[whichCamera])
-  {
-    case CameraResolutionRequest::w320h240:
-      cameraInfo.width = 320;
-      cameraInfo.height = 240;
-      break;
-    case CameraResolutionRequest::w640h480:
-      cameraInfo.width = 640;
-      cameraInfo.height = 480;
-      break;
-    case CameraResolutionRequest::w1280h960:
-      cameraInfo.width = 1280;
-      cameraInfo.height = 960;
-      break;
-    default:
-      FAIL("Unknown resolution.");
-      break;
-  }
+  cameraResolutionRequest.apply(whichCamera, cameraInfo);
 
   // set opening angle
   cameraInfo.openingAngleWidth = cameraIntrinsics.cameras[whichCamera].openingAngleWidth;
@@ -224,8 +222,12 @@ void CameraProvider::setupCamera()
 
   // update focal length
   cameraInfo.updateFocalLength();
+  createCamera();
+}
 
-#ifdef CAMERA_INCLUDED
+void CameraProvider::createCamera()
+{
+#ifdef TARGET_ROBOT
   ASSERT(camera == nullptr);
   camera = new NaoCamera(whichCamera == CameraInfo::upper ?
                          "/dev/video-top" : "/dev/video-bottom",
@@ -239,7 +241,7 @@ void CameraProvider::setupCamera()
 
 bool CameraProvider::isFrameDataComplete()
 {
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   if(resetPending)
     return false;
   if(theInstance)
@@ -251,11 +253,13 @@ bool CameraProvider::isFrameDataComplete()
 
 void CameraProvider::takeImages()
 {
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   BH_TRACE_INIT(whichCamera == CameraInfo::upper ? "UpperCameraProvider" : "LowerCameraProvider");
   Thread::nameCurrentThread("CameraProvider");
   thread.setPriority(11);
   unsigned imageReceived = Time::getRealSystemTime();
+  unsigned cameraStarted = Time::getRealSystemTime();
+  bool restartedStream = false;
   while(thread.isRunning())
   {
     if(camera->resetRequired)
@@ -268,12 +272,14 @@ void CameraProvider::takeImages()
       if(resetPending)
       {
         NaoCamera::resetCamera();
-        SystemCall::playSound(headName.c_str());
-        SystemCall::say("Camera reset");
+        SystemCall::playSound(headName.c_str(), true);
+        SystemCall::say("Camera reset", true);
         resetPending = false;
       }
       setupCamera();
       performingReset.post();
+      cameraStarted = Time::getRealSystemTime();
+      imageReceived = Time::getRealSystemTime();
       continue;
     }
 
@@ -292,7 +298,8 @@ void CameraProvider::takeImages()
 
     while(!camera->hasImage())
     {
-      cameraOk = camera->captureNew(maxWaitForImage);
+      // If we just restarted the camera, use a larger timeout
+      cameraOk = camera->captureNew(Time::getRealTimeSince(cameraStarted) > timeBetweenResets ? minWaitForImage : maxWaitForImage);
 
       if(!cameraOk)
       {
@@ -302,16 +309,24 @@ void CameraProvider::takeImages()
     }
 
     if(camera->hasImage())
+    {
       imageReceived = Time::getRealSystemTime();
-    else if(Time::getRealTimeSince(imageReceived) > resetDelay)
+      restartedStream = false;
+    }
+    // Reset camera only after some time passed after the last reset
+    else if(Time::getRealTimeSince(cameraStarted) > timeBetweenResets && Time::getRealTimeSince(imageReceived) > resetDelay)
     {
       delete camera;
-      camera = new NaoCamera(whichCamera == CameraInfo::upper ?
-                             "/dev/video-top" : "/dev/video-bottom",
-                             cameraInfo.camera,
-                             cameraInfo.width, cameraInfo.height, whichCamera == CameraInfo::upper,
-                             theCameraSettings.cameras[whichCamera], theAutoExposureWeightTable.tables[whichCamera]);
+      camera = nullptr;
+      createCamera();
       imageReceived = Time::getRealSystemTime();
+      cameraStarted = Time::getRealSystemTime();
+    }
+    // We assume the camera stream died, therefore only restart the stream
+    else if(Time::getRealTimeSince(cameraStarted) > timeBetweenResets && Time::getRealTimeSince(imageReceived) > static_cast<int>(minWaitForImage) && !restartedStream)
+    {
+      resetPending = !(camera->simpleCameraReset());
+      restartedStream = true;
     }
 
     if(camera->hasImage())
@@ -327,10 +342,11 @@ void CameraProvider::takeImages()
 
 void CameraProvider::waitForFrameData()
 {
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   if(theInstance)
   {
     theInstance->takeNextImage.post();
+    DEBUG_RESPONSE_ONCE("module:CameraProvider:delay") Thread::sleep(2000);
     theInstance->imageTaken.wait();
   }
 #endif

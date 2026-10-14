@@ -55,18 +55,24 @@ class QSurfacePrivate;
 
 class Q_GUI_EXPORT QSurface
 {
+    Q_GADGET
 public:
     enum SurfaceClass {
         Window,
         Offscreen
     };
+    Q_ENUM(SurfaceClass)
 
     enum SurfaceType {
         RasterSurface,
         OpenGLSurface,
         RasterGLSurface,
         OpenVGSurface,
+        VulkanSurface,
+        MetalSurface,
+        Direct3DSurface
     };
+    Q_ENUM(SurfaceType)
 
     virtual ~QSurface();
 
@@ -90,6 +96,6 @@ protected:
 
 QT_END_NAMESPACE
 
-Q_DECLARE_METATYPE(QSurface*)
+QT_DECL_METATYPE_EXTERN_TAGGED(QSurface*, QSurface_ptr, Q_GUI_EXPORT)
 
 #endif //QSURFACE_H

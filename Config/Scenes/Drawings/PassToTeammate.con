@@ -1,0 +1,5 @@
+vfd worldState option:PassToTeammate:target
+echo vfd worldState option:PassToTeammate:target
+echo vfd worldState option:PassToTeammate:evaluation
+echo vfd worldState option:PassToTeammate:precision
+echo vfd worldState option:PassToTeammate:wheel

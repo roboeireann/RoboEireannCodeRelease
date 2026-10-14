@@ -59,9 +59,6 @@ public:
 
     int count() const;
 
-    inline bool isEmpty() const
-    { return count() == 0; }
-
     QTextBlock item(int i) const;
 
     int itemNumber(const QTextBlock &) const;

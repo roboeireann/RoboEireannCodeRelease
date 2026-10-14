@@ -10,14 +10,13 @@
  */
 
 #include "ObstaclesFieldPercept.h"
-#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/CameraInfo.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
-#include "Tools/Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings.h"
 #include "Tools/Math/Transformation.h"
-#include "Tools/Modeling/Obstacle.h"
-#include "Tools/Module/Blackboard.h"
+#include "Framework/Blackboard.h"
 #include <cmath>
 
 void ObstaclesFieldPercept::draw() const
@@ -33,10 +32,14 @@ void ObstaclesFieldPercept::draw() const
   const ColorRGBA teamColors[] =
   {
     ColorRGBA::white,
-    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
-        static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).ourTeam().fieldPlayerColor : TEAM_GREEN),
-    ColorRGBA::fromTeamColor(Blackboard::getInstance().exists("GameInfo") ?
-         static_cast<const GameInfo&>(Blackboard::getInstance()["GameInfo"]).opponentTeam().fieldPlayerColor : TEAM_RED)
+    ColorRGBA::fromTeamColor(static_cast<int>(Blackboard::getInstance().exists("GameState") ?
+        static_cast<const GameState&>(Blackboard::getInstance()["GameState"]).ownTeam.fieldPlayerColor : GameState::Team::Color::black)),
+    ColorRGBA::fromTeamColor(static_cast<int>(Blackboard::getInstance().exists("GameState") ?
+        static_cast<const GameState&>(Blackboard::getInstance()["GameState"]).opponentTeam.fieldPlayerColor : GameState::Team::Color::red)),
+    ColorRGBA::fromTeamColor(static_cast<int>(Blackboard::getInstance().exists("GameState") ?
+        static_cast<const GameState&>(Blackboard::getInstance()["GameState"]).ownTeam.goalkeeperColor : GameState::Team::Color::purple)),
+    ColorRGBA::fromTeamColor(static_cast<int>(Blackboard::getInstance().exists("GameState") ?
+        static_cast<const GameState&>(Blackboard::getInstance()["GameState"]).opponentTeam.goalkeeperColor : GameState::Team::Color::blue))
   };
 
   // Draw robots in field view:
@@ -45,7 +48,7 @@ void ObstaclesFieldPercept::draw() const
     for(const Obstacle& obstacle : obstacles)
     {
       const float radius = std::max((obstacle.left - obstacle.right).norm() / 2.f, 50.f);
-      CIRCLE("representation:ObstaclesFieldPercept:field", obstacle.center.x(), obstacle.center.y(), radius, 20, Drawings::solidPen,
+      CIRCLE("representation:ObstaclesFieldPercept:field", obstacle.center.x(), obstacle.center.y(), radius, 10, Drawings::solidPen,
              penColors[obstacle.type], Drawings::solidBrush, teamColors[obstacle.type]);
     }
   }
@@ -69,9 +72,22 @@ void ObstaclesFieldPercept::draw() const
         {
           for(int i = 0; i < 3; ++i)
             pointsInImage[i] = imageCoordinateSystem.fromCorrected(pointsInImage[i]);
-          RECTANGLE("representation:ObstaclesFieldPercept:image",
-                    pointsInImage[0].x(), pointsInImage[0].y(), pointsInImage[1].x(), pointsInImage[2].y(),
-                    6, Drawings::solidPen, teamColors[obstacle.type]);
+          if(obstacle.type == unknown)
+          {
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() - 2.5f, pointsInImage[0].y() + 2.5f, pointsInImage[1].x() + 2.5f, pointsInImage[2].y() - 2.5f, 1, Drawings::solidPen, ColorRGBA::red);
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() - 1.5f, pointsInImage[0].y() + 1.5f, pointsInImage[1].x() + 1.5f, pointsInImage[2].y() - 1.5f, 1, Drawings::solidPen, ColorRGBA::orange);
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() - 0.5f, pointsInImage[0].y() + 0.5f, pointsInImage[1].x() + 0.5f, pointsInImage[2].y() - 0.5f, 1, Drawings::solidPen, ColorRGBA::yellow);
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() + 0.5f, pointsInImage[0].y() - 0.5f, pointsInImage[1].x() - 0.5f, pointsInImage[2].y() + 0.5f, 1, Drawings::solidPen, ColorRGBA::green);
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() + 1.5f, pointsInImage[0].y() - 1.5f, pointsInImage[1].x() - 1.5f, pointsInImage[2].y() + 1.5f, 1, Drawings::solidPen, ColorRGBA::blue);
+            RECTANGLE("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() + 2.5f, pointsInImage[0].y() - 2.5f, pointsInImage[1].x() - 2.5f, pointsInImage[2].y() + 2.5f, 1, Drawings::solidPen, ColorRGBA::violet);
+          }
+          else
+          {
+            RECTANGLE("representation:ObstaclesFieldPercept:image",
+                      pointsInImage[0].x(), pointsInImage[0].y(), pointsInImage[1].x(), pointsInImage[2].y(),
+                      6, Drawings::solidPen, teamColors[obstacle.type]);
+          }
+          //DRAW_TEXT("representation:ObstaclesFieldPercept:image", pointsInImage[0].x() + 2, pointsInImage[0].y() + 14, 10, teamColors[obstacle.type], "Team Conf: " << std::to_string(obstacle.confidence).substr(0, 4));
         }
       }
     }
@@ -80,7 +96,7 @@ void ObstaclesFieldPercept::draw() const
 
 void ObstaclesFieldPercept::verify() const
 {
-  for(const Obstacle& obstacle : obstacles)
+  for([[maybe_unused]] const Obstacle& obstacle : obstacles)
   {
     ASSERT(std::isfinite(obstacle.center.x()));
     ASSERT(std::isfinite(obstacle.center.y()));

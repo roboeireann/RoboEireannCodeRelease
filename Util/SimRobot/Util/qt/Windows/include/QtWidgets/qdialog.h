@@ -60,7 +60,7 @@ class Q_WIDGETS_EXPORT QDialog : public QWidget
     Q_PROPERTY(bool modal READ isModal WRITE setModal)
 
 public:
-    explicit QDialog(QWidget *parent = Q_NULLPTR, Qt::WindowFlags f = Qt::WindowFlags());
+    explicit QDialog(QWidget *parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
     ~QDialog();
 
     enum DialogCode { Rejected, Accepted };
@@ -68,12 +68,6 @@ public:
     int result() const;
 
     void setVisible(bool visible) override;
-
-    void setOrientation(Qt::Orientation orientation);
-    Qt::Orientation orientation() const;
-
-    void setExtension(QWidget* extension);
-    QWidget* extension() const;
 
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
@@ -95,8 +89,6 @@ public Q_SLOTS:
     virtual void done(int);
     virtual void accept();
     virtual void reject();
-
-    void showExtension(bool);
 
 protected:
     QDialog(QDialogPrivate &, QWidget *parent, Qt::WindowFlags f = Qt::WindowFlags());

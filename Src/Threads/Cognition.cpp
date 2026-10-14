@@ -6,35 +6,28 @@
  * @author Jan Fiedler
  */
 
+#include "Cognition.h"
 #include "Modules/Infrastructure/InterThreadProviders/PerceptionProviders.h"
 #include "Modules/Infrastructure/LogDataProvider/LogDataProvider.h"
+#include "Representations/Communication/BHumanMessageOutputGenerator.h"
+#include "Representations/Communication/RETeamMessage2025.h"
 
-#include "Representations/Communication/TeamMessage2025.h"
-
-#include "Representations/Infrastructure/LogfileLoggerStatus.h"
-
+#include "Debugging/DebugRequest.h"
+#include "Debugging/Stopwatch.h"
+#include "Framework/Settings.h"
 #include "Platform/SystemCall.h"
 #include "Platform/Thread.h"
-#include "Tools/Settings.h"
-
-#include "Tools/TextLogging.h"
-
-#include <cstring>
+#include "Streaming/Global.h"
+#include "Streaming/Output.h"
 
 REGISTER_EXECUTION_UNIT(Cognition)
 
 thread_local bool Cognition::isUpper = false;
 
-DECL_TLOGGER(tlogger, "Cognition", TextLogging::INFO);
-
 Cognition::Cognition()
 {
-  Blackboard::getInstance().alloc<UpperFrameInfo>("UpperFrameInfo").time = 100000;
-  Blackboard::getInstance().alloc<LowerFrameInfo>("LowerFrameInfo").time = 100000;
-
-  InMapFile stream("cognition.cfg");
-  ASSERT(stream.exists());
-  stream >> params;
+  Blackboard::getInstance().alloc<UpperFrameInfo>("UpperFrameInfo").time = minTime;
+  Blackboard::getInstance().alloc<LowerFrameInfo>("LowerFrameInfo").time = minTime;
 }
 
 Cognition::~Cognition()
@@ -43,54 +36,50 @@ Cognition::~Cognition()
   Blackboard::getInstance().free("LowerFrameInfo");
 }
 
-bool Cognition::initLogging(LogfileLogger* loggerIn, const std::string& threadName)
-{
-  (void)(threadName);
-  if (loggerIn)
-  {
-    if (logger)
-    {
-      TLOGD(tlogger, "initLogging called, but logger already set");
-      ASSERT(logger == loggerIn);
-    }
-    else
-    {
-      TLOGD(tlogger, "initLogging called, specifying logfileLogger managed by this thread");
-      logger = loggerIn;
-    }
-    // tell the logger that this thread has the GameInfo
-    // logger->setGameInfoThread(threadName);
-    return true;
-  }
-  else
-  {
-    TLOGD(tlogger, "initLogging called");
-    return false;
-  }
-}
-
 bool Cognition::beforeFrame()
 {
-  const FrameInfo* lowerFrameInfo = Blackboard::getInstance().exists("LowerFrameInfo")
-                                    ? static_cast<FrameInfo*>(const_cast<Streamable*>(&Blackboard::getInstance()["LowerFrameInfo"]))
-                                    : nullptr;
-  const FrameInfo* upperFrameInfo = Blackboard::getInstance().exists("UpperFrameInfo")
-                                    ? static_cast<FrameInfo*>(const_cast<Streamable*>(&Blackboard::getInstance()["UpperFrameInfo"]))
-                                    : nullptr;
-  unsigned lowerFrameTime = lowerFrameInfo ? lowerFrameInfo->time : 0;
-  unsigned upperFrameTime = upperFrameInfo ? upperFrameInfo->time : 0;
+  STOPWATCH_START("CognitionBeforeAfterFrame");
 
-  upperIsNew |= upperFrameTime != lastUpperFrameTime && (upperFrameTime >= lastAcceptedTime || SystemCall::getMode() == SystemCall::logFileReplay);
-  lowerIsNew |= lowerFrameTime != lastLowerFrameTime && (lowerFrameTime >= lastAcceptedTime || SystemCall::getMode() == SystemCall::logFileReplay);
+  // Currently replaying a log file?
+  const bool replay = (SystemCall::getMode() == SystemCall::logFileReplay || SystemCall::getMode() == SystemCall::remoteRobot)
+                      && LogDataProvider::exists();
+
+  // During replay if there is no new frame and no delayed frame, there is nothing to process
+  if(replay && !LogDataProvider::isFrameDataComplete(false) && !delayedLogCounter)
+  {
+    acceptNext = false;
+    return false;
+  }
+
+  const unsigned lowerFrameTime = static_cast<FrameInfo*>(const_cast<Streamable*>(&Blackboard::getInstance()["LowerFrameInfo"]))->time;
+  const unsigned upperFrameTime = static_cast<FrameInfo*>(const_cast<Streamable*>(&Blackboard::getInstance()["UpperFrameInfo"]))->time;
+
+  const bool upperIsLate = static_cast<int>(lowerFrameTime - upperFrameTime) >= 100;
+  const bool lowerIsLate = static_cast<int>(upperFrameTime - lowerFrameTime) >= 100 || Global::getSettings().robotType == Settings::t1;
+  upperIsNew |= upperFrameTime != lastUpperFrameTime && upperFrameTime >= lastAcceptedTime;
+  lowerIsNew |= lowerFrameTime != lastLowerFrameTime && lowerFrameTime >= lastAcceptedTime;
   lastUpperFrameTime = upperFrameTime;
   lastLowerFrameTime = lowerFrameTime;
 
   // Begin a new frame if either there is data for a new one left over from
   // the previous frame or we have two from which we can choose.
-  if(acceptNext || (upperIsNew && lowerIsNew))
+  if(acceptNext || (upperIsNew && lowerIsNew) || (upperIsNew && lowerIsLate) || (lowerIsNew && upperIsLate))
   {
-    // We always switch between upper and lower
-    isUpper ^= true;
+    // The frame will be processed, so no delay and no data waiting anymore
+    delayedLogCounter = 0;
+
+    // During replay, acknowledge that a new frame was received
+    if(replay)
+      LogDataProvider::isFrameDataComplete();
+
+    // We switch between upper and lower except if one of them is really late
+    if(upperIsLate)
+      isUpper = false;
+    else if(lowerIsLate)
+      isUpper = true;
+    else
+      isUpper ^= true;
+
     if(isUpper)
     {
       lastAcceptedTime = upperFrameTime;
@@ -112,13 +101,20 @@ bool Cognition::beforeFrame()
     acceptNext = (isUpper && lowerIsNew) || (!isUpper && upperIsNew);
     return true;
   }
-  else
+  else if(replay)
   {
-    // Wait for another frame to arrive before one can be picked.
-    // However, a new frame is accepted when replaying logs.
-    if(LogDataProvider::exists() && LogDataProvider::isFrameDataComplete()
-       && SystemCall::getMode() == SystemCall::logFileReplay)
-      return true;
+    // Give Upper and Lower time to process the data. However, since logs can be
+    // replayed at different speeds, this code is not bullet-proof. There must
+    // be a timeout, because a frame from Upper or Lower can actually be missing
+    // and the log would get stuck.
+    Thread::sleep(3);
+    if(++delayedLogCounter >= 11)
+    {
+      LogDataProvider::isFrameDataComplete();
+      delayedLogCounter = 1;
+      lastAcceptedTime = 0;
+      return Global::getDebugRequestTable().pollCounter > 0;
+    }
   }
 
   return false;
@@ -126,33 +122,18 @@ bool Cognition::beforeFrame()
 
 void Cognition::beforeModules()
 {
-  Blackboard& blackboard = Blackboard::getInstance();
-  if (logger && blackboard.exists("LogfileLoggerStatus"))
+  BHExecutionUnit::beforeModules();
+  if(SystemCall::getMode() != SystemCall::physicalRobot)
   {
-    LogfileLoggerStatus& logfileLoggerStatus = static_cast<LogfileLoggerStatus &>(blackboard["LogfileLoggerStatus"]);
-
-    LogfileLogger::State state;
-    size_t buffersToWrite;
-
-    logger->getStatus(state, buffersToWrite);
-
-    if (logfileLoggerStatus.updateStatus) // has the function been initialised by the module?
-      logfileLoggerStatus.updateStatus(state, static_cast<unsigned>(buffersToWrite));
+    DEBUG_RESPONSE_NOT("unmute")
+      SystemCall::mute(true);
+    else
+      SystemCall::mute(false);
   }
-
-  // if the modules do not finish executing in this number of ms the watchdog
-  // timer will fire and interrupt the process. Modules should complete in < 33 ms
-  // so 1 second should be more than enough time. If we exceed that, something
-  // is badly wrong.
-  if (params.watchdogEnabled)
-    watchdog.setTimeout(params.watchdogTimeout); // FIXME - SimRobot with 7v7 takes a long time to start up and a 1sec timeout causes the watchdog to fire
 }
 
 void Cognition::afterModules()
 {
-  // cancel the watchdog since we got here before it expired and shut us down
-  watchdog.cancelTimeout();
-
   Blackboard& blackboard = Blackboard::getInstance();
 
   // NOTE: in the following it seems the representations will exist whether the
@@ -160,17 +141,37 @@ void Cognition::afterModules()
   // needed to see which module has actually filled in the representation
   // (sendIfNeeded) in order to decide how to proceed
 
-  if (blackboard.exists("TeamMessage2025OutputGenerator") &&
-           static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"])
-               .sendIfNeeded)
+  if (blackboard.exists("RETeamMessage2025OutputGenerator") 
+    && static_cast<const RETeamMessage2025OutputGenerator &>(blackboard["RETeamMessage2025OutputGenerator"]).sendIfNeeded)
   {
-    BH_TRACE_MSG("before TeamMessage2025OutputGenerator.sendIfNeeded()");
-    static_cast<const TeamMessage2025OutputGenerator &>(blackboard["TeamMessage2025OutputGenerator"]).sendIfNeeded();
+    BH_TRACE_MSG("before RETeamMessage2025OutputGenerator.sendIfNeeded()");
+    static_cast<const RETeamMessage2025OutputGenerator &>(blackboard["RETeamMessage2025OutputGenerator"]).sendIfNeeded();
+  }
+  else if(Blackboard::getInstance().exists("BHumanMessageOutputGenerator")
+     && static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).send
+     && static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).sendThisFrame
+     && static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).sendThisFrame())
+  {
+    BH_TRACE_MSG("before BHumanMessageOutputGenerator::send()");
+    static_cast<const BHumanMessageOutputGenerator&>(blackboard["BHumanMessageOutputGenerator"]).send();
+  }
+
+  DEBUG_RESPONSE_ONCE("Cognition:Settings")
+  {
+    const Settings& s = Global::getSettings();
+    OUTPUT_TEXT_FMT("Settings: head={}, body={}, F_motion={:.1f}, type={}, "
+                    "team={}, player={}, outfieldColor={}, goalieColor={}, "
+                    "location={}, scenario={}, magicNumber={}",
+                    s.headName, s.bodyName, 1.0f / s.motionCycleTime, TypeRegistry::getEnumName(s.robotType),
+                    s.teamNumber, s.playerNumber, TypeRegistry::getEnumName(s.fieldPlayerColor),
+                    TypeRegistry::getEnumName(s.goalkeeperColor), s.location, s.scenario, s.magicNumber);
   }
 }
 
 bool Cognition::afterFrame()
 {
+  STOPWATCH_STOP("CognitionBeforeAfterFrame");
+
   // If there is already a frame waiting to be processed, do not wait for the next one to arrive.
-  return !acceptNext;
+  return !acceptNext && !delayedLogCounter;
 }

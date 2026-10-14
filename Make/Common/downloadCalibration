@@ -1,0 +1,44 @@
+#!/bin/bash
+# Download calibration files from an actual robot.
+# The files are then stored in the configuration
+# directory for that robot.
+
+basePath=$(cd "$(dirname "$(which "$0")")" && pwd)
+
+usage()
+{
+  echo "usage: downloadCalibration <ip>"
+  echo "  examples:"
+  echo "    ./downloadCalibration 192.168.2.28"
+  exit 1
+}
+
+source "${basePath}/setupSSH"
+
+if [ $# -ne 1 ]
+then
+  usage
+fi
+
+ip=$1
+
+source "$basePath/setupTarget" "$ip"
+
+robotNames=`ssh $SSHOPTIONS -o ConnectTimeout=2 $TARGET_USER@$ip "hostname; cat /var/volatile/tmp/bodyName.txt 2>/dev/null"`
+if [ -z "$robotNames" ]
+then
+  echo "Could not get name from robot."
+  exit 1
+fi
+headName=$(echo $robotNames | cut -d " " -f 1)
+# This quietly falls back to the head name if bodyName.txt was not written yet. This may be a bad idea.
+bodyName=$(echo $robotNames | cut -d " " -f 2)
+
+files=("Config/Robots/$headName/$bodyName/cameraCalibration.cfg"
+       "Config/Robots/$bodyName/Body/imuCalibration.cfg")
+
+if [ "$(uname)" == "Darwin" ]; then
+  rsync --chmod=F-x -Rzce "ssh $SSHOPTIONS" "$TARGET_USER@$ip:${files[*]}" "$basePath/../.." && ssh $SSHOPTIONS $TARGET_USER@$ip "touch Config/settings.cfg"
+else
+  rsync --chmod=F-x -Rzce "ssh $SSHOPTIONS" $TARGET_USER@$ip${files[*]//Config/:Config} "$basePath/../.." && ssh $SSHOPTIONS $TARGET_USER@$ip "touch Config/settings.cfg"
+fi

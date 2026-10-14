@@ -1,0 +1,13 @@
+# Additional setup for 3 vs 3
+# Player numbers are 1, 2, 3. Player 3 plays the forward/striker role - the
+# equivalent of player 5's role in the 5v5 formation - see Config/Scenarios/RC2026-3v3.
+
+robot robot1 robot2 robot3
+jc press 11 call Includes/PenaltyKickFirst # Shift+Ctrl+K (penalty kicK)
+jc press 12 call Includes/PushingFreeKickFirst # Shift+Ctrl+L (fouL)
+
+robot robot21 robot22 robot23
+jc press 11 call Includes/PenaltyKickSecond # Shift+Ctrl+K (penalty kicK)
+jc press 12 call Includes/PushingFreeKickSecond # Shift+Ctrl+L (fouL)
+
+robot all

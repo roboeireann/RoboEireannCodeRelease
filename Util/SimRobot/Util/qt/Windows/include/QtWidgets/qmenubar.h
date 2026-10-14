@@ -43,10 +43,9 @@
 #include <QtWidgets/qtwidgetsglobal.h>
 #include <QtWidgets/qmenu.h>
 
+QT_REQUIRE_CONFIG(menubar);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_MENUBAR
 
 class QMenuBarPrivate;
 class QStyleOptionMenuItem;
@@ -61,12 +60,14 @@ class Q_WIDGETS_EXPORT QMenuBar : public QWidget
     Q_PROPERTY(bool nativeMenuBar READ isNativeMenuBar WRITE setNativeMenuBar)
 
 public:
-    explicit QMenuBar(QWidget *parent = Q_NULLPTR);
+    explicit QMenuBar(QWidget *parent = nullptr);
     ~QMenuBar();
 
     using QWidget::addAction;
+#if QT_WIDGETS_REMOVED_SINCE(6, 3)
     QAction *addAction(const QString &text);
     QAction *addAction(const QString &text, const QObject *receiver, const char* member);
+#endif
 
     QAction *addMenu(QMenu *menu);
     QMenu *addMenu(const QString &title);
@@ -96,7 +97,7 @@ public:
     void setCornerWidget(QWidget *w, Qt::Corner corner = Qt::TopRightCorner);
     QWidget *cornerWidget(Qt::Corner corner = Qt::TopRightCorner) const;
 
-#ifdef Q_OS_OSX
+#if defined(Q_OS_MACOS) || defined(Q_CLANG_QDOC)
     NSMenu* toNSMenu();
 #endif
 
@@ -125,7 +126,7 @@ protected:
     void timerEvent(QTimerEvent *) override;
     bool eventFilter(QObject *, QEvent *) override;
     bool event(QEvent *) override;
-    void initStyleOption(QStyleOptionMenuItem *option, const QAction *action) const;
+    virtual void initStyleOption(QStyleOptionMenuItem *option, const QAction *action) const;
 
 private:
     Q_DECLARE_PRIVATE(QMenuBar)
@@ -139,8 +140,6 @@ private:
     friend class QMenuPrivate;
     friend class QWindowsStyle;
 };
-
-#endif // QT_NO_MENUBAR
 
 QT_END_NAMESPACE
 

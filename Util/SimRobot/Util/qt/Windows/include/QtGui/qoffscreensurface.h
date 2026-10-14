@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtGui module of the Qt Toolkit.
@@ -42,7 +42,9 @@
 
 #include <QtGui/qtguiglobal.h>
 #include <QtCore/QObject>
+#include <QtCore/qnativeinterface.h>
 #include <QtGui/qsurface.h>
+Q_MOC_INCLUDE(<QScreen>)
 
 QT_BEGIN_NAMESPACE
 
@@ -57,11 +59,10 @@ class Q_GUI_EXPORT QOffscreenSurface : public QObject, public QSurface
     Q_DECLARE_PRIVATE(QOffscreenSurface)
 
 public:
+    explicit QOffscreenSurface(QScreen *screen = nullptr, QObject *parent = nullptr);
+    ~QOffscreenSurface();
 
-    explicit QOffscreenSurface(QScreen *screen = Q_NULLPTR);
-    virtual ~QOffscreenSurface();
-
-    SurfaceType surfaceType() const Q_DECL_OVERRIDE;
+    SurfaceType surfaceType() const override;
 
     void create();
     void destroy();
@@ -69,18 +70,17 @@ public:
     bool isValid() const;
 
     void setFormat(const QSurfaceFormat &format);
-    QSurfaceFormat format() const Q_DECL_OVERRIDE;
+    QSurfaceFormat format() const override;
     QSurfaceFormat requestedFormat() const;
 
-    QSize size() const Q_DECL_OVERRIDE;
+    QSize size() const override;
 
     QScreen *screen() const;
     void setScreen(QScreen *screen);
 
     QPlatformOffscreenSurface *handle() const;
 
-    void *nativeHandle() const;
-    void setNativeHandle(void *handle);
+    QT_DECLARE_NATIVE_INTERFACE_ACCESSOR(QOffscreenSurface)
 
 Q_SIGNALS:
     void screenChanged(QScreen *screen);
@@ -90,11 +90,13 @@ private Q_SLOTS:
 
 private:
 
-    QPlatformSurface *surfaceHandle() const Q_DECL_OVERRIDE;
+    QPlatformSurface *surfaceHandle() const override;
 
     Q_DISABLE_COPY(QOffscreenSurface)
 };
 
 QT_END_NAMESPACE
+
+#include <QtGui/qoffscreensurface_platform.h>
 
 #endif // QOFFSCREENSURFACE_H

@@ -52,22 +52,13 @@ class QVariant;
 template <class T>
 class QPointer
 {
-    Q_STATIC_ASSERT_X(!std::is_pointer<T>::value, "QPointer's template type must not be a pointer type");
+    static_assert(!std::is_pointer<T>::value, "QPointer's template type must not be a pointer type");
 
-    template<typename U>
-    struct TypeSelector
-    {
-        typedef QObject Type;
-    };
-    template<typename U>
-    struct TypeSelector<const U>
-    {
-        typedef const QObject Type;
-    };
-    typedef typename TypeSelector<T>::Type QObjectType;
+    using QObjectType =
+        typename std::conditional<std::is_const<T>::value, const QObject, QObject>::type;
     QWeakPointer<QObjectType> wp;
 public:
-    inline QPointer() { }
+    QPointer() = default;
     inline QPointer(T *p) : wp(p, true) { }
     // compiler-generated copy/move ctor/assignment operators are fine!
     // compiler-generated dtor is fine!
@@ -77,13 +68,15 @@ public:
     ~QPointer();
 #endif
 
-    inline void swap(QPointer &other) { wp.swap(other.wp); }
+    inline void swap(QPointer &other) noexcept { wp.swap(other.wp); }
 
     inline QPointer<T> &operator=(T* p)
     { wp.assign(static_cast<QObjectType*>(p)); return *this; }
 
     inline T* data() const
-    { return static_cast<T*>( wp.data()); }
+    { return static_cast<T*>(wp.internalData()); }
+    inline T* get() const
+    { return data(); }
     inline T* operator->() const
     { return data(); }
     inline T& operator*() const
@@ -96,55 +89,42 @@ public:
 
     inline void clear()
     { wp.clear(); }
+
+#define DECLARE_COMPARE_SET(T1, A1, T2, A2) \
+    friend bool operator==(T1, T2) \
+    { return A1 == A2; } \
+    friend bool operator!=(T1, T2) \
+    { return A1 != A2; }
+
+#define DECLARE_TEMPLATE_COMPARE_SET(T1, A1, T2, A2) \
+    template <typename X> \
+    friend bool operator==(T1, T2) noexcept \
+    { return A1 == A2; } \
+    template <typename X> \
+    friend bool operator!=(T1, T2) noexcept \
+    { return A1 != A2; }
+
+    DECLARE_TEMPLATE_COMPARE_SET(const QPointer &p1, p1.data(), const QPointer<X> &p2, p2.data())
+    DECLARE_TEMPLATE_COMPARE_SET(const QPointer &p1, p1.data(), X *ptr, ptr)
+    DECLARE_TEMPLATE_COMPARE_SET(X *ptr, ptr, const QPointer &p2, p2.data())
+    DECLARE_COMPARE_SET(const QPointer &p1, p1.data(), std::nullptr_t, nullptr)
+    DECLARE_COMPARE_SET(std::nullptr_t, nullptr, const QPointer &p2, p2.data())
+#undef DECLARE_COMPARE_SET
+#undef DECLARE_TEMPLATE_COMPARE_SET
 };
-template <class T> Q_DECLARE_TYPEINFO_BODY(QPointer<T>, Q_MOVABLE_TYPE);
-
-template <class T>
-inline bool operator==(const T *o, const QPointer<T> &p)
-{ return o == p.operator->(); }
-
-template<class T>
-inline bool operator==(const QPointer<T> &p, const T *o)
-{ return p.operator->() == o; }
-
-template <class T>
-inline bool operator==(T *o, const QPointer<T> &p)
-{ return o == p.operator->(); }
-
-template<class T>
-inline bool operator==(const QPointer<T> &p, T *o)
-{ return p.operator->() == o; }
-
-template<class T>
-inline bool operator==(const QPointer<T> &p1, const QPointer<T> &p2)
-{ return p1.operator->() == p2.operator->(); }
-
-template <class T>
-inline bool operator!=(const T *o, const QPointer<T> &p)
-{ return o != p.operator->(); }
-
-template<class T>
-inline bool operator!= (const QPointer<T> &p, const T *o)
-{ return p.operator->() != o; }
-
-template <class T>
-inline bool operator!=(T *o, const QPointer<T> &p)
-{ return o != p.operator->(); }
-
-template<class T>
-inline bool operator!= (const QPointer<T> &p, T *o)
-{ return p.operator->() != o; }
-
-template<class T>
-inline bool operator!= (const QPointer<T> &p1, const QPointer<T> &p2)
-{ return p1.operator->() != p2.operator->() ; }
+template <class T> Q_DECLARE_TYPEINFO_BODY(QPointer<T>, Q_RELOCATABLE_TYPE);
 
 template<typename T>
 QPointer<T>
 qPointerFromVariant(const QVariant &variant)
 {
-    return QPointer<T>(qobject_cast<T*>(QtSharedPointer::weakPointerFromVariant_internal(variant).data()));
+    const auto wp = QtSharedPointer::weakPointerFromVariant_internal(variant);
+    return QPointer<T>{qobject_cast<T*>(QtPrivate::EnableInternalData::internalData(wp))};
 }
+
+template <class T>
+inline void swap(QPointer<T> &p1, QPointer<T> &p2) noexcept
+{ p1.swap(p2); }
 
 QT_END_NAMESPACE
 

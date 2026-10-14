@@ -7,11 +7,11 @@
  */
 
 #include "BallSpots.h"
-#include "Tools/Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings.h"
 
 void BallSpots::draw() const
 {
-  DEBUG_DRAWING("representation:BallSpots:image", "drawingOnImage") // Draws the ballspots to the image
+  DEBUG_DRAWING("representation:BallSpots:image", "drawingOnImage") // Draws the ball spots to the image
   {
     for(const Vector2i& ballSpot : ballSpots)
     {

@@ -1,0 +1,52 @@
+# -----------------------------------------------------------------
+# green/white team positions - coords relative to defending half
+
+# robot robot1
+# mvrp 4300 0 525 0 0 180
+
+# robot robot2
+# mvrp 2700 1000 525 0 0 180
+
+robot robot3
+mvrp -800 -800 525 0 0 180
+
+robot robot4
+mvrp 1600 1800 525 0 0 180
+
+robot robot5
+mvrp 2000 200 525 0 0 120
+
+
+# -----------------------------------------------------------------
+# red/blue team positions
+robot robot21
+mvrp -4300 0 525 0 0 0
+
+robot robot22
+mvrp -1300 1700 525 0 0 30
+
+robot robot23
+mvrp 2200 500 525 0 0 0
+
+robot robot24
+mvrp -300 -300 525 0 0 0
+
+# robot robot25
+# mvrp -800 -2000 525 0 0 0
+
+# -----------------------------------------------------------------
+# move the ball near robot22
+mvb -900 1850 1000
+# mvb 2000 3000 500
+
+# -----------------------------------------------------------------
+# Set GameState
+robot robot5
+gc kickOffSecondTeam
+gc playing
+
+# make robot22 kick the ball straight out
+robot robot22
+dr behaviour:StrikerPlayingTask:kickStraightAhead
+
+# gc kickInForFirstTeam

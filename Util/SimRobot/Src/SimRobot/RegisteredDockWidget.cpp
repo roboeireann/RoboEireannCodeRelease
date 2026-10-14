@@ -9,38 +9,22 @@
 
 #include "RegisteredDockWidget.h"
 #include "MainWindow.h"
-
-#ifdef FIX_MACOS_UNDOCKED_WIDGETS_DURING_CLOSE_BUG
-extern MainWindow* mainWindow;
-#endif
+#include "Theme.h"
 
 RegisteredDockWidget::RegisteredDockWidget(const QString& fullName, QWidget* parent) :
   QDockWidget(parent), fullName(fullName), module(0), object(0), widget(0), flags(0), reallyVisible(false)
 {
   setObjectName(fullName);
+  setFeatures(features() & ~DockWidgetFloatable);
   setAllowedAreas(Qt::TopDockWidgetArea);
   setFocusPolicy(Qt::ClickFocus);
-#ifdef FIX_MACOS_DOCKED_WIDGETS_DRAG_BUG
-  connect(this, SIGNAL(topLevelChanged(bool)), this, SLOT(topLevelChanged(bool)));
-#endif
-  connect(this, SIGNAL(visibilityChanged(bool)), this, SLOT(visibilityChanged(bool)));
+  connect(this, &QDockWidget::visibilityChanged, this, &RegisteredDockWidget::visibilityChanged);
 }
 
 void RegisteredDockWidget::setWidget(SimRobot::Widget* widget, const SimRobot::Module* module, SimRobot::Object* object, int flags)
 {
   if(widget)
-  {
-#ifdef FIX_MACOS_UNDOCKED_WIDGETS_DISAPPEAR_WHEN_DOCKED_BUG
-    if(isFloating() && widget->getWidget()->inherits("QGLWidget"))
-    {
-      setFloating(false);
-      QDockWidget::setWidget(widget->getWidget());
-      setFloating(true);
-    }
-    else
-#endif
-      QDockWidget::setWidget(widget->getWidget());
-  }
+    QDockWidget::setWidget(widget->getWidget());
   else
     QDockWidget::setWidget(nullptr);
   if(this->widget)
@@ -58,7 +42,7 @@ bool RegisteredDockWidget::canClose()
 
 QMenu* RegisteredDockWidget::createFileMenu() const
 {
-  return widget ? widget->createFileMenu() : 0;
+  return widget ? widget->createFileMenu() : nullptr;
 }
 
 QMenu* RegisteredDockWidget::createEditMenu()
@@ -76,10 +60,12 @@ QMenu* RegisteredDockWidget::createEditMenu()
 
   if(flags & SimRobot::Flag::copy)
   {
-    QAction* copyAction = menu->addAction(QIcon(":/Icons/page_copy.png"), tr("&Copy"));
+    QIcon copyActionIcon(":/Icons/icons8-copy-to-clipboard-50.png");
+    copyActionIcon.setIsMask(true);
+    QAction* copyAction = menu->addAction(copyActionIcon, tr("&Copy"));
     copyAction->setShortcut(QKeySequence(QKeySequence::Copy));
     copyAction->setStatusTip(tr("Copy the window drawing to the clipboard"));
-    connect(copyAction, SIGNAL(triggered()), this, SLOT(copy()));
+    connect(copyAction, &QAction::triggered, this, &RegisteredDockWidget::copy);
   }
 
   return menu;
@@ -100,8 +86,8 @@ QMenu* RegisteredDockWidget::createUserMenu() const
     QMenu* exportImgMenu = menu->addMenu(tr("&Export Image"));
     QAction* svgAction = exportImgMenu->addAction(tr("Export Image as &SVG"));
     QAction* pngAction = exportImgMenu->addAction(tr("Export Image as &PNG"));
-    connect(svgAction, SIGNAL(triggered()), this, SLOT(exportAsSvg()));
-    connect(pngAction, SIGNAL(triggered()), this, SLOT(exportAsPng()));
+    connect(svgAction, &QAction::triggered, this, &RegisteredDockWidget::exportAsSvg);
+    connect(pngAction, &QAction::triggered, this, &RegisteredDockWidget::exportAsPng);
   }
 
   return menu;
@@ -133,18 +119,7 @@ void RegisteredDockWidget::closeEvent(QCloseEvent* event)
     return;
   }
 
-#ifdef FIX_MACOS_UNDOCKED_WIDGETS_DURING_CLOSE_BUG
-  if(isFloating())
-  {
-    mainWindow->setUpdatesEnabled(false);
-    setFloating(false);
-    QDockWidget::closeEvent(event);
-    mainWindow->setUpdatesEnabled(true);
-  }
-  else
-#endif
-    QDockWidget::closeEvent(event);
-
+  QDockWidget::closeEvent(event);
   emit closedObject(fullName);
 }
 
@@ -174,11 +149,11 @@ void RegisteredDockWidget::contextMenuEvent(QContextMenuEvent* event)
     for(QAction* action : editMenu->actions())
     {
       editMenu->removeAction(action);
-      menu.addAction(action);
+      menu.addAction(Theme::updateIcon(this, action));
     }
     menu.addSeparator();
   }
-  menu.addAction(simMenu->menuAction());
+  menu.addAction(Theme::updateIcon(this, simMenu->menuAction()));
   if(userMenu)
   {
     QMetaObject::invokeMethod(userMenu, "aboutToShow", Qt::DirectConnection);
@@ -186,7 +161,7 @@ void RegisteredDockWidget::contextMenuEvent(QContextMenuEvent* event)
     for(QAction* action : userMenu->actions())
     {
       userMenu->removeAction(action);
-      menu.addAction(action);
+      menu.addAction(Theme::updateIcon(this, action));
     }
   }
   event->accept();
@@ -206,18 +181,9 @@ void RegisteredDockWidget::visibilityChanged(bool visible)
   reallyVisible = visible;
 }
 
-void RegisteredDockWidget::topLevelChanged(bool topLevel)
-{
-  if(topLevel)
-    setFeatures(features() | DockWidgetMovable);
-  else
-    setFeatures(features() & ~DockWidgetMovable);
-}
-
 void RegisteredDockWidget::copy()
 {
-  QApplication::clipboard()->clear();
-  QApplication::clipboard()->setPixmap(QDockWidget::widget()->grab());
+  QApplication::clipboard()->setImage(QDockWidget::widget()->grab().toImage());
 }
 
 void RegisteredDockWidget::exportAsSvg()
@@ -227,7 +193,11 @@ void RegisteredDockWidget::exportAsSvg()
 
   QSettings& settings = MainWindow::application->getSettings();
   QString fileName = QFileDialog::getSaveFileName(this,
-    tr("Export as SVG"), settings.value("ExportDirectory", "").toString(), tr("Scalable Vector Graphics (*.svg)"));
+    tr("Export as SVG"), settings.value("ExportDirectory", "").toString(), tr("Scalable Vector Graphics (*.svg)")
+#if defined LINUX && defined QT_VERSION && QT_VERSION < QT_VERSION_CHECK(6, 6, 0)
+    , nullptr, QFileDialog::DontUseNativeDialog
+#endif
+    );
   if(fileName.isEmpty())
     return;
   settings.setValue("ExportDirectory", QFileInfo(fileName).dir().path());
@@ -253,7 +223,11 @@ void RegisteredDockWidget::exportAsPng()
 
   QSettings& settings = MainWindow::application->getSettings();
   QString fileName = QFileDialog::getSaveFileName(this,
-    tr("Export as PNG"), settings.value("ExportDirectory", "").toString(), tr("(*.png)"));
+    tr("Export as PNG"), settings.value("ExportDirectory", "").toString(), tr("(*.png)")
+#if defined LINUX && defined QT_VERSION && QT_VERSION < QT_VERSION_CHECK(6, 6, 0)
+    , nullptr, QFileDialog::DontUseNativeDialog
+#endif
+    );
   if(fileName.isEmpty())
     return;
   settings.setValue("ExportDirectory", QFileInfo(fileName).dir().path());
@@ -262,30 +236,4 @@ void RegisteredDockWidget::exportAsPng()
   pixmap.fill(QColor(0, 0, 0, 0));
   widget->getWidget()->render(&pixmap);
   pixmap.save(fileName, "PNG");
-}
-
-void RegisteredDockWidget::keyPressEvent(QKeyEvent* event)
-{
-  if(isFloating() && (event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
-  {
-    static_cast<RegisteredDockWidget*>(qobject_cast<QWidget*>(parent()))->keyPressEvent(event);
-    // note: the dirty cast is for accessing keyPressEvent
-    if(event->isAccepted())
-      return;
-  }
-
-  QDockWidget::keyPressEvent(event);
-}
-
-void RegisteredDockWidget::keyReleaseEvent(QKeyEvent* event)
-{
-  if(isFloating() && (event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)) == (Qt::ControlModifier | Qt::ShiftModifier))
-  {
-    static_cast<RegisteredDockWidget*>(qobject_cast<QWidget*>(parent()))->keyReleaseEvent(event);
-    // note: the dirty cast is for accessing keyReleaseEvent
-    if(event->isAccepted())
-      return;
-  }
-
-  QDockWidget::keyReleaseEvent(event);
 }

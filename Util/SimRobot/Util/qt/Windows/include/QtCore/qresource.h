@@ -1,6 +1,7 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
+** Copyright (C) 2019 Intel Corporation.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -54,7 +55,13 @@ class QResourcePrivate;
 class Q_CORE_EXPORT QResource
 {
 public:
-    QResource(const QString &file=QString(), const QLocale &locale=QLocale());
+    enum Compression {
+        NoCompression,
+        ZlibCompression,
+        ZstdCompression
+    };
+
+    QResource(const QString &file = QString(), const QLocale &locale = QLocale());
     ~QResource();
 
     void setFileName(const QString &file);
@@ -66,13 +73,12 @@ public:
 
     bool isValid() const;
 
-    bool isCompressed() const;
+    Compression compressionAlgorithm() const;
     qint64 size() const;
     const uchar *data() const;
+    qint64 uncompressedSize() const;
+    QByteArray uncompressedData() const;
     QDateTime lastModified() const;
-
-    static void addSearchPath(const QString &path);
-    static QStringList searchPaths();
 
     static bool registerResource(const QString &rccFilename, const QString &resourceRoot=QString());
     static bool unregisterResource(const QString &rccFilename, const QString &resourceRoot=QString());

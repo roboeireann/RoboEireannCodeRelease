@@ -6,13 +6,14 @@
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
+#include "Tools/Communication/BHumanMessageParticle.h"
+#include "Streaming/AutoStreamable.h"
 
 /**
  * @struct FrameInfo
  * A struct that contains information on the current frame.
  */
-STREAMABLE(FrameInfo,
+STREAMABLE(FrameInfo, COMMA public BHumanCompressedMessageParticle<FrameInfo>
 {
   /**
    * The method returns the time difference between a given timestamp and the

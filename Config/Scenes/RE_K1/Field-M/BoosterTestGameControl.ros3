@@ -1,0 +1,26 @@
+<Simulation>
+  <Include href="../../Includes/BallFifa3.rsi3"/>
+  <Include href="../../Includes/Field2026-M.rsi3"/>
+  <Include href="../../Includes/K1/K1_new.rsi3"/>
+
+  <!-- specifies the common location and layout info -->
+  <Include href="../Includes/SingleM.rsi3"/>
+
+  <Scene name="RoboCup" controller="SimulatedNao" stepLength="0.002" color="rgb(65%, 65%, 70%)">
+    <PointLight z="9m" ambientColor="rgb(50%, 50%, 50%)"/>
+
+    <Compound ref="robot type"/>
+    <Compound ref="teams"/>
+    <Compound ref="robots"/>
+    <Compound name="extras"/>
+    <Compound ref="balls"/>
+    <Compound ref="field"/>
+
+    <Compound ref="location"/>
+
+    <Compound name="scenarios">
+      <Compound name="RE-K1-TestGameControl"/>
+    </Compound>
+
+  </Scene>
+</Simulation>

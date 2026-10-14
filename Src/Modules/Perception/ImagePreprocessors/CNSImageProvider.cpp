@@ -8,13 +8,12 @@
 
 #include "CNSImageProvider.h"
 #include "Representations/Infrastructure/CameraImage.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Math/BHMath.h"
-#include "Tools/ImageProcessing/AVX.h"
+#include "Debugging/DebugDrawings.h"
+#include "Math/BHMath.h"
+#include "ImageProcessing/AVX.h"
 #include "Tools/Math/Transformation.h"
-#include "Tools/ImageProcessing/InImageSizeCalculations.h"
 
-MAKE_MODULE(CNSImageProvider, perception);
+MAKE_MODULE(CNSImageProvider);
 
 ///////////////////////////////////////////////////////////////////////////
 // Local helpers
@@ -170,7 +169,7 @@ ALWAYSINLINE static void cnsFormula(__m128i& result, __m128i sobelX, __m128i sob
  * 2 above (passed in \c currentIV) are used to compute sobelX, sobelY, gaussI and gaussI2A/B. The latter one
  * is floating point and separated into two halves.
  *
- * Also \c gaussI is stored in \c currentIV.gaussI (used for downsampling).
+ * Also \c gaussI is stored in \c currentIV.gaussI (used for down sampling).
  */
 ALWAYSINLINE static void filters(IntermediateValues& currentIV, const IntermediateValues& previousIV,
                                  __m128i& sobelX, __m128i& sobelY, __m128i& gaussI, __m128& gaussI2A, __m128& gaussI2B,

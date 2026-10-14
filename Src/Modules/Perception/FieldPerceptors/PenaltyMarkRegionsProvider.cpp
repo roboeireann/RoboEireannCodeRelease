@@ -10,10 +10,10 @@
  */
 
 #include "PenaltyMarkRegionsProvider.h"
-#include "Tools/ImageProcessing/InImageSizeCalculations.h"
-#include "Tools/ImageProcessing/PixelTypes.h"
+#include "Tools/Math/InImageSizeCalculations.h"
+#include "ImageProcessing/PixelTypes.h"
 
-MAKE_MODULE(PenaltyMarkRegionsProvider, perception);
+MAKE_MODULE(PenaltyMarkRegionsProvider);
 
 void PenaltyMarkRegionsProvider::update(PenaltyMarkRegions& thePenaltyMarkRegions)
 {
@@ -21,9 +21,8 @@ void PenaltyMarkRegionsProvider::update(PenaltyMarkRegions& thePenaltyMarkRegion
   DECLARE_DEBUG_DRAWING("module:PenaltyMarkRegionsProvider:mergedRegions", "drawingOnImage");
 
   thePenaltyMarkRegions.regions.clear();
-  cnsRegions.clear();
 
-  if(theScanGrid.y.empty())
+  if(!theScanGrid.isValid())
     return;
 
   Vector2f pointInImage;
@@ -35,13 +34,13 @@ void PenaltyMarkRegionsProvider::update(PenaltyMarkRegions& thePenaltyMarkRegion
                 - theColorScanLineRegionsVerticalClipped.scanLines[theColorScanLineRegionsVerticalClipped.lowResStart].x;
 
     unsigned short upperBound = static_cast<unsigned short>(std::max(0.f, pointInImage.y()));
-    if(upperBound < theScanGrid.y[0])
+    if(upperBound < theScanGrid.fullResY[0])
     {
       initTables(upperBound);
       if(initRegions(upperBound))
       {
         unionFind(xStep);
-        analyseRegions(upperBound, xStep, thePenaltyMarkRegions.regions);
+        analyzeRegions(upperBound, xStep, thePenaltyMarkRegions.regions);
       }
     }
   }
@@ -51,11 +50,11 @@ void PenaltyMarkRegionsProvider::initTables(unsigned short upperBound)
 {
   extendedLower.resize(theCameraInfo.height + 1);
 
-  int y = theScanGrid.y[0] + 1;
+  int y = theScanGrid.fullResY[0] + 1;
   int yGrid;
-  for(size_t i = 1; i < theScanGrid.y.size() && (yGrid = theScanGrid.y[i]) >= upperBound; ++i)
+  for(size_t i = 1; i < theScanGrid.fullResY.size() && (yGrid = theScanGrid.fullResY[i]) >= upperBound; ++i)
   {
-    int extension = (theScanGrid.y[i - 1] - yGrid) * regionExtensionFactor;
+    int extension = (theScanGrid.fullResY[i - 1] - yGrid) * regionExtensionFactor;
     while(y >= yGrid)
     {
       extendedLower[y] = static_cast<unsigned short>(y + extension);
@@ -75,13 +74,13 @@ bool PenaltyMarkRegionsProvider::initRegions(unsigned short upperBound)
     bool first = true;
     for(auto& region : scanLine.regions)
     {
-      if(region.color != PixelTypes::Color::field && region.range.lower > upperBound)
+      if(region.color != ScanLineRegion::field && region.range.lower > upperBound)
       {
         if(regions.empty() || regions.back().left != scanLine.x || regions.back().upper != region.range.lower)
         {
           if(regions.size() == regions.capacity())
             return false;
-          regions.emplace_back(std::max(region.range.upper, upperBound), region.range.lower, scanLine.x, region.color == PixelTypes::Color::white);
+          regions.emplace_back(std::max(region.range.upper, upperBound), region.range.lower, scanLine.x, region.color == ScanLineRegion::white);
         }
         else
         {
@@ -89,7 +88,7 @@ bool PenaltyMarkRegionsProvider::initRegions(unsigned short upperBound)
           unsigned short upper = std::max(region.range.upper, upperBound);
           r.upper = upper;
           r.pixels += region.range.lower - upper;
-          if(region.color == PixelTypes::Color::white)
+          if(region.color == ScanLineRegion::white)
             r.whitePixels += region.range.lower - upper;
         }
         if(first || region.range.upper <= upperBound)
@@ -125,7 +124,7 @@ void PenaltyMarkRegionsProvider::unionFind(int xStep)
     }
 }
 
-void PenaltyMarkRegionsProvider::analyseRegions(unsigned short upperBound, int xStep, std::vector<Boundaryi>& searchRegions)
+void PenaltyMarkRegionsProvider::analyzeRegions(unsigned short upperBound, int xStep, std::vector<Boundaryi>& searchRegions)
 {
   std::vector<Region*> mergedRegions;
   mergedRegions.reserve(100);
@@ -144,7 +143,7 @@ void PenaltyMarkRegionsProvider::analyseRegions(unsigned short upperBound, int x
     }
 
   upperBound = extendedLower[upperBound];
-  unsigned short lowerBound = static_cast<unsigned short>(theScanGrid.y[0] + 1);
+  unsigned short lowerBound = static_cast<unsigned short>(theScanGrid.fullResY[0] + 1);
 
   struct Candidate
   {
@@ -168,8 +167,8 @@ void PenaltyMarkRegionsProvider::analyseRegions(unsigned short upperBound, int x
            && measuredWidth + 2 * (xStep - 1) >= expectedWidth * (1.f - sizeToleranceRatio)
            && measuredHeight <= expectedHeight * (1.f + sizeToleranceRatio)
            && measuredHeight >= expectedHeight * (1.f - sizeToleranceRatio)
-           && region->left > theScanGrid.lines[theScanGrid.lowResStart].x
-           && region->right < theScanGrid.lines[theScanGrid.lines.size() - 1 - theScanGrid.lowResStart].x
+           && region->left > theScanGrid.verticalLines[theScanGrid.lowResStart].x
+           && region->right < theScanGrid.verticalLines[theScanGrid.verticalLines.size() - 1 - theScanGrid.lowResStart].x
            && region->pixels * minWhiteRatio < region->whitePixels)
         {
           candidate.center = center.cast<int>();
@@ -196,10 +195,6 @@ void PenaltyMarkRegionsProvider::analyseRegions(unsigned short upperBound, int x
   {
     const Candidate& candidate = candidates[i];
     searchRegions.emplace_back(candidate.region);
-    cnsRegions.emplace_back(Rangei(candidate.region.x.min - candidate.xExtent,
-                                   candidate.region.x.max + candidate.xExtent),
-                            Rangei(candidate.region.y.min - candidate.yExtent,
-                                   candidate.region.y.max + candidate.yExtent));
   }
 
   COMPLEX_DRAWING("module:PenaltyMarkRegionsProvider:mergedRegions")

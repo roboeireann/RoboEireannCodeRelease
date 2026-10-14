@@ -46,32 +46,18 @@
 
 QT_BEGIN_NAMESPACE
 
-class QStringList;
-
 class Q_CORE_EXPORT QLibraryInfo
 {
 public:
-#if QT_DEPRECATED_SINCE(5, 8)
-    static QT_DEPRECATED QString licensee();
-    static QT_DEPRECATED QString licensedProducts();
-#endif
-
-#ifndef QT_NO_DATESTRING
-#if QT_DEPRECATED_SINCE(5, 5)
-    static QT_DEPRECATED QDate buildDate();
-#endif // QT_DEPRECATED_SINCE(5, 5)
-#endif //QT_NO_DATESTRING
-
-    static const char * build() Q_DECL_NOTHROW;
+    static const char *build() noexcept;
 
     static bool isDebugBuild();
 
 #ifndef QT_BOOTSTRAPPED
-    static QVersionNumber version() Q_DECL_NOTHROW Q_DECL_CONST_FUNCTION;
+    static QVersionNumber version() noexcept Q_DECL_CONST_FUNCTION;
 #endif
 
-    enum LibraryLocation
-    {
+    enum LibraryPath {
         PrefixPath = 0,
         DocumentationPath,
         HeadersPath,
@@ -79,36 +65,24 @@ public:
         LibraryExecutablesPath,
         BinariesPath,
         PluginsPath,
-        ImportsPath,
-        Qml2ImportsPath,
+        QmlImportsPath,
+        Qml2ImportsPath = QmlImportsPath,
         ArchDataPath,
         DataPath,
         TranslationsPath,
         ExamplesPath,
         TestsPath,
         // Insert new values above this line
-        // Please read the comments in qlibraryinfo.cpp before adding
-#ifdef QT_BUILD_QMAKE
-        // These are not subject to binary compatibility constraints
-        SysrootPath,
-        SysrootifyPrefixPath,
-        HostBinariesPath,
-        HostLibrariesPath,
-        HostDataPath,
-        TargetSpecPath,
-        HostSpecPath,
-        HostPrefixPath,
-        LastHostPath = HostPrefixPath,
-#endif
+        // Please read the comments in qconfig.cpp.in before adding
         SettingsPath = 100
     };
-    static QString location(LibraryLocation); // ### Qt 6: consider renaming it to path()
-#ifdef QT_BUILD_QMAKE
-    enum PathGroup { FinalPaths, EffectivePaths, EffectiveSourcePaths, DevicePaths };
-    static QString rawLocation(LibraryLocation, PathGroup);
-    static void reload();
+    static QString path(LibraryPath p);
+#if QT_DEPRECATED_SINCE(6, 0)
+    using LibraryLocation = LibraryPath;
+    QT_DEPRECATED_VERSION_X_6_0("Use path()")
+    static QString location(LibraryLocation location)
+    { return path(location); }
 #endif
-
     static QStringList platformPluginArguments(const QString &platformName);
 
 private:

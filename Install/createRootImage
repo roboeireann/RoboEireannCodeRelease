@@ -1,6 +1,6 @@
 #!/bin/bash
-
-# This script is based on something published by the Nao Devils.
+# This script creates a root image for the NAO robot using Ubuntu 22.04.
+# It is based on something published by the Nao Devils.
 # Thanks!
 
 set -euo pipefail
@@ -11,19 +11,19 @@ includeDir="${baseDir}/Include"
 
 source "${includeDir}/bhumanBase"
 
-rootDir="/tmp/roboeireann-root"
+rootDir="/tmp/robo-root"
 naoOPN=""
 naoImage="/tmp/nao-image.ext3"
 naoImageDir="/tmp/nao-image-dir"
-rootImage="${baseDir}/root.ext3"
+rootImage="${baseDir}/root-$(date +%Y-%m-%d).ext3"
 
 usage() {
   echo "usage:"
-  echo "${0} [-r <root image>] <SBR image>"
+  echo "${0} [-r <root image>] <OPN image>"
   echo "${0} -h"
   echo ""
   echo " <root image>: path to the root image (.ext3)"
-  echo " <SBR image> : path to an original SoftBank Robotics .opn (including HAL and LoLA)"
+  echo " <OPN image> : path to an original Aldebaran .opn (including HAL and LoLA)"
   echo ""
   echo " -h          : Display this help"
   exit 1
@@ -50,7 +50,7 @@ parseOptions() {
 
   naoOPN="${1}"
   if [ ! $(dd if="${naoOPN}" skip=96 bs=1 count=8 status=none | xxd -p) = "0000000000100000" ]; then
-    fatal "Invalid SoftBank image."
+    fatal "Invalid Aldebaran image."
   fi
 }
 
@@ -83,14 +83,14 @@ fi
 
 # Install a minimal Ubuntu.
 mkdir -p "${rootDir}"
-debootstrap --variant=minbase --arch=amd64 focal "${rootDir}" http://archive.ubuntu.com/ubuntu
+debootstrap --variant=minbase --arch=amd64 jammy "${rootDir}" http://archive.ubuntu.com/ubuntu
 
 # Adjust sources.
 cat >"${rootDir}/etc/apt/sources.list" <<EOF
-deb http://archive.ubuntu.com/ubuntu focal main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu focal-updates main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu focal-security main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu focal-backports main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
 EOF
 
 mount -o bind /dev "${rootDir}/dev"
@@ -100,18 +100,18 @@ mount -t proc /proc "${rootDir}/proc"
 LANG=C LC_ALL=C chroot "${rootDir}" /bin/bash <<EOF
 set -eu
 
-apt-get update
-apt-get dist-upgrade
+DEBIAN_FRONTEND=noninteractive apt-get update -y
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y
 
-DEBIAN_FRONTEND=noninteractive apt-get install -y alsa beignet-opencl-icd gdb htop i2c-tools iw libusb-1.0-0 net-tools ocl-icd-libopencl1 openssh-server pciutils rsync ubuntu-minimal valgrind vim wpasupplicant
+DEBIAN_FRONTEND=noninteractive apt-get install -y alsa gdb htop i2c-tools iw libssl3 libusb-1.0-0 net-tools openssh-server pciutils rsync ubuntu-minimal valgrind vim wpasupplicant
 
 # wpa_supplicant does not need to run by itself, it will be started by netplan if necessary.
 systemctl disable wpa_supplicant.service
 
-addgroup --system nao --gid 1001
-addgroup hal --gid 99
-addgroup usb --gid 85
-addgroup rt --gid 113
+addgroup --gid 1001 nao
+addgroup --system hal
+addgroup --system usb
+addgroup --system rt
 useradd -s /bin/bash -g nao -G tty,uucp,audio,video,plugdev,systemd-journal,syslog,hal,usb,rt,sudo,render -u 1001 -M nao
 echo "nao:nao" | chpasswd
 echo "root:root" | chpasswd
@@ -143,7 +143,7 @@ DefaultDependencies=no
 
 [Service]
 Type=oneshot
-ExecStart=/usr/sbin/tune2fs -U 66666666-1120-1120-1120-666666666666 -L B-Human-data -j /dev/disk/by-partuuid/66666666-1120-1120-1120-666666666666
+ExecStart=/usr/sbin/tune2fs -U 66666666-1120-1120-1120-666666666666 -L robo-data -j /dev/disk/by-partuuid/66666666-1120-1120-1120-666666666666
 ExecStartPost=/bin/systemctl disable tune-home-fs.service
 
 [Install]
@@ -190,8 +190,6 @@ cp "${baseDir}/Files/chest-harakiri" "${rootDir}/opt/roboeireann/libexec"
 cp "${baseDir}/Files/flash-cx3" "${rootDir}/opt/aldebaran/libexec"
 cp "${baseDir}/Files/reset-cameras.sh" "${rootDir}/opt/aldebaran/libexec"
 cp "${baseDir}/Files/harakiri" "${rootDir}/lib/systemd/system-shutdown"
-
-rm "${rootDir}/etc/systemd/system/multi-user.target.wants/ondemand.service"
 
 # Copy HAL, LoLA and other blobs from an original image.
 if [ ! -e "${naoImage}" ]; then
@@ -386,7 +384,7 @@ patchelf --set-interpreter /opt/aldebaran/lib/ld-linux.so.2 "${rootDir}/opt/alde
 # Clean up.
 rm -r "${rootDir}/var/lib/apt/lists"/* "${rootDir}/var/log"/* "${rootDir}/var/cache"/*
 
-mke2fs -q -F -U 42424242-1120-1120-1120-424242424242 -L "B-Human-system" -b 4096 -t ext3 -d "${rootDir}" "${rootImage}" 999168
+mke2fs -q -F -U 42424242-1120-1120-1120-424242424242 -L "robo-system" -b 4096 -t ext3 -d "${rootDir}" "${rootImage}" 999168
 
 rm -rf "${rootDir}"
 

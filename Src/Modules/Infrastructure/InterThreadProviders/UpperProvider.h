@@ -9,15 +9,14 @@
 
 #pragma once
 
-#include "Representations/Perception/GoalPercepts/GoalPostsPercept.h"
+#include "Representations/MotionControl/OdometryData.h"
 #include "Representations/Perception/ImagePreprocessing/FieldBoundary.h"
-#include "Representations/Perception/ObstaclesPercepts/ObstaclesFieldPercept.h"
 #include "Representations/Perception/ObstaclesPercepts/ObstaclesPerceptorData.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 STREAMABLE_WITH_BASE(UpperFieldBoundary, FieldBoundary, {,});
 STREAMABLE_WITH_BASE(UpperObstaclesPerceptorData, ObstaclesPerceptorData, {,});
-STREAMABLE_WITH_BASE(UpperGoalPostsPercept, GoalPostsPercept, {,});
+STREAMABLE_WITH_BASE(UpperOdometryData, OdometryData, {,});
 
 MODULE(UpperProvider,
 {,
@@ -25,8 +24,8 @@ MODULE(UpperProvider,
   PROVIDES(OtherFieldBoundary),
   REQUIRES(UpperObstaclesPerceptorData),
   PROVIDES(OtherObstaclesPerceptorData),
-  REQUIRES(UpperGoalPostsPercept),
-  PROVIDES(OtherGoalPostsPercept),
+  REQUIRES(UpperOdometryData),
+  PROVIDES(OtherOdometryData),
 });
 
 class UpperProvider : public UpperProviderBase
@@ -39,13 +38,13 @@ class UpperProvider : public UpperProviderBase
 
   /**
    * This method is called when the representation provided needs to be updated.
-   * @param theOtherGoalPostPercept The representation updated.
-   */
-  void update(OtherGoalPostsPercept& theOtherGoalPostsPercept) override;
-
-  /**
-   * This method is called when the representation provided needs to be updated.
    * @param theOtherObstaclesPerceptorData The representation updated.
    */
   void update(OtherObstaclesPerceptorData& theOtherObstaclesPerceptorData) override;
+
+  /**
+   * This method is called when the representation provided needs to be updated.
+   * @param theOtherOdometryData The representation updated.
+   */
+  void update(OtherOdometryData& theOtherOdometryData) override;
 };

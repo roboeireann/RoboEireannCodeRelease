@@ -53,18 +53,18 @@ class Q_WIDGETS_EXPORT QFocusFrame : public QWidget
 {
     Q_OBJECT
 public:
-    QFocusFrame(QWidget *parent = Q_NULLPTR);
+    QFocusFrame(QWidget *parent = nullptr);
     ~QFocusFrame();
 
     void setWidget(QWidget *widget);
     QWidget *widget() const;
 
 protected:
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
+    bool event(QEvent *e) override;
 
-    bool eventFilter(QObject *, QEvent *) Q_DECL_OVERRIDE;
-    void paintEvent(QPaintEvent *) Q_DECL_OVERRIDE;
-    void initStyleOption(QStyleOption *option) const;
+    bool eventFilter(QObject *, QEvent *) override;
+    void paintEvent(QPaintEvent *) override;
+    virtual void initStyleOption(QStyleOption *option) const;
 
 private:
     Q_DECLARE_PRIVATE(QFocusFrame)

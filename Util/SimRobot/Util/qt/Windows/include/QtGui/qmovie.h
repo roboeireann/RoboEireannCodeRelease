@@ -64,8 +64,8 @@ class Q_GUI_EXPORT QMovie : public QObject
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(QMovie)
-    Q_PROPERTY(int speed READ speed WRITE setSpeed)
-    Q_PROPERTY(CacheMode cacheMode READ cacheMode WRITE setCacheMode)
+    Q_PROPERTY(int speed READ speed WRITE setSpeed BINDABLE bindableSpeed)
+    Q_PROPERTY(CacheMode cacheMode READ cacheMode WRITE setCacheMode BINDABLE bindableCacheMode)
 public:
     enum MovieState {
         NotRunning,
@@ -79,9 +79,9 @@ public:
     };
     Q_ENUM(CacheMode)
 
-    explicit QMovie(QObject *parent = Q_NULLPTR);
-    explicit QMovie(QIODevice *device, const QByteArray &format = QByteArray(), QObject *parent = Q_NULLPTR);
-    explicit QMovie(const QString &fileName, const QByteArray &format = QByteArray(), QObject *parent = Q_NULLPTR);
+    explicit QMovie(QObject *parent = nullptr);
+    explicit QMovie(QIODevice *device, const QByteArray &format = QByteArray(), QObject *parent = nullptr);
+    explicit QMovie(const QString &fileName, const QByteArray &format = QByteArray(), QObject *parent = nullptr);
     ~QMovie();
 
     static QList<QByteArray> supportedFormats();
@@ -105,6 +105,8 @@ public:
     QPixmap currentPixmap() const;
 
     bool isValid() const;
+    QImageReader::ImageReaderError lastError() const;
+    QString lastErrorString() const;
 
     bool jumpToFrame(int frameNumber);
     int loopCount() const;
@@ -113,12 +115,14 @@ public:
     int currentFrameNumber() const;
 
     int speed() const;
+    QBindable<int> bindableSpeed();
 
     QSize scaledSize();
     void setScaledSize(const QSize &size);
 
     CacheMode cacheMode() const;
     void setCacheMode(CacheMode mode);
+    QBindable<CacheMode> bindableCacheMode();
 
 Q_SIGNALS:
     void started();

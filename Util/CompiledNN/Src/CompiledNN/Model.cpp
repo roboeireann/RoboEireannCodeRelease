@@ -48,23 +48,14 @@ namespace NeuralNetwork
     node.outputDimensions = node.inputDimensions;
   }
 
-  void DropoutLayer::calcOutputDimensions(Node& node) const
-  {
-    node.outputDimensions = node.inputDimensions;
-  }
-
-  void FlattenLayer::calcOutputDimensions(Node& node) const
+  void Conv1DLayer::calcOutputDimensions(Node& node) const
   {
     ASSERT(node.inputDimensions.size() == 1);
-    node.outputDimensions.push_back({std::accumulate(node.inputDimensions[0].begin(), node.inputDimensions[0].end(), 1u, std::multiplies<>())});
-  }
-
-  void ReshapeLayer::calcOutputDimensions(Node& node) const
-  {
-    ASSERT(node.inputDimensions.size() == 1);
-    ASSERT(std::accumulate(node.inputDimensions[0].begin(), node.inputDimensions[0].end(), 1u, std::multiplies<>()) ==
-           std::accumulate(dimensions.begin(), dimensions.end(), 1u, std::multiplies<>()));
-    node.outputDimensions.push_back(dimensions);
+    ASSERT(node.inputDimensions[0].size() == 2);
+    ASSERT(padding == PaddingType::same || node.inputDimensions[0][0] >= weights.dims(0));
+    ASSERT(node.inputDimensions[0][1] == weights.dims(1));
+    node.outputDimensions.push_back({{(node.inputDimensions[0][0] - (padding == PaddingType::valid ? weights.dims(0) - 1 : 0) + stride - 1) / stride,
+                                      weights.dims(2)}});
   }
 
   void Conv2DLayer::calcOutputDimensions(Node& node) const
@@ -104,31 +95,13 @@ namespace NeuralNetwork
                                       node.inputDimensions[0][2] * weights.dims(3)}});
   }
 
-  void Cropping2DLayer::calcOutputDimensions(Node& node) const
+  void Pooling1DLayer::calcOutputDimensions(Node& node) const
   {
     ASSERT(node.inputDimensions.size() == 1);
-    ASSERT(node.inputDimensions[0].size() == 3);
-    node.outputDimensions = node.inputDimensions;
-    node.outputDimensions[0][0] -= cropping[TOP] + cropping[BOTTOM];
-    node.outputDimensions[0][1] -= cropping[LEFT] + cropping[RIGHT];
-  }
-
-  void UpSampling2DLayer::calcOutputDimensions(Node& node) const
-  {
-    ASSERT(node.inputDimensions.size() == 1);
-    ASSERT(node.inputDimensions[0].size() == 3);
-    node.outputDimensions = node.inputDimensions;
-    node.outputDimensions[0][0] *= size[0];
-    node.outputDimensions[0][1] *= size[1];
-  }
-
-  void ZeroPadding2DLayer::calcOutputDimensions(Node& node) const
-  {
-    ASSERT(node.inputDimensions.size() == 1);
-    ASSERT(node.inputDimensions[0].size() == 3);
-    node.outputDimensions = node.inputDimensions;
-    node.outputDimensions[0][0] += padding[TOP] + padding[BOTTOM];
-    node.outputDimensions[0][1] += padding[LEFT] + padding[RIGHT];
+    ASSERT(node.inputDimensions[0].size() == 2);
+    ASSERT(padding == PaddingType::same || node.inputDimensions[0][0] >= kernelSize);
+    node.outputDimensions.push_back({{(node.inputDimensions[0][0] - (padding == PaddingType::valid ? kernelSize - 1 : 0) + stride - 1) / stride,
+                                      node.inputDimensions[0][1]}});
   }
 
   void Pooling2DLayer::calcOutputDimensions(Node& node) const
@@ -149,31 +122,96 @@ namespace NeuralNetwork
     node.outputDimensions.push_back({node.inputDimensions[0][2]});
   }
 
-  void AddLayer::calcOutputDimensions(Node& node) const
+  void BatchNormalizationLayer::calcOutputDimensions(Node& node) const
   {
-    ASSERT(node.inputDimensions.size() > 1);
+    ASSERT(node.inputDimensions.size() == 1);
 #ifndef NDEBUG
-    for(std::size_t i = 1; i < node.inputDimensions.size(); ++i)
-      ASSERT(node.inputDimensions[i] == node.inputDimensions[0]);
+    if(axis >= 0)
+    {
+      ASSERT(static_cast<std::size_t>(axis) < node.inputDimensions[0].size());
+      ASSERT(node.inputDimensions[0][axis] == factor.size());
+    }
+    else
+    {
+      ASSERT(static_cast<std::size_t>(-(axis + 1)) < node.inputDimensions[0].size());
+      ASSERT(node.inputDimensions[0][node.inputDimensions[0].size() + axis] == factor.size());
+    }
 #endif
-    node.outputDimensions.push_back(node.inputDimensions[0]);
+    node.outputDimensions = node.inputDimensions;
   }
 
-  void SubtractLayer::calcOutputDimensions(Node& node) const
+  void DropoutLayer::calcOutputDimensions(Node& node) const
   {
-    ASSERT(node.inputDimensions.size() == 2);
-    ASSERT(node.inputDimensions[1] == node.inputDimensions[0]);
-    node.outputDimensions.push_back(node.inputDimensions[0]);
+    node.outputDimensions = node.inputDimensions;
   }
 
-  void MultiplyLayer::calcOutputDimensions(Node& node) const
+  void ReshapeLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    ASSERT(std::accumulate(node.inputDimensions[0].begin(), node.inputDimensions[0].end(), 1u, std::multiplies<>()) ==
+           std::accumulate(dimensions.begin(), dimensions.end(), 1u, std::multiplies<>()));
+    node.outputDimensions.push_back(dimensions);
+  }
+
+  void FlattenLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    node.outputDimensions.push_back({std::accumulate(node.inputDimensions[0].begin(), node.inputDimensions[0].end(), 1u, std::multiplies<>())});
+  }
+
+  void Cropping2DLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    ASSERT(node.inputDimensions[0].size() == 3);
+    node.outputDimensions = node.inputDimensions;
+    node.outputDimensions[0][0] -= cropping[TOP] + cropping[BOTTOM];
+    node.outputDimensions[0][1] -= cropping[LEFT] + cropping[RIGHT];
+  }
+
+  void UpSampling2DLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    ASSERT(node.inputDimensions[0].size() == 3);
+    node.outputDimensions = node.inputDimensions;
+    node.outputDimensions[0][0] *= size[0];
+    node.outputDimensions[0][1] *= size[1];
+  }
+
+  void ZeroPadding1DLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    ASSERT(node.inputDimensions[0].size() == 2);
+    node.outputDimensions = node.inputDimensions;
+    node.outputDimensions[0][0] += padding[LEFT] + padding[RIGHT];
+  }
+
+  void ZeroPadding2DLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    ASSERT(node.inputDimensions[0].size() == 3);
+    node.outputDimensions = node.inputDimensions;
+    node.outputDimensions[0][0] += padding[TOP] + padding[BOTTOM];
+    node.outputDimensions[0][1] += padding[LEFT] + padding[RIGHT];
+  }
+
+  void ConcatenateLayer::calcOutputDimensions(Node& node) const
   {
     ASSERT(node.inputDimensions.size() > 1);
-#ifndef NDEBUG
+    std::vector<unsigned int> dimensions = node.inputDimensions[0];
+    ASSERT(static_cast<std::size_t>(axis >= 0 ? axis : -(axis + 1)) < dimensions.size());
+    std::size_t realAxis = axis >= 0 ? axis : dimensions.size() + axis;
     for(std::size_t i = 1; i < node.inputDimensions.size(); ++i)
-      ASSERT(node.inputDimensions[i] == node.inputDimensions[0]);
-#endif
-    node.outputDimensions.push_back(node.inputDimensions[0]);
+    {
+      ASSERT(node.inputDimensions[i].size() == dimensions.size());
+      for(std::size_t j = 0; j < dimensions.size(); ++j)
+      {
+        if(j == realAxis)
+          dimensions[j] += node.inputDimensions[i][j];
+        else
+          ASSERT(dimensions[j] == node.inputDimensions[i][j]);
+      }
+    }
+    node.outputDimensions.push_back(dimensions);
   }
 
   void AverageLayer::calcOutputDimensions(Node& node) const
@@ -206,24 +244,44 @@ namespace NeuralNetwork
     node.outputDimensions.push_back(node.inputDimensions[0]);
   }
 
-  void ConcatenateLayer::calcOutputDimensions(Node& node) const
+  void AddLayer::calcOutputDimensions(Node& node) const
   {
     ASSERT(node.inputDimensions.size() > 1);
-    std::vector<unsigned int> dimensions = node.inputDimensions[0];
-    ASSERT(static_cast<std::size_t>(axis >= 0 ? axis : -(axis + 1)) < dimensions.size());
-    std::size_t realAxis = axis >= 0 ? axis : dimensions.size() + axis;
+#ifndef NDEBUG
     for(std::size_t i = 1; i < node.inputDimensions.size(); ++i)
-    {
-      ASSERT(node.inputDimensions[i].size() == dimensions.size());
-      for(std::size_t j = 0; j < dimensions.size(); ++j)
-      {
-        if(j == realAxis)
-          dimensions[j] += node.inputDimensions[i][j];
-        else
-          ASSERT(dimensions[j] == node.inputDimensions[i][j]);
-      }
-    }
-    node.outputDimensions.push_back(dimensions);
+      ASSERT(node.inputDimensions[i] == node.inputDimensions[0]);
+#endif
+    node.outputDimensions.push_back(node.inputDimensions[0]);
+  }
+
+  void SubtractLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 2);
+    ASSERT(node.inputDimensions[1] == node.inputDimensions[0]);
+    node.outputDimensions.push_back(node.inputDimensions[0]);
+  }
+
+  void MultiplyLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() > 1);
+#ifndef NDEBUG
+    for(std::size_t i = 1; i < node.inputDimensions.size(); ++i)
+      ASSERT(node.inputDimensions[i] == node.inputDimensions[0]);
+#endif
+    node.outputDimensions.push_back(node.inputDimensions[0]);
+  }
+
+  void ReluLayer::calcOutputDimensions(Node& node) const
+  {
+    if(node.inputDimensions.size() != 1)
+      FAIL("ReLU layers must currently have exactly one input tensor.");
+    node.outputDimensions = node.inputDimensions;
+  }
+
+  void SoftmaxLayer::calcOutputDimensions(Node& node) const
+  {
+    ASSERT(node.inputDimensions.size() == 1);
+    node.outputDimensions = node.inputDimensions;
   }
 
   void LeakyReluLayer::calcOutputDimensions(Node& node) const
@@ -244,37 +302,6 @@ namespace NeuralNetwork
   {
     if(node.inputDimensions.size() != 1)
       FAIL("ThresholdedReLU layers must currently have exactly one input tensor.");
-    node.outputDimensions = node.inputDimensions;
-  }
-
-  void SoftmaxLayer::calcOutputDimensions(Node& node) const
-  {
-    ASSERT(node.inputDimensions.size() == 1);
-    node.outputDimensions = node.inputDimensions;
-  }
-
-  void ReluLayer::calcOutputDimensions(Node& node) const
-  {
-    if(node.inputDimensions.size() != 1)
-      FAIL("ReLU layers must currently have exactly one input tensor.");
-    node.outputDimensions = node.inputDimensions;
-  }
-
-  void BatchNormalizationLayer::calcOutputDimensions(Node& node) const
-  {
-    ASSERT(node.inputDimensions.size() == 1);
-#ifndef NDEBUG
-    if(axis >= 0)
-    {
-      ASSERT(static_cast<std::size_t>(axis) < node.inputDimensions[0].size());
-      ASSERT(node.inputDimensions[0][axis] == factor.size());
-    }
-    else
-    {
-      ASSERT(static_cast<std::size_t>(-(axis + 1)) < node.inputDimensions[0].size());
-      ASSERT(node.inputDimensions[0][node.inputDimensions[0].size() + axis] == factor.size());
-    }
-#endif
     node.outputDimensions = node.inputDimensions;
   }
 

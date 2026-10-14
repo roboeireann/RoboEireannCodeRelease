@@ -1,0 +1,12 @@
+dr annotation
+dr representation:AudioData
+dr debugData:representation:AudioData
+
+echo Plotting Samples
+vp samples 32000 -1.05 1.05
+vpd samples module:REWhistleDetector:audioBuffer red
+
+echo Plotting whistleConfidence
+vp whistleConfidence 250 -0.05 1.05
+vpd whistleConfidence module:REWhistleDetector:whistleConfidence red
+vpd whistleConfidence module:REWhistleDetector:whistleConfidenceThresh orange

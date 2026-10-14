@@ -10,14 +10,16 @@
 #include "WorldModelPredictor.h"
 #include "Tools/Modeling/BallPhysics.h"
 
-MAKE_MODULE(WorldModelPredictor, modeling);
+MAKE_MODULE(WorldModelPredictor);
 
 void WorldModelPredictor::update(WorldModelPrediction& worldModelPrediction)
 {
   // Predict robot pose:
   worldModelPrediction.robotPose = theRobotPose + theOdometer.odometryOffset;
 
-  // Update kick time, if ball speed increased and ball was near
+  // Update kick time, if ball speed increased and ball was near.
+  // This is necessary, as the ball model might have a changed velocity due to a kick but was not
+  // seen after kicking. The model was changed by code for handling contacts.
   if((theBallModel.estimate.velocity.norm() > ballSpeedAtLastExecution) &&
      theBallModel.estimate.position.norm() < 400.f)
   {
@@ -46,19 +48,14 @@ void WorldModelPredictor::update(WorldModelPrediction& worldModelPrediction)
   worldModelPrediction.ballVelocity = propagatedBallVelocity.rotate(odometryOffset.rotation);
 
   // Special handling for penalty shootout -> ball is supposed to be on the penalty spot!
-  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT &&
+  if(theGameState.isPenaltyShootout() &&
      theFrameInfo.getTimeSince(lastUsedBallModel.timeWhenLastSeen) > 100)
   {
-    const Vector2f knownBallPosition = theGameInfo.isOurKick()
+    const Vector2f knownBallPosition = theGameState.isForOwnTeam()
       ? Vector2f(theFieldDimensions.xPosOpponentPenaltyMark, 0.f)
       : Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0.f);
-    worldModelPrediction.ballPosition = theRobotPose.inversePose * knownBallPosition;
+    worldModelPrediction.ballPosition = theRobotPose.inverse() * knownBallPosition;
     worldModelPrediction.ballVelocity = Vector2f::Zero();
-    worldModelPrediction.ballIsPredictedByRule = true;
-  }
-  else
-  {
-    worldModelPrediction.ballIsPredictedByRule = false;
   }
 
   worldModelPrediction.timeWhenBallLastSeen = theBallModel.timeWhenLastSeen;

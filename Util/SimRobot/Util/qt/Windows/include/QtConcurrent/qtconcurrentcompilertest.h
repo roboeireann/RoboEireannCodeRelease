@@ -3,7 +3,7 @@
 ** Copyright (C) 2016 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
-** This file is part of the QtCore module of the Qt Toolkit.
+** This file is part of the QtConcurrent module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -48,16 +48,26 @@ QT_BEGIN_NAMESPACE
 
 namespace QtPrivate {
 
-template<class T>
-class HasResultType {
-    typedef char Yes;
-    typedef void *No;
-    template<typename U> static Yes test(int, const typename U::result_type * = 0);
-    template<typename U> static No test(double);
-public:
-    enum { Value = (sizeof(test<T>(0)) == sizeof(Yes)) };
-};
+    template <class T, typename = void>
+    struct IsIterable : std::false_type {};
+    template <class T>
+    struct IsIterable<T, std::void_t<decltype(std::declval<T>().begin()),
+        decltype(std::declval<T>().end())>>
+        : std::true_type
+    { };
 
+    template <class T>
+    inline constexpr bool IsIterableValue = IsIterable<T>::value;
+
+    template <class T, typename = void>
+    struct IsDereferenceable : std::false_type {};
+    template <class T>
+    struct IsDereferenceable<T, std::void_t<decltype(*std::declval<T>())>>
+        : std::true_type
+    { };
+
+    template <class T>
+    inline constexpr bool IsDereferenceableValue = IsDereferenceable<T>::value;
 }
 
 QT_END_NAMESPACE

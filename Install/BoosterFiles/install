@@ -1,0 +1,185 @@
+#!/bin/bash
+# install <name>
+
+# Make script path the current directory
+cd "$(dirname "$(which "$0")")"
+
+# Handle Motion PC - Booster T1 only and exits after setting it up
+if [ $USER == master ]; then
+  # Install watchdog script
+  mkdir -p /home/master/bin
+  cp bin/watchdog /home/master/bin
+  chmod +x /home/master/bin/watchdog
+
+  # Install watchdog service
+  sudo cp watchdog.service /etc/systemd/system
+  if [ -z "$(grep 'watchdog.service' /etc/systemd/system/booster-daemon.service)" ]; then
+    echo "Patching booster-daemon.service"
+    sudo sed -i 's%\(StartLimitBurst.*\)%\1\nPartOf=watchdog.service%' /etc/systemd/system/booster-daemon.service
+  fi
+  sudo systemctl daemon-reload
+  sudo systemctl enable watchdog
+
+  exit 0
+fi
+
+# Set hostname to $1
+if [ -n "$1" ]; then
+  echo "Setting hostname to $1..."
+  # sudo sed -i "s%$(hostname)%$1%g" /etc/hosts
+  # ubuntu standard address for hostname
+  sudo sed -i "s/127.0.1.1.*/127.0.1.1\t$1/" /etc/hosts
+  sudo hostnamectl set-hostname "$1"
+
+  if [ "$(hostname)" == "$1" ]; then
+    echo "  Success: Hostname updated to $1"
+  else
+    echo "  Error: Failed to update hostname"
+  fi
+fi
+
+# Create directory for status information in ram
+if [ ! -f /etc/tmpfiles.d/00-create-volatile.conf ]; then
+  echo "Creating directory for status information in ram"
+  sudo bash -c "cat >/etc/tmpfiles.d/00-create-volatile.conf <<EOF
+d       /var/volatile/log 1777  - - -
+d       /var/volatile/tmp 1777  - - -
+L+      /var/log          1777  - - - volatile/log
+L+      /var/tmp          1777  - - - volatile/tmp
+EOF"
+fi
+
+# Extend rights of user booster
+if [ -z "$(grep "booster" /etc/security/limits.conf)" ]; then
+  echo "Extending rights for user booster"
+  sudo bash -c 'echo "booster - rtprio 65" >>/etc/security/limits.conf'
+  sudo bash -c 'echo "booster - nice -10" >>/etc/security/limits.conf'
+  sudo bash -c 'echo "booster - memlock 40000" >>/etc/security/limits.conf'
+fi
+
+# Deactivate automatic suspend for USB - needed for USB sensors etc.
+if [ -z "$(grep "usbcore.autosuspend=-1" /boot/extlinux/extlinux.conf)" ]; then
+  echo "Disabling automatic suspend for USB"
+  sudo sed -i 's%\(APPEND.*\)%\1 usbcore.autosuspend=-1%' /boot/extlinux/extlinux.conf
+fi
+
+# setvolume should not ask for password
+if [ -z "$(sudo grep "/home/booster/bin/setprofile" /etc/sudoers)" ]; then
+  echo "Allowing setvolume to change volume without password"
+  sudo bash -c 'echo "%sudo ALL=(ALL) NOPASSWD: /home/booster/bin/setprofile" >>/etc/sudoers'
+fi
+
+# sudo nmcli should not ask for password
+if [ -z "$(sudo grep "/usr/bin/nmcli" /etc/sudoers)" ]; then
+  echo "Allowing nmcli to activate connection without password"
+  sudo bash -c 'echo "%sudo ALL=(ALL) NOPASSWD: /usr/bin/nmcli" >>/etc/sudoers'
+fi
+
+# Disable Booster services (TODO: there were more on the T1 in Brazil)
+for service in daemon-perception battery-daemon rtc-speech; do
+  sudo systemctl stop booster-$service
+  sudo systemctl disable booster-$service
+done
+
+# Allow user access to /dev/input/event*
+sudo bash -c 'cat >/etc/udev/rules.d/99-input.rules <<EOF
+KERNEL=="event*", SUBSYSTEM=="input", OWNER="booster", MODE="0600"
+EOF'
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Create directory for scripts, logs, and network profiles
+mkdir -p /home/booster/bin /home/booster/logs /home/booster/Profiles
+
+# Copy scripts and make them executable
+for script in roboeireann enableRoboEireann chmod-usb setprofile setvolume; do
+	cp bin/${script} /home/booster/bin/
+	chmod +x /home/booster/bin/${script}
+done
+
+# parse lan or wlan from network.cfg
+get_config_val() {
+  awk -F'[ =";]+' -v key="$1" '$1 == key {print $2}' network.cfg
+}
+
+
+
+# Add second IP address for LAN
+# LAN_IP="$(grep "^lan *=" network.cfg | sed -e 's%[^"]*"%%' -e 's%".*%%')"
+# LAN_DEVICE="$(nmcli device show | tr '\n' '|' | sed 's%||%!%g' | tr '!' '\n' | grep 192.168.10.102 | tr '|' '\n' | grep GENERAL.CONNECTION | sed 's%GENERAL.CONNECTION: *%%')"
+# sudo nmcli connection modify "$LAN_DEVICE" +ipv4.address "$LAN_IP/24"
+# sudo nmcli connection reload "$LAN_DEVICE"
+echo "Updating ethernet address..."
+LAN_IP=$(get_config_val "lan")
+LAN_CON=$(nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS device show | awk -F: '
+  $1 == "GENERAL.CONNECTION" { con = $2 }
+  $1 ~ /^IP4.ADDRESS/ && $2 ~ /^192.168.10.102/ { print con }
+')
+
+if [ -n "$LAN_CON" ]; then
+  echo "  Found connection '$LAN_CON' on factory IP 192.168.10.102"
+
+  # check if address we want to add was already added (by a previous run of this script)
+  CURRENT_IPS=$(nmcli -g ipv4.addresses connection show "$LAN_CON")
+
+  if [[ "$CURRENT_IPS" == *"$LAN_IP"* ]]; then
+    echo "Note: LAN IP $LAN_IP is already present in profile '$LAN_CON'. Skipping."
+  else
+    sudo nmcli connection modify "$LAN_CON" +ipv4.addresses "$LAN_IP/24"
+    
+    # Verify the modification was written to the profile
+    if nmcli -g ipv4.addresses connection show "$LAN_CON" | grep -q "$LAN_IP"; then
+      echo "  Verified: $LAN_IP added to profile '$LAN_CON'"
+    else
+      echo "  Error: Failed to verify LAN IP in profile."
+    fi
+  fi
+else
+  echo "  Error: No ethernet connection found with factory IP 192.168.10.102"
+fi
+
+# Setup wireless network connection
+# WLAN_IP="$(grep "^wlan *=" network.cfg | sed -e 's%[^"]*"%%' -e 's%".*%%')"
+# WLAN_DEVICE="$(nmcli device | grep " wifi " | head -1 | sed 's% .*%%')"
+echo "Updating WiFi address..."
+WLAN_IP=$(get_config_val "wlan")
+WLAN_DEVICE=$(nmcli -t -f DEVICE,TYPE device status | awk -F: '$2=="wifi" {print $1; exit}')
+
+if [ -n "$WLAN_DEVICE" ]; then
+  echo "  Detected WiFi device: $WLAN_DEVICE"
+  
+  sudo cp RoboEireannWifi.nmconnection /etc/NetworkManager/system-connections
+  sudo chmod 600 /etc/NetworkManager/system-connections/RoboEireannWifi.nmconnection
+
+  sudo nmcli connection reload
+
+  # override default WLAN address in RoboEireannWifi.nmconnection with value from network.cfg
+  sudo nmcli connection modify "RoboEireannWifi" \
+    connection.interface-name "$WLAN_DEVICE" \
+    ipv4.address "$WLAN_IP/16"
+
+  # Verify the change was committed to the profile
+  if nmcli -g ipv4.addresses connection show "RoboEireannWifi" | grep -q "$WLAN_IP"; then
+    echo "  Verified: WiFi profile 'RoboEireannWifi' configured for $WLAN_IP on $WLAN_DEVICE"
+  else
+    echo "  Error: Failed to verify WiFi IP in NetworkManager profile."
+  fi
+fi
+
+sudo nmcli radio wifi off
+echo "WiFi radio disabled by default."
+
+# Setup roboeireann service
+mkdir -p /home/booster/.config/systemd/user
+cp roboeireann.service /home/booster/.config/systemd/user
+systemctl --user daemon-reload
+
+# systemctl --user enable roboeireann
+# echo "Service 'roboeireann' installed (Auto start on boot)."
+
+systemctl --user disable roboeireann
+echo "Service 'roboeireann' installed (Manual start only)."
+
+# Make sure everything is written to disk before a reboot
+sync
+echo "Please reboot the robot!"

@@ -4,20 +4,13 @@
  * Provides the FieldBall for the Behavior
  *
  * @author Tim Laue
- * @author Rudi Villing
  */
 
 #include "FieldBallProvider.h"
-#include "Tools/Math/Geometry.h"
+#include "Math/Geometry.h"
 #include "Tools/Modeling/BallPhysics.h"
 
-#include "Tools/TextLogging.h"
-#include "Tools/FmtCommonTypes.h"
-
-
-DECL_TLOGGER(tlogger, "FieldBallProvider", TextLogging::INFO);
-
-MAKE_MODULE(FieldBallProvider, behaviorControl);
+MAKE_MODULE(FieldBallProvider);
 
 void FieldBallProvider::update(FieldBall& fieldBall)
 {
@@ -25,138 +18,52 @@ void FieldBallProvider::update(FieldBall& fieldBall)
   fieldBall.positionOnField         = theRobotPose * fieldBall.positionRelative;
   fieldBall.positionOnFieldClipped  = fieldBall.positionOnField;
   theFieldDimensions.clipToField(fieldBall.positionOnFieldClipped);
-  fieldBall.positionRelativeClipped = theRobotPose.inversePose * fieldBall.positionOnFieldClipped;
+  fieldBall.positionRelativeClipped = theRobotPose.inverse() * fieldBall.positionOnFieldClipped;
   fieldBall.endPositionRelative     = BallPhysics::getEndPosition(theBallModel.estimate.position, theBallModel.estimate.velocity, theBallSpecification.friction);
   fieldBall.endPositionOnField      = theRobotPose * fieldBall.endPositionRelative;
+  fieldBall.velocityRelative = theBallModel.estimate.velocity;
+  fieldBall.velocityOnField = theRobotPose * fieldBall.velocityRelative;
 
-  fieldBall.teamPositionOnField     = theTeamBallModel.position;
-  fieldBall.teamPositionRelative    = theRobotPose.inversePose * fieldBall.teamPositionOnField;
-  fieldBall.teamEndPositionOnField  = BallPhysics::getEndPosition(theTeamBallModel.position, theTeamBallModel.velocity, theBallSpecification.friction);
-  fieldBall.teamEndPositionRelative = theRobotPose.inversePose * fieldBall.teamEndPositionOnField;
+  fieldBall.teamBallIsValid = theTeamBallModel.isValid;
+  if(theTeamBallModel.isValid)
+  {
+    fieldBall.teamPositionOnField     = theTeamBallModel.position;
+    fieldBall.teamPositionRelative    = theRobotPose.inverse() * theTeamBallModel.position;
+    fieldBall.teamEndPositionOnField  = BallPhysics::getEndPosition(theTeamBallModel.position, theTeamBallModel.velocity, theBallSpecification.friction);
+    fieldBall.teamEndPositionRelative = theRobotPose.inverse() * fieldBall.teamEndPositionOnField;
+    fieldBall.teamVelocityOnField = theRobotPose.inverse() * fieldBall.teamVelocityRelative;
+    fieldBall.teamVelocityRelative = theTeamBallModel.velocity;
+  }
 
   fieldBall.timeSinceBallWasSeen = theFrameInfo.getTimeSince(theBallModel.timeWhenLastSeen);
   fieldBall.timeSinceBallDisappeared = theFrameInfo.getTimeSince(theBallModel.timeWhenDisappeared);
-  fieldBall.timeSinceTeamBallWasValid = theFrameInfo.getTimeSince(theTeamBallModel.timeWhenLastValid);
-  fieldBall.isTeamBallValid = theTeamBallModel.isValid;
 
-  checkIfBallIsRollingTowardsAGoal(fieldBall);
-  checkIfBallIsPassingOwnYAxis(fieldBall);
-  checkIfBallIsPassingOwnXAxis(fieldBall);
+  fieldBall.teamBallNewerThanOwnBall = theTeamBallModel.newerThanOwnBall;
+
+  checkIfBallIsRollingTowardsAGoal(fieldBall.isRollingTowardsOpponentGoal, fieldBall.isRollingTowardsOwnGoal,
+                                   fieldBall.positionOnField, theBallModel.estimate.velocity);
   checkIfBallIsInsideOwnPenaltyArea(fieldBall);
+  checkBallPositionIsConsistentWithGameState(fieldBall, theGameState);
 }
 
-void FieldBallProvider::checkIfBallIsRollingTowardsAGoal(FieldBall& fieldBall)
+void FieldBallProvider::checkIfBallIsRollingTowardsAGoal(bool& isRollingTowardsOpponentGoal, bool& isRollingTowardsOwnGoal,
+                                                         const Vector2f& positionOnField, const Vector2f& velocity)
 {
-  fieldBall.isRollingTowardsOpponentGoal = false;
-  fieldBall.isRollingTowardsOwnGoal = false;
+  isRollingTowardsOpponentGoal = false;
+  isRollingTowardsOwnGoal = false;
   if(theBallModel.estimate.velocity.norm() == 0.f)
     return;
-  const Vector2f bPosField = fieldBall.positionOnField;
-  const Vector2f bVelField = theBallModel.estimate.velocity.rotated(theRobotPose.rotation);
-  const Vector2f leftOppPost(theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosLeftGoal + opponentGoalpostYOffset);
-  const Vector2f rightOppPost(theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosRightGoal - opponentGoalpostYOffset);
-  const Vector2f leftOwnPost(theFieldDimensions.xPosOwnGroundLine, theFieldDimensions.yPosLeftGoal + ownGoalpostYOffset);
-  const Vector2f rightOwnPost(theFieldDimensions.xPosOwnGroundLine, theFieldDimensions.yPosRightGoal - ownGoalpostYOffset);
+  const Vector2f bPosField = positionOnField;
+  const Vector2f bVelField = velocity.rotated(theRobotPose.rotation);
+  const Vector2f leftOppPost(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftGoal + opponentGoalpostYOffset);
+  const Vector2f rightOppPost(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightGoal - opponentGoalpostYOffset);
+  const Vector2f leftOwnPost(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftGoal + ownGoalpostYOffset);
+  const Vector2f rightOwnPost(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightGoal - ownGoalpostYOffset);
 
   // Check, if ball is rolling TOWARDS (this is why we multiply the velocity) the expanded opponent goal:
-  fieldBall.isRollingTowardsOpponentGoal = Geometry::checkIntersectionOfLines(bPosField, bPosField + bVelField * 1000.f, leftOppPost, rightOppPost);
-  fieldBall.isRollingTowardsOwnGoal      = Geometry::checkIntersectionOfLines(bPosField, bPosField + bVelField * 1000.f, leftOwnPost, rightOwnPost);
+  isRollingTowardsOpponentGoal = Geometry::checkIntersectionOfLines(bPosField, bPosField + bVelField * 1000.f, leftOppPost, rightOppPost);
+  isRollingTowardsOwnGoal      = Geometry::checkIntersectionOfLines(bPosField, bPosField + bVelField * 1000.f, leftOwnPost, rightOwnPost);
 }
-
-void FieldBallProvider::checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall)
-{
-  fieldBall.intersectionPositionWithOwnYAxis = Vector2f::Zero();
-  fieldBall.secsUntilIntersectsOwnYAxis = std::numeric_limits<float>::max();
-
-  fieldBall.intersectionPositionWithOwnYAxisAggressive = Vector2f::Zero();
-  fieldBall.secsUntilIntersectsOwnYAxisAggressive = std::numeric_limits<float>::max();
-
-  const Vector2f& ballPosRel = theBallModel.estimate.position;
-  const Vector2f& ballVelRel = theBallModel.estimate.velocity;
-  if(ballVelRel.x() >= 0 || ballPosRel.x() < 0.f) // Ball does not move or moves away
-    return;
-
-  const float FIXME_HACK_FACTOR = 0.95f; // FIXME - it appears that the update of the predicted end position
-                                    // gets out of sync with ball velocity such that predicted time to
-                                    // reach end pos becomes huge (which doesn't make sense).
-                                    // So we artifically shorten the distance we estimate time for 
-  Vector2f intersection;
-  if(Geometry::getIntersectionOfLines(Geometry::Line(ballPosRel, ballVelRel),
-                                      Geometry::Line(Vector2f(0.f, 0.f), Vector2f(0.f, 1.f)), intersection))
-  {
-    const float distanceToIntersection = (intersection - ballPosRel).norm();
-    Vector2f ballEndPosition = BallPhysics::getEndPosition(ballPosRel, ballVelRel, theBallSpecification.friction);
-    const float distanceToEndPosition = (ballEndPosition - ballPosRel).norm();
-    // Is the ball fast enough to reach the intersection point?
-    if(distanceToIntersection < distanceToEndPosition)
-    {
-      fieldBall.intersectionPositionWithOwnYAxis = intersection;
-      fieldBall.secsUntilIntersectsOwnYAxis = BallPhysics::timeForDistance(
-          ballVelRel, distanceToIntersection * FIXME_HACK_FACTOR, theBallSpecification.friction);
-      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: distanceToIntersection < endPos");
-    }
-    else if ((distanceToEndPosition + aggressiveEndPositionDistance) > distanceToIntersection)
-    {
-      fieldBall.intersectionPositionWithOwnYAxisAggressive = intersection;
-
-      float secsToEndPos = BallPhysics::timeForDistance(ballVelRel, distanceToEndPosition * FIXME_HACK_FACTOR,
-                                                        theBallSpecification.friction);
-      float secsEndPosToIntersection =
-          (distanceToIntersection - distanceToEndPosition) /
-          ballVelRel.norm(); // TODO hack (const velocity for diff between end point and intersection)
-      fieldBall.secsUntilIntersectsOwnYAxisAggressive = secsToEndPos + secsEndPosToIntersection;
-
-      TLOGD(
-          tlogger,
-          "checkIfBallIsPassingOwnYAxis: distToIntersect < endPos + aggr, distToEnd {}, ballVel {}, secToEnd {}, secExtra {}",
-          distanceToEndPosition, ballVelRel, secsToEndPos, secsEndPosToIntersection);
-    }
-    else if (-ballVelRel.x() > aggressiveMinVelocityX)
-    {
-      fieldBall.intersectionPositionWithOwnYAxisAggressive = intersection;
-      fieldBall.secsUntilIntersectsOwnYAxisAggressive =
-          distanceToEndPosition / ballVelRel.norm(); // TODO: HACK - ignore friction in order to get an estimate
-      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ballVel towards");
-    }
-    else
-      TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ball will intersect y, but conditions not satisfied");
-  }
-  else
-    TLOGD(tlogger, "checkIfBallIsPassingOwnYAxis: ball does not intersect y");
-}
-
-
-void FieldBallProvider::checkIfBallIsPassingOwnXAxis(FieldBall& fieldBall)
-{
-  fieldBall.intersectionPositionWithOwnXAxis = Vector2f(200000.f, 200000.f); // larger than any field size (even future)
-  fieldBall.secsUntilIntersectsOwnXAxis = std::numeric_limits<float>::max();
-
-  const Vector2f& ballPosRel = theBallModel.estimate.position;
-  const Vector2f& ballVelRel = theBallModel.estimate.velocity;
-
-  // ball off to one side or the other and rolling further to the same side?
-  if ((ballPosRel.y() > 0.f && ballVelRel.y() > 0.f) || (ballPosRel.y() < 0.f && ballVelRel.y() < 0.f))
-    return; // ball won't intersect x
-
-  Vector2f intersection;
-  if (Geometry::getIntersectionOfLines(Geometry::Line(ballPosRel, ballVelRel),
-                                       Geometry::Line(Vector2f(0.f, 0.f), Vector2f(1.f, 0.f)), intersection))
-  {
-    const float distanceToIntersection = (intersection - ballPosRel).norm();
-    Vector2f ballEndPosition = BallPhysics::getEndPosition(ballPosRel, ballVelRel, theBallSpecification.friction);
-    const float distanceToEndPosition = (ballEndPosition - ballPosRel).norm();
-
-    // Is the ball fast enough to reach the intersection point?
-    if (distanceToIntersection < distanceToEndPosition)
-    {
-      fieldBall.intersectionPositionWithOwnXAxis = intersection;
-      fieldBall.secsUntilIntersectsOwnXAxis =
-          BallPhysics::timeForDistance(ballVelRel, distanceToIntersection, theBallSpecification.friction);
-    }
-  }
-}
-
-
 
 void FieldBallProvider::checkIfBallIsInsideOwnPenaltyArea(FieldBall& fieldBall)
 {
@@ -183,5 +90,56 @@ void FieldBallProvider::checkIfBallIsInsideOwnPenaltyArea(FieldBall& fieldBall)
       fieldBall.distanceToOwnPenaltyArea = (Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosLeftPenaltyArea) - bp).norm();
     else // ball is right front of penalty area
       fieldBall.distanceToOwnPenaltyArea = (Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosRightPenaltyArea) - bp).norm();
+  }
+}
+
+void FieldBallProvider::checkBallPositionIsConsistentWithGameState(FieldBall& fieldBall, const GameState& theGameState)
+{
+  if(theGameState.isKickOff())
+  {
+    Vector2f kickoffPosition = Vector2f(theFieldDimensions.xPosHalfwayLine, 0.f);
+    fieldBall.ballPositionConsistentWithGameState = (fieldBall.positionOnField - kickoffPosition).squaredNorm() <= sqr(consistencyDistanceToDropInPosition);
+    fieldBall.teamBallPositionConsistentWithGameState = (fieldBall.teamPositionOnField - kickoffPosition).squaredNorm() <=
+                                                        sqr(consistencyDistanceToDropInPosition);
+  }
+  else if(theGameState.isCornerKick() || theGameState.isGoalKick())
+  {
+    Vector2f leftDropInPosition;
+    Vector2f rightDropInPosition;
+    if(theGameState.state == GameState::State::ownCornerKick)
+    {
+      leftDropInPosition = Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftTouchline);
+      rightDropInPosition = Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightTouchline);
+    }
+    else if(theGameState.state == GameState::State::opponentCornerKick)
+    {
+      leftDropInPosition = Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftTouchline);
+      rightDropInPosition = Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightTouchline);
+    }
+    else if(theGameState.state == GameState::State::ownGoalKick)
+    {
+      leftDropInPosition = Vector2f(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosLeftGoalArea);
+      rightDropInPosition = Vector2f(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosRightGoalArea);
+    }
+    else if(theGameState.state == GameState::State::opponentGoalKick)
+    {
+      leftDropInPosition = Vector2f(theFieldDimensions.xPosOpponentGoalArea, theFieldDimensions.yPosLeftGoalArea);
+      rightDropInPosition = Vector2f(theFieldDimensions.xPosOpponentGoalArea, theFieldDimensions.yPosRightGoalArea);
+    }
+    float squaredDistanceToDropInLeft = (leftDropInPosition - fieldBall.positionOnField).squaredNorm();
+    float squaredDistanceToDropInRight = (rightDropInPosition - fieldBall.positionOnField).squaredNorm();
+    fieldBall.ballPositionConsistentWithGameState = std::min(squaredDistanceToDropInLeft, squaredDistanceToDropInRight) <= sqr(consistencyDistanceToDropInPosition);
+    float teamSquaredDistanceLeft = (leftDropInPosition - fieldBall.teamPositionOnField).squaredNorm();
+    float teamSquaredDistanceRight = (rightDropInPosition - fieldBall.teamPositionOnField).squaredNorm();
+    fieldBall.teamBallPositionConsistentWithGameState = std::min(teamSquaredDistanceLeft, teamSquaredDistanceRight) <= sqr(consistencyDistanceToDropInPosition);
+  }
+  // no special handling for kick-in because the ball will be placed back near to where it rolled out -> position should be consistent for most kick-ins
+  else if(theGameState.isPlaying())
+  {
+    fieldBall.ballPositionConsistentWithGameState = fieldBall.teamBallPositionConsistentWithGameState = true;
+  }
+  else
+  {
+    fieldBall.ballPositionConsistentWithGameState = fieldBall.teamBallPositionConsistentWithGameState = false;
   }
 }

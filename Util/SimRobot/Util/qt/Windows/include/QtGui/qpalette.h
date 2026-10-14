@@ -67,21 +67,15 @@ public:
     QPalette(const QPalette &palette);
     ~QPalette();
     QPalette &operator=(const QPalette &palette);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QPalette(QPalette &&other) Q_DECL_NOTHROW
-        : d(other.d), data(other.data)
-    { other.d = Q_NULLPTR; }
-    inline QPalette &operator=(QPalette &&other) Q_DECL_NOEXCEPT
-    {
-        for_faster_swapping_dont_use = other.for_faster_swapping_dont_use;
-        qSwap(d, other.d); return *this;
-    }
-#endif
+    QPalette(QPalette &&other) noexcept
+        : d(qExchange(other.d, nullptr)), currentGroup(other.currentGroup)
+    {}
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QPalette)
 
-    void swap(QPalette &other) Q_DECL_NOEXCEPT
+    void swap(QPalette &other) noexcept
     {
-        qSwap(d, other.d);
-        qSwap(for_faster_swapping_dont_use, other.for_faster_swapping_dont_use);
+        std::swap(currentGroup, other.currentGroup);
+        qt_ptr_swap(d, other.d);
     }
 
     operator QVariant() const;
@@ -96,13 +90,13 @@ public:
                      AlternateBase,
                      NoRole,
                      ToolTipBase, ToolTipText,
-                     NColorRoles = ToolTipText + 1,
-                     Foreground = WindowText, Background = Window
+                     PlaceholderText,
+                     NColorRoles = PlaceholderText + 1,
                    };
     Q_ENUM(ColorRole)
 
-    inline ColorGroup currentColorGroup() const { return static_cast<ColorGroup>(data.current_group); }
-    inline void setCurrentColorGroup(ColorGroup cg) { data.current_group = cg; }
+    inline ColorGroup currentColorGroup() const { return currentGroup; }
+    inline void setCurrentColorGroup(ColorGroup cg) { currentGroup = cg; }
 
     inline const QColor &color(ColorGroup cg, ColorRole cr) const
     { return brush(cg, cr).color(); }
@@ -120,7 +114,6 @@ public:
 
     inline const QColor &color(ColorRole cr) const { return color(Current, cr); }
     inline const QBrush &brush(ColorRole cr) const { return brush(Current, cr); }
-    inline const QBrush &foreground() const { return brush(WindowText); }
     inline const QBrush &windowText() const { return brush(WindowText); }
     inline const QBrush &button() const { return brush(Button); }
     inline const QBrush &light() const { return brush(Light); }
@@ -131,7 +124,6 @@ public:
     inline const QBrush &alternateBase() const { return brush(AlternateBase); }
     inline const QBrush &toolTipBase() const { return brush(ToolTipBase); }
     inline const QBrush &toolTipText() const { return brush(ToolTipText); }
-    inline const QBrush &background() const { return brush(Window); }
     inline const QBrush &window() const { return brush(Window); }
     inline const QBrush &midlight() const { return brush(Midlight); }
     inline const QBrush &brightText() const { return brush(BrightText); }
@@ -141,19 +133,19 @@ public:
     inline const QBrush &highlightedText() const { return brush(HighlightedText); }
     inline const QBrush &link() const { return brush(Link); }
     inline const QBrush &linkVisited() const { return brush(LinkVisited); }
+    inline const QBrush &placeholderText() const { return brush(PlaceholderText); }
 
     bool operator==(const QPalette &p) const;
     inline bool operator!=(const QPalette &p) const { return !(operator==(p)); }
     bool isCopyOf(const QPalette &p) const;
 
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline int serialNumber() const { return cacheKey() >> 32; }
-#endif
     qint64 cacheKey() const;
 
-    QPalette resolve(const QPalette &) const;
-    inline uint resolve() const { return data.resolve_mask; }
-    inline void resolve(uint mask) { data.resolve_mask = mask; }
+    QPalette resolve(const QPalette &other) const;
+
+    using ResolveMask = quint64;
+    ResolveMask resolveMask() const;
+    void setResolveMask(ResolveMask mask);
 
 private:
     void setColorGroup(ColorGroup cr, const QBrush &windowText, const QBrush &button,
@@ -177,14 +169,8 @@ private:
     void detach();
 
     QPalettePrivate *d;
-    struct Data {
-        uint current_group : 4;
-        uint resolve_mask : 28;
-    };
-    union {
-        Data data;
-        quint32 for_faster_swapping_dont_use;
-    };
+    ColorGroup currentGroup{Active};
+
     friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &s, const QPalette &p);
 };
 

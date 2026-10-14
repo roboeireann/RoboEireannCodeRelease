@@ -1,20 +1,20 @@
-# LICENCE
+Copyright (c) 2023-2026 RoboÉireann (RoboEireann)
 
-Copyright (c) 2023 RoboÉireann (RoboEireann)
+Preamble: This product includes software developed by B-Human
+(see `LicenceBHuman.md`, https://www.b-human.de), released in their 2025 code
+release, and software developed by Nao Devils (see `LicenseNaoDevils.txt`,
+https://naodevils.de), included in that release. The terms of this licence do
+not apply to that software. Files derived from B-Human or Nao Devils software,
+including those modified by RoboÉireann, remain subject to the licence terms of
+the respective originator.
 
-Preamble: This product includes software developed by B-Human 
-(see `LicenceBHuman.md`, http://www.b-human.de), and released in their 2021 code
-release. The terms of this licence do not apply to that software.
+Parts of this distribution were not developed by RoboÉireann, B-Human or
+Nao Devils. The terms of this licence do not apply to such parts; the rights of
+the copyright owners remain. Where provided, their licence terms are in the
+corresponding files and directories.
 
-Parts of this distribution were not developed by RoboÉireann or B-Human. 
-The terms of this license do not apply to such parts; the rights of the 
-copyright owners remain.
-
-The licence terms below apply only to those parts of the product 
-developed by RoboÉireann
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+The licence terms below apply only to those parts of the product
+developed by RoboÉireann.
 
 1. Redistributions of source code must retain the above copyright notice, this
    list of conditions and the following disclaimer.
@@ -31,7 +31,7 @@ are permitted provided that the following conditions are met:
    itself, if and wherever such third-party acknowledgments
    normally appear.
 
-4. Neither the name of the copyright holder nor the names of its contributors
+4. Neither the name of RoboÉireann nor the names of its contributors
    may be used to endorse or promote products derived from this software without
    specific prior written permission.
 
@@ -45,4 +45,3 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-

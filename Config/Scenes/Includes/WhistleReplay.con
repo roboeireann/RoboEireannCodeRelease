@@ -1,5 +1,2 @@
-mr ReceivedGameControlData LogDataProvider Cognition
-
-mr Whistle WhistleRecognizerBH2021 Cognition
-
-call Includes/Whistle
+for Audio mr Whistle WhistleDetector
+call Whistle

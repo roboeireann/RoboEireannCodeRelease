@@ -4,28 +4,33 @@
  * The file contains the definition of the struct RobotPose.
  *
  * @author Thomas Röfer
+ * @author Rudi Villing [modifications]
  */
 
 #pragma once
 
-#include "Tools/Math/Pose2f.h"
-#include "Tools/Streams/AutoStreamable.h"
-
-#include "Tools/FmtFormatter.h"
+#include "Math/Pose2f.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/Enum.h"
+#include "Tools/Communication/BHumanMessageParticle.h"
 
 /**
  * @struct RobotPose
  * The pose of the robot with additional information
  */
-STREAMABLE_WITH_BASE(RobotPose, Pose2f,
+STREAMABLE_WITH_BASE(RobotPose, Pose2f, COMMA public BHumanMessageParticle
 {
   /** Different states of robot pose estimate quality */
   ENUM(LocalizationQuality,
   {,
-    superb,   /**< Everything is cool! The internal model ist unimodal and all deviations are low. */
+    superb,   /**< Everything is cool! The internal model is unimodal and all deviations are low. */
     okay,     /**< Could be better. The model is still somewhat unimodal but at least one deviation is quite high or the validity is low. Rough estimate might be correct but not precise. */
     poor,     /**< Nope. Do not do any serious stuff, if this is the current state. There seem to be multiple quite different hypotheses about the current pose or some deviations are REALLY high. We do not have any clue about the current pose, actually. */
   });
+
+  /** BHumanMessageParticle functions */
+  void operator>>(BHumanMessage& m) const override;
+  void operator<<(const BHumanMessage& m) override;
 
   /**
    * Assignment operator for Pose2f objects
@@ -40,28 +45,38 @@ STREAMABLE_WITH_BASE(RobotPose, Pose2f,
     return *this;
   }
 
-  void onRead();
-  Pose2f inverse() const;
-  /** Verifies that the robot pose contains valid values. */
-  void verify() const;
-  /** Draws the robot pose in the color of the team to the field view. */
-  void draw() const;
+  const Pose2f& inverse() const
+  {
+    return inversePose;
+  }
 
 
-  /// convert field point to robot relative coords
-  Vector2f toRobotCoordinates(const Vector2f& fieldPoint) const { return this->inversePose * fieldPoint; }
-  /// convert field pose to robot relative coords
-  Pose2f toRobotCoordinates(const Pose2f& fieldPose) const { return this->inversePose + fieldPose; }
-  /// convert robot relative point to field coords
-  Vector2f toFieldCoordinates(const Vector2f& point) const { return (*this) * point; }
-  /// convert robot relative pose to field coords
+  /** convert field point to robot relative coords */
+  Vector2f toRobotCoordinates(const Vector2f &fieldPoint) const { return this->inversePose * fieldPoint; }
+  
+  /** convert field pose to robot relative coords */
+  Pose2f toRobotCoordinates(const Pose2f &fieldPose) const { return this->inversePose + fieldPose; }
+  
+  /** convert robot relative point to field coords */
+  Vector2f toFieldCoordinates(const Vector2f &point) const { return (*this) * point; }
+  
+  /** convert robot relative pose to field coords */
   Pose2f toFieldCoordinates(const Pose2f& pose) const { return (*this) + pose; }
 
-  /// convert vector2 field coords to vector3 robot coords
+  /** convert vector2 field coords to vector3 robot coords */
   Vector3f toRobotVector3f(const Vector2f& fieldPoint, float z = 0.f) const
   {
     return (Vector3f() << this->inversePose * fieldPoint, z).finished();
   }
+
+  
+  void onRead();
+
+  /** Verifies that the robot pose contains valid values. */
+  void verify() const;
+
+  /** Draws the robot pose in the color of the team to the field view. */
+  void draw() const;
 
   /**
    * Computes the standard deviation given the covariance matrix.
@@ -96,14 +111,14 @@ STREAMABLE_WITH_BASE(RobotPose, Pose2f,
     return std::sqrt(covariance(1, 1));
   }
 
-  Pose2f inversePose,                             /**< The inverted robot pose. Precomputed as it is needed often. */
+private:
+  Pose2f inversePose;                             /**< The inverted robot pose. Precomputed as it is needed often. */
+
+public:,
   (LocalizationQuality)(superb) quality,          /**< Indicates how good the pose estimate seems to be (must not be true). */
   (Matrix3f)(Matrix3f::Identity()) covariance,    /**< The covariance matrix of the estimated robot pose. */
   (unsigned)(0) timestampLastJump,                /**< Timestamp of last "big change" (jump) notification */
 });
-
-FMT_FORMATTER(RobotPose, p, "{{{:.1f}, {:.0f}, {:.0f}}}", p.rotation.toDegrees(), p.translation.x(), p.translation.y());
-
 
 /**
  * @struct GroundTruthRobotPose
@@ -118,4 +133,25 @@ STREAMABLE_WITH_BASE(GroundTruthRobotPose, RobotPose,
   (unsigned)(0) timestamp,
 });
 
-FMT_FORMATTER(GroundTruthRobotPose, p, "{{{:.1f}, {:.0f}, {:.0f}}}", p.rotation.toDegrees(), p.translation.x(), p.translation.y());
+/**
+ * @struct RobotPoseCompact
+ * A wrapper to stream the RobotPose with a 2x2 covariance matrix
+ * and without the actual pose.
+ */
+STREAMABLE(RobotPoseCompact,
+{
+private:
+  RobotPose& robotPose;
+  static short float2half(float floatValue);
+  static float half2float(short halfValue);
+
+public:
+  RobotPoseCompact(const RobotPose& robotPose);
+  void onRead(),
+
+  (Angle) rotation,
+  (Vector2f) translation,
+  (RobotPose::LocalizationQuality) quality,
+  (Eigen::Matrix2<short>) covariance,
+  (unsigned) timestampLastJump,
+});

@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtWidgets module of the Qt Toolkit.
@@ -42,13 +42,13 @@
 
 #include <QtWidgets/qtwidgetsglobal.h>
 #include <QtCore/qdatetime.h>
+#include <QtCore/qcalendar.h>
 #include <QtCore/qvariant.h>
 #include <QtWidgets/qabstractspinbox.h>
 
+QT_REQUIRE_CONFIG(datetimeedit);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_DATETIMEEDIT
 
 class QDateTimeEditPrivate;
 class QStyleOptionSpinBox;
@@ -61,8 +61,10 @@ class Q_WIDGETS_EXPORT QDateTimeEdit : public QAbstractSpinBox
     Q_PROPERTY(QDateTime dateTime READ dateTime WRITE setDateTime NOTIFY dateTimeChanged USER true)
     Q_PROPERTY(QDate date READ date WRITE setDate NOTIFY dateChanged)
     Q_PROPERTY(QTime time READ time WRITE setTime NOTIFY timeChanged)
-    Q_PROPERTY(QDateTime maximumDateTime READ maximumDateTime WRITE setMaximumDateTime RESET clearMaximumDateTime)
-    Q_PROPERTY(QDateTime minimumDateTime READ minimumDateTime WRITE setMinimumDateTime RESET clearMinimumDateTime)
+    Q_PROPERTY(QDateTime maximumDateTime READ maximumDateTime WRITE setMaximumDateTime
+               RESET clearMaximumDateTime)
+    Q_PROPERTY(QDateTime minimumDateTime READ minimumDateTime WRITE setMinimumDateTime
+               RESET clearMinimumDateTime)
     Q_PROPERTY(QDate maximumDate READ maximumDate WRITE setMaximumDate RESET clearMaximumDate)
     Q_PROPERTY(QDate minimumDate READ minimumDate WRITE setMinimumDate RESET clearMinimumDate)
     Q_PROPERTY(QTime maximumTime READ maximumTime WRITE setMaximumTime RESET clearMaximumTime)
@@ -93,15 +95,18 @@ public:
     Q_DECLARE_FLAGS(Sections, Section)
     Q_FLAG(Sections)
 
-    explicit QDateTimeEdit(QWidget *parent = Q_NULLPTR);
-    explicit QDateTimeEdit(const QDateTime &dt, QWidget *parent = Q_NULLPTR);
-    explicit QDateTimeEdit(const QDate &d, QWidget *parent = Q_NULLPTR);
-    explicit QDateTimeEdit(const QTime &t, QWidget *parent = Q_NULLPTR);
+    explicit QDateTimeEdit(QWidget *parent = nullptr);
+    explicit QDateTimeEdit(const QDateTime &dt, QWidget *parent = nullptr);
+    explicit QDateTimeEdit(QDate d, QWidget *parent = nullptr);
+    explicit QDateTimeEdit(QTime t, QWidget *parent = nullptr);
     ~QDateTimeEdit();
 
     QDateTime dateTime() const;
     QDate date() const;
     QTime time() const;
+
+    QCalendar calendar() const;
+    void setCalendar(QCalendar calendar);
 
     QDateTime minimumDateTime() const;
     void clearMinimumDateTime();
@@ -114,24 +119,24 @@ public:
     void setDateTimeRange(const QDateTime &min, const QDateTime &max);
 
     QDate minimumDate() const;
-    void setMinimumDate(const QDate &min);
+    void setMinimumDate(QDate min);
     void clearMinimumDate();
 
     QDate maximumDate() const;
-    void setMaximumDate(const QDate &max);
+    void setMaximumDate(QDate max);
     void clearMaximumDate();
 
-    void setDateRange(const QDate &min, const QDate &max);
+    void setDateRange(QDate min, QDate max);
 
     QTime minimumTime() const;
-    void setMinimumTime(const QTime &min);
+    void setMinimumTime(QTime min);
     void clearMinimumTime();
 
     QTime maximumTime() const;
-    void setMaximumTime(const QTime &max);
+    void setMaximumTime(QTime max);
     void clearMaximumTime();
 
-    void setTimeRange(const QTime &min, const QTime &max);
+    void setTimeRange(QTime min, QTime max);
 
     Sections displayedSections() const;
     Section currentSection() const;
@@ -167,17 +172,17 @@ public:
     bool event(QEvent *event) override;
 Q_SIGNALS:
     void dateTimeChanged(const QDateTime &dateTime);
-    void timeChanged(const QTime &time);
-    void dateChanged(const QDate &date);
+    void timeChanged(QTime time);
+    void dateChanged(QDate date);
 
 public Q_SLOTS:
     void setDateTime(const QDateTime &dateTime);
-    void setDate(const QDate &date);
-    void setTime(const QTime &time);
+    void setDate(QDate date);
+    void setTime(QTime time);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
-#ifndef QT_NO_WHEELEVENT
+#if QT_CONFIG(wheelevent)
     void wheelEvent(QWheelEvent *event) override;
 #endif
     void focusInEvent(QFocusEvent *event) override;
@@ -190,9 +195,9 @@ protected:
     StepEnabled stepEnabled() const override;
     void mousePressEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
-    void initStyleOption(QStyleOptionSpinBox *option) const;
+    void initStyleOption(QStyleOptionSpinBox *option) const override;
 
-    QDateTimeEdit(const QVariant &val, QVariant::Type parserType, QWidget *parent = Q_NULLPTR);
+    QDateTimeEdit(const QVariant &val, QMetaType::Type parserType, QWidget *parent = nullptr);
 private:
     Q_DECLARE_PRIVATE(QDateTimeEdit)
     Q_DISABLE_COPY(QDateTimeEdit)
@@ -205,12 +210,12 @@ class Q_WIDGETS_EXPORT QTimeEdit : public QDateTimeEdit
     Q_OBJECT
     Q_PROPERTY(QTime time READ time WRITE setTime NOTIFY userTimeChanged USER true)
 public:
-    explicit QTimeEdit(QWidget *parent = Q_NULLPTR);
-    explicit QTimeEdit(const QTime &time, QWidget *parent = Q_NULLPTR);
+    explicit QTimeEdit(QWidget *parent = nullptr);
+    explicit QTimeEdit(QTime time, QWidget *parent = nullptr);
     ~QTimeEdit();
 
 Q_SIGNALS:
-    void userTimeChanged(const QTime &time);
+    void userTimeChanged(QTime time);
 };
 
 class Q_WIDGETS_EXPORT QDateEdit : public QDateTimeEdit
@@ -218,17 +223,15 @@ class Q_WIDGETS_EXPORT QDateEdit : public QDateTimeEdit
     Q_OBJECT
     Q_PROPERTY(QDate date READ date WRITE setDate NOTIFY userDateChanged USER true)
 public:
-    explicit QDateEdit(QWidget *parent = Q_NULLPTR);
-    explicit QDateEdit(const QDate &date, QWidget *parent = Q_NULLPTR);
+    explicit QDateEdit(QWidget *parent = nullptr);
+    explicit QDateEdit(QDate date, QWidget *parent = nullptr);
     ~QDateEdit();
 
 Q_SIGNALS:
-    void userDateChanged(const QDate &date);
+    void userDateChanged(QDate date);
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QDateTimeEdit::Sections)
-
-#endif // QT_NO_DATETIMEEDIT
 
 QT_END_NAMESPACE
 

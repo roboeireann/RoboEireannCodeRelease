@@ -6,14 +6,11 @@
  */
 
 #include "LibPositionProvider.h"
-#include "Tools/Debugging/DebugDrawings.h"
 
-MAKE_MODULE(LibPositionProvider, behaviorControl);
+MAKE_MODULE(LibPositionProvider);
 
 void LibPositionProvider::update(LibPosition& libPosition)
 {
-  DECLARE_DEBUG_DRAWING("behavior:LibPositionProvider:obstacleAtMyPosition", "drawingOnField");
-
   libPosition.distanceToOwnGoalGreaterThan = [this](float distance) -> bool
   {
     return distanceToOwnGoalGreaterThan(distance);
@@ -46,15 +43,15 @@ void LibPositionProvider::update(LibPosition& libPosition)
   {
     return isOutSideGoalFrame(position, offset);
   };
-  libPosition.getObstacleAtMyPositionCircle = [this](const Vector2f& pos) -> Geometry::Circle
-  {
-    return getObstacleAtMyPositionCircle(pos);
+  libPosition.isNearPost = [this](const Pose2f& position) -> std::tuple<bool, bool>
+    {
+    return isNearPost(position);
   };
 }
 
 bool LibPositionProvider::distanceToOwnGoalGreaterThan(float distance) const
 {
-  const Vector2f midPoint(theFieldDimensions.xPosOwnGroundLine, 0.f);
+  const Vector2f midPoint(theFieldDimensions.xPosOwnGoalLine, 0.f);
   float distanceToGoal = (theRobotPose.translation - midPoint).norm();
   return distanceToGoal > distance;
 }
@@ -94,21 +91,29 @@ bool LibPositionProvider::isInOpponentPenaltyArea(const Vector2f& position) cons
 
 bool LibPositionProvider::isOutSideGoalFrame(const Vector2f& position, const float offset) const
 {
-  return position.x() - theFieldDimensions.xPosOwnGroundLine > offset || std::abs(position.y()) - theFieldDimensions.yPosLeftGoal > offset;
+  return position.x() - theFieldDimensions.xPosOwnGoalLine > offset || std::abs(position.y()) - theFieldDimensions.yPosLeftGoal > offset;
 }
 
-Geometry::Circle LibPositionProvider::getObstacleAtMyPositionCircle(const Vector2f& position)
+std::tuple<bool, bool> LibPositionProvider::isNearPost(const Pose2f& position) const
 {
-  CIRCLE("behavior:LibPositionProvider:obstacleAtMyPosition", lastCircle.center.x(), lastCircle.center.y(), lastCircle.radius, 20, Drawings::solidPen, ColorRGBA::red, Drawings::noPen, ColorRGBA::black);
-  const Vector2f posRel(theRobotPose.inversePose * position);
-  for(const Obstacle& obstacle : theObstacleModel.obstacles)
-    if((obstacle.center - posRel).squaredNorm() < sqr(positionOffsetIfOccupied))
-      return lastCircle = Geometry::Circle(theRobotPose * obstacle.center, positionOffsetIfOccupied);
+  const float jumpDistanceThreshold = 600.f;
+  const Angle jumpAngleThresholdMin = 65_deg;
+  const Angle jumpAngleThresholdMax = 100_deg;
+  const Vector2f leftPost(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosLeftGoal);
+  const Vector2f rightPost(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosRightGoal);
+  const Vector2f leftRel = position.inverse() * leftPost;
+  const Vector2f rightRel = position.inverse() * rightPost;
+  const float angleToLeft = leftRel.angle();
+  const float angleToRight = rightRel.angle();
 
-  if((lastCircle.center - position).squaredNorm() < sqr(lastCircle.radius) &&
-     std::abs((theRobotPose.inversePose * lastCircle.center).angle()) > deleteObstacleCircleRange)
-    return lastCircle;
+  bool isNearLeftPost =
+    leftRel.norm() < jumpDistanceThreshold &&
+    angleToLeft > jumpAngleThresholdMin &&
+    angleToLeft < jumpAngleThresholdMax;
+  bool isNearRightPost =
+    rightRel.norm() < jumpDistanceThreshold &&
+    angleToRight < -jumpAngleThresholdMin &&
+    angleToRight > -jumpAngleThresholdMax;
 
-  lastCircle.radius = 0.f;
-  return lastCircle;
+  return std::make_tuple(isNearLeftPost, isNearRightPost);
 }

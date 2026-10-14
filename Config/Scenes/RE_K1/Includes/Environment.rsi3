@@ -1,0 +1,13 @@
+<Simulation>
+
+  <!-- HSL 2026 S-field, size 3 ball -->
+  <Include href="../../Includes/BallFifa3.rsi3"/>
+  <Include href="../../Includes/Field2020SPL.rsi3"/>
+
+  <!-- HSL 2026 M-field, size 3 ball -->
+  <!--
+  <Include href="../../Includes/BallFifa3.rsi3"/>
+  <Include href="../../Includes/Field2026-M.rsi3"/>
+  -->
+
+</Simulation>

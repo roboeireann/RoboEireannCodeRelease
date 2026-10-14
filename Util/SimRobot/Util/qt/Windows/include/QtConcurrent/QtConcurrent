@@ -1,8 +1,8 @@
 #ifndef QT_QTCONCURRENT_MODULE_H
 #define QT_QTCONCURRENT_MODULE_H
 #include <QtConcurrent/QtConcurrentDepends>
+#include "qtaskbuilder.h"
 #include "qtconcurrentcompilertest.h"
-#include "qtconcurrentexception.h"
 #include "qtconcurrentfilter.h"
 #include "qtconcurrentfilterkernel.h"
 #include "qtconcurrentfunctionwrappers.h"
@@ -14,6 +14,7 @@
 #include "qtconcurrentrun.h"
 #include "qtconcurrentrunbase.h"
 #include "qtconcurrentstoredfunctioncall.h"
+#include "qtconcurrenttask.h"
 #include "qtconcurrentthreadengine.h"
 #include "qtconcurrentversion.h"
 #endif

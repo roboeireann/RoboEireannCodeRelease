@@ -1,134 +1,92 @@
 #!/bin/bash
 # Frontend to `cmake --build ...`
 
-
-function usage
-{
-  echo "usage: compile [--help] | TARGET CONFIG [SCRIPT-OPTIONS...] [CMAKE-OPTIONS...]"
-  echo ""
-  echo "  --help                   Display this usage"
-  echo "  TARGET                   Required: The target of the build. Valid targets include:"
-  echo "                              all             Build all known targets"
-  echo "                              Nao             The robot binary"
-  echo "                              SimRobot        The simulator binary"
-  echo "                              Bush            The robot management shell"
-  echo "                              clean           Clean all build files (does not clear ccache add --ccache if you want this)"
-  echo "                              Any other valid target in the build, e.g. some .cpp.o file etc"
-  echo "  CONFIG                   Required: One of Debug|Develop|Release"
-  echo "  SCRIPT-OPTIONS:"
-  echo "    --verbose              Make the build output verbose information"
-  echo "    --no-check-files       Do not check for added or removed files (therefore don't detect if you add/remove .cpp files)"
-  echo "                           [Default is to check for added/removed files]"
-  echo "    --pch                  Force rebuild precompiled headers - needed in the rare case that you change a header"
-  echo "                           in the precompiled header set and get warnings that the pch files are out of date."
-  echo "                           The pch option also includes the check-files option by default."
-  echo "                           Note: this will also clear ccache and will result in long build time."
-  echo "    --ccache               Clear the ccache cache (a deep clean or previously built files) - rarely needed."
-  echo "                           Note: this will result in a long build time."
-  echo "  CMAKE-OPTIONS            Most valid cmake command line options are valid here - use with care!!"
-  echo "                           Do not use --target or --config cmake options"
-  echo ""
-  echo "Examples:"
-  echo "  compile --help"
-  echo "  compile SimRobot"
-  echo "  compile SimRobot Develop"
-  echo "  compile Nao Release --pch"
-  exit 1
-}
-
-
-
 cd "$(dirname "$(which "$0")")"
 
 CONFIG="Develop"
-TARGET=""
-CMAKE_VERBOSE=""
-CHECK_FILES=true
+TARGETS=""
+DEEP_CLEAN=0
+PCH_CLEAN=0
+
+usage() {
+  echo "Usage: $(basename "$0") [Debug|Develop|Release] [--pch|--deep-clean] [target ...]"
+  echo ""
+  echo "  Config (default: Develop):"
+  echo "    Debug | Develop | Release"
+  echo ""
+  echo "  Options:"
+  echo "    --pch         Delete PCH files and rebuild (fixes 'please rebuild precompiled header' warnings)"
+  echo "    --deep-clean  Full clean: cmake --build --target clean + ccache -C, then rebuild"
+  echo ""
+  echo "  Examples:"
+  echo "    $(basename "$0") Develop Booster"
+  echo "    $(basename "$0") Develop --pch Booster"
+  echo "    $(basename "$0") --deep-clean"
+  echo "    $(basename "$0") Release"
+  exit 0
+}
+
+case $1 in
+  -h|--help)
+    usage
+    ;;
+  Debug|Develop|Release)
+    CONFIG=$1
+    shift
+    ;;
+esac
 
 
-if [ $# -eq 0 ]; then
-  usage
-# elif [ $# -eq 1 ]; then
-#   case "$1" in
-#     --help)
-#       usage
-#       ;;
-#     *)
-#       echo "ERROR: At least 2 arguments expected if not --help"; echo
-#       usage
-#       ;;
-#   esac
-else
-  # verify the target (or --help option)
-  case "$1" in
-    --help)
+# Parse flags after optional config
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h|--help)
       usage
       ;;
-    *)  
-      TARGET="--target $1"
+    --pch)
+      PCH_CLEAN=1
       shift
-    ;;
-  esac
-
-  # verify the config
-  case "$1" in
-    Debug|Develop|Release)
-      CONFIG=$1
+      ;;
+    --deep-clean)
+      DEEP_CLEAN=1
       shift
       ;;
     *)
-      echo "Assuming config is Develop"
+      TARGETS="$TARGETS $1"
+      shift
       ;;
   esac
+done
 
-  # check for our script options
-  while [ $# -gt 0 ]
-  do
-    case "$1" in
-      --verbose)
-        shift
-        CMAKE_VERBOSE="--verbose"
-        ;;
-      --no-check-files)
-        shift
-        CHECK_FILES=false
-        ;;
-      --pch)
-        shift
-        touch CMakeLists.txt
-        touch ../../Src/Tools/Precompiled/*
-        ../../Util/Buildchain/Linux/bin/ccache -C
-        ;;
-      --ccache)
-        shift
-        touch CMakeLists.txt
-        ../../Util/Buildchain/Linux/bin/ccache -C
-        ;;
-      *)
-        break;
-        ;;
-    esac
-  done
+BUILD_DIR="../../Build/Linux/CMake/$CONFIG" # after the cd at the start
+
+# PCH-only clean: remove .pch and .gch files so cmake regenerates them
+if [ $PCH_CLEAN -eq 1 ]; then
+  echo "Cleaning precompiled headers in $BUILD_DIR..."
+  find "$BUILD_DIR" -name "*.pch" -o -name "*.gch" | xargs rm -f
+  if command -v ccache &>/dev/null; then
+    echo "Clearing ccache..."
+    ccache -C
+  fi	
+  echo "PCH files removed."
 fi
 
-if [ "$CHECK_FILES" = true ]; then
-  touch CMakeLists.txt
+# Deep clean: cmake clean target + ccache clear
+if [ $DEEP_CLEAN -eq 1 ]; then
+  echo "Deep cleaning $BUILD_DIR..."
+  cmake --build "$BUILD_DIR" --config "$CONFIG" --target clean
+  if command -v ccache &>/dev/null; then
+    echo "Clearing ccache..."
+    ccache -C
+  fi
+  echo "Clean complete."
 fi
 
-# elif [ $# -eq 2 ]; then
-#   case $1 in
-#     Debug|Develop|Release)
-#       CONFIG=$1
-#       TARGET="--target $2"
-#       ;;
-#     *)
-#       CONFIG=$2
-#       TARGET="--target $1"
-#       ;;
-#   esac
-# elif [ $# -ne 0 ]; then
-#   >&2 echo "wrong number of arguments"
-#   exit 1
-# fi
 
-cmake --build ../../Build/Linux/CMake/$CONFIG $CMAKE_VERBOSE $@ $TARGET --config $CONFIG
+if [ -n "$TARGETS" ]; then
+  cmake --build "$BUILD_DIR" --config "$CONFIG" --target $TARGETS
+else
+  if [ $PCH_CLEAN -eq 0 ] && [ $DEEP_CLEAN -eq 0 ]; then
+    cmake --build "$BUILD_DIR" --config "$CONFIG"
+  fi
+fi

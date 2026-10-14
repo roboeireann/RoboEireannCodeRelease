@@ -11,21 +11,21 @@
 
 #include "Representations/Infrastructure/CameraImage.h"
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Representations/Modeling/Odometer.h"
+#include "Representations/MotionControl/OdometryData.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/FieldBoundary.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
-#include "Tools/Math/Geometry.h"
-#include "Tools/Math/LeastSquares.h"
-#include "Tools/Module/Module.h"
+#include "Math/Geometry.h"
+#include "Math/LeastSquares.h"
+#include "Framework/Module.h"
 #include <CompiledNN/CompiledNN.h>
 #include <memory>
 
 ENUM(FittingMethod,
 {,
-  Ransac,
-  NotRansac,
-  NoFitting,
+  ransac,
+  notRansac,
+  noFitting,
 });
 
 MODULE(FieldBoundaryProvider,
@@ -34,24 +34,26 @@ MODULE(FieldBoundaryProvider,
   REQUIRES(CameraInfo),
   REQUIRES(CameraMatrix),
   REQUIRES(ImageCoordinateSystem),
-  REQUIRES(Odometer),
+  REQUIRES(OdometryData),
   REQUIRES(OtherFieldBoundary),
+  REQUIRES(OtherOdometryData),
   PROVIDES(FieldBoundary),
-  DEFINES_PARAMETERS(
+  LOADS_PARAMETERS(
   {,
-    (float)(100.f) minDistance, /**< Boundary spots closer than this distance will be ignored (in mm). */
-    (FittingMethod)(NoFitting) fittingMethod, /**< Which line fitting should be used? */
-    (unsigned)(10) minNumberOfSpots, /**< The minimum number of valid spots to calculate a field boundary. */
-    (int)(50) maxNumberOfIterations, /**< Up to how often does RANSAC iterate? */
-    (int)(100) maxSquaredError, /**< Limit at which deviations of spots from the boundary saturate (in pixel^2).  */
-    (int)(1) spotAbovePenaltyFactor, /**< A spot being above this boundary is this factor worse than being below. */
-    (float)(0.1f) acceptanceRatio, /**< Which overall ratio of maxSquaredError is good enough to end the RANSAC? */
-    (Angle)(15_deg) randomlyChosenAngleDevThreshold,
-    (float)(2.f) threshold, /**< threshold to determine weather the boundary is smooth enough */
-    (float)(0.1) nonTopPoints, /**<how many points must not be at the top of the image in relation to the total number of points */
-    (int)(4) top, /**< to which pixel points are considered as at the top*/
-    (float)(6) uncertaintyLimit, /**< maximum average uncertainty of the non top spots to be not considered as odd */
-    (int)(2) maxPointsUnderBorder, /**< how much the points are allowed to be below the lower end on average*/
+    (float) minDistance, /**< Boundary spots closer than this distance will be ignored (in mm). */
+    (FittingMethod) fittingMethod, /**< Which line fitting should be used? */
+    (unsigned) minNumberOfSpots, /**< The minimum number of valid spots to calculate a field boundary. */
+    (int) maxNumberOfIterations, /**< Up to how often does RANSAC iterate? */
+    (int) maxSquaredError, /**< Limit at which deviations of spots from the boundary saturate (in pixel^2).  */
+    (int) spotAbovePenaltyFactor, /**< A spot being above this boundary is this factor worse than being below. */
+    (float) acceptanceRatio, /**< Which overall ratio of maxSquaredError is good enough to end the RANSAC? */
+    (Angle) randomlyChosenAngleDevThreshold,
+    (float) threshold, /**< threshold to determine weather the boundary is smooth enough */
+    (float) nonTopPoints, /**<how many points must not be at the top of the image in relation to the total number of points */
+    (int) top, /**< to which pixel points are considered as at the top*/
+    (float) uncertaintyLimit, /**< maximum average uncertainty of the non top spots to be not considered as odd */
+    (int) maxPointsUnderBorder, /**< how much the points are allowed to be below the lower end on average */
+    (bool) useOtherFieldBoundary, /**< Allow using the field boundary of the other camera. */
   }),
 });
 
@@ -67,10 +69,10 @@ private:
   {
     Vector2i inImage; /**< The spot in image coordinates. */
     Vector2f onField; /**< The spot in robot-relative field coordinates. */
-    float uncertanty; /**<uncertainty of the network for this spot 0 if the network do not provide it */
+    float uncertainty; /**<uncertainty of the network for this spot 0 if the network do not provide it */
 
     Spot() = default;
-    Spot(const Vector2i& inImage, const Vector2f& onField, const float u) : inImage(inImage), onField(onField), uncertanty(u) {}
+    Spot(const Vector2i& inImage, const Vector2f& onField, const float u) : inImage(inImage), onField(onField), uncertainty(u) {}
   };
 
   struct LineCandidate
@@ -85,7 +87,7 @@ private:
       fitLine(fitOnField);
     }
 
-    inline void fitLine(bool fitOnField)
+    void fitLine(bool fitOnField)
     {
       Vector2f n0;
       float d;
@@ -145,7 +147,7 @@ private:
 
   void fitBoundaryNotRansac(const std::vector<Spot>& spots, FieldBoundary& fieldBoundary);
 
-  std::unique_ptr<NeuralNetwork::Model> model; /** The model of the neural network. */
+  std::unique_ptr<NeuralNetwork::Model> model; /**< The model of the neural network. */
   NeuralNetwork::CompiledNN network; /**< The compiled neural network. */
   Vector2i patchSize;  /**< The width and height of the neural network input image. */
 };

@@ -7,53 +7,37 @@
 #include "Platform/Time.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Infrastructure/FrameInfo.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/Math/Approx.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Math/Approx.h"
 #include "Tools/Modeling/BallPhysics.h"
-#include "Tools/Module/Blackboard.h"
-
-#include <algorithm>
-
-void BallModelSimplified::toBallModel(BallModel& ballModel)
-{
-  ballModel.lastPerception = lastPerception;
-
-  ballModel.estimate = BallState();
-  ballModel.estimate.position = position;
-  ballModel.estimate.velocity = velocity;
-
-  ballModel.timeWhenLastSeen = timeWhenLastSeen;
-  ballModel.timeWhenDisappeared = timeWhenDisappeared;
-  ballModel.seenPercentage = seenPercentage;
-}
-
-void BallModelSimplified::fromBallModel(const BallModel& ballModel)
-{
-  lastPerception = ballModel.lastPerception;
-  position = ballModel.estimate.position;
-  velocity = ballModel.estimate.velocity;
-  timeWhenLastSeen = ballModel.timeWhenLastSeen;
-  timeWhenDisappeared = ballModel.timeWhenDisappeared;
-  seenPercentage = ballModel.seenPercentage;
-}
+#include "Framework/Blackboard.h"
 
 void BallModel::verify() const
 {
+#ifndef NDEBUG
   ASSERT(std::isfinite(lastPerception.x()));
   ASSERT(std::isfinite(lastPerception.y()));
   ASSERT(seenPercentage <= 100);
 
-  ASSERT(std::isfinite(estimate.position.x()));
-  ASSERT(std::isfinite(estimate.position.y()));
-  ASSERT(std::isfinite(estimate.velocity.x()));
-  ASSERT(std::isfinite(estimate.velocity.y()));
+  const auto check = [](const BallState& estimate)
+  {
+    ASSERT(std::isfinite(estimate.position.x()));
+    ASSERT(std::isfinite(estimate.position.y()));
+    ASSERT(std::isfinite(estimate.velocity.x()));
+    ASSERT(std::isfinite(estimate.velocity.y()));
 
-  ASSERT(std::isnormal(estimate.covariance(0, 0)));
-  ASSERT(std::isnormal(estimate.covariance(1, 1)));
-  ASSERT(std::isfinite(estimate.covariance(0, 1)));
-  ASSERT(std::isfinite(estimate.covariance(1, 0)));
-  ASSERT(Approx::isEqual(estimate.covariance(0, 1), estimate.covariance(1, 0), 1e-20f));
+    ASSERT(std::isnormal(estimate.covariance(0, 0)));
+    ASSERT(std::isnormal(estimate.covariance(1, 1)));
+    ASSERT(std::isfinite(estimate.covariance(0, 1)));
+    ASSERT(std::isfinite(estimate.covariance(1, 0)));
+    ASSERT(Approx::isEqual(estimate.covariance(0, 1), estimate.covariance(1, 0), 1e-20f));
+  };
+
+  check(estimate);
+  if(riskyMovingEstimateIsValid)
+    check(riskyMovingEstimate);
+#endif
 }
 
 void BallModel::draw() const
@@ -64,11 +48,17 @@ void BallModel::draw() const
     const Vector2f& position(estimate.position);
     const Vector2f& velocity(estimate.velocity);
     CIRCLE("representation:BallModel",
-           position.x(), position.y(), 45, 5, // pen width
-           Drawings::solidPen, ColorRGBA::orange.darker(0.3f),
+           position.x(), position.y(), 45, 0, // pen width
+           Drawings::solidPen, ColorRGBA::orange,
            Drawings::solidBrush, ColorRGBA::orange);
     ARROW("representation:BallModel", position.x(), position.y(),
-          position.x() + velocity.x(), position.y() + velocity.y(), 15, Drawings::solidPen, ColorRGBA::orange);
+          position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, ColorRGBA::orange);
+    if(riskyMovingEstimateIsValid)
+    {
+      const Vector2f& riskyVelocity(riskyMovingEstimate.velocity);
+      ARROW("representation:BallModel", position.x(), position.y(),
+            position.x() + riskyVelocity.x(), position.y() + riskyVelocity.y(), 5, 1, ColorRGBA::blue);
+    }
   }
 
   DEBUG_DRAWING("representation:BallModel:covariance", "drawingOnField")
@@ -81,27 +71,21 @@ void BallModel::draw() const
   {
     if(Blackboard::getInstance().exists("BallSpecification"))
     {
-      const BallSpecification &ballSpecification =
-          static_cast<const BallSpecification &>(Blackboard::getInstance()["BallSpecification"]);
-      Vector2f endPosition;
-      if (estimate.rotation == 0.f)
-        endPosition = BallPhysics::getEndPosition(estimate.position, estimate.velocity, ballSpecification.friction);
-      else
-        endPosition = BallPhysics::getEndPositionRegardingRotation(estimate.position, estimate.velocity,
-                                                                   estimate.rotation, ballSpecification.friction);
-
-      // ColorRGBA violet = ColorRGBA(168, 25, 99, 220); // So you know what you see in the world state...
-      ColorRGBA ballColor = ColorRGBA(255, 0, 192); // So you know what you see in the world state...
-      LINE("representation:BallModel:endPosition", estimate.position.x(), estimate.position.y(), endPosition.x(),
-           endPosition.y(), 5, Drawings::dottedPen, ballColor.alpha(0.5f));
+      const BallSpecification& ballSpecification = static_cast<const BallSpecification&>(Blackboard::getInstance()["BallSpecification"]);
+      Vector2f position = BallPhysics::getEndPosition(estimate.position, estimate.velocity, ballSpecification.friction);
+      ColorRGBA violet = ColorRGBA(168, 25, 99, 220); //So you know what you see in the world state...
       CIRCLE("representation:BallModel:endPosition",
-             endPosition.x(),  endPosition.y(), 15, 0, // pen width
-             Drawings::noPen, ballColor,
-             Drawings::solidBrush, ballColor);
-      CIRCLE("representation:BallModel:endPosition",
-             endPosition.x(),  endPosition.y(), 75, 15, // pen width
-             Drawings::dottedPen, ballColor,
-             Drawings::noBrush, ballColor);
+             position.x(),  position.y(), 45, 0, // pen width
+             Drawings::solidPen, ColorRGBA::black,
+             Drawings::solidBrush, violet);
+      if(riskyMovingEstimateIsValid)
+      {
+        position = BallPhysics::getEndPosition(riskyMovingEstimate.position, riskyMovingEstimate.velocity, ballSpecification.friction);
+        CIRCLE("representation:BallModel:endPosition",
+               position.x(), position.y(), 45, 0, // pen width
+               Drawings::solidPen, ColorRGBA::black,
+               Drawings::solidBrush, ColorRGBA::cyan);
+      }
     }
   }
 
@@ -122,37 +106,12 @@ void GroundTruthBallModel::draw() const
   {
     const Vector2f& position(estimate.position);
     const Vector2f& velocity(estimate.velocity);
-    ColorRGBA transparentOrange(255, 128, 0, 96);
+    ColorRGBA transparentOrange(255, 128, 0, 128);
     CIRCLE("representation:GroundTruthBallModel",
            position.x(), position.y(), 45, 4, // pen width
            Drawings::solidPen, ColorRGBA::gray,
            Drawings::solidBrush, transparentOrange);
     ARROW("representation:GroundTruthBallModel", position.x(), position.y(),
           position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, transparentOrange);
-  }
-}
-
-void BallModel3D::draw() const
-{
-  // drawing of the ball model in the field view
-  DEBUG_DRAWING("representation:BallModel3D", "drawingOnField")
-  {
-    const Vector3f& position(estimate.position);
-    const Vector3f& velocity(estimate.velocity);
-    CIRCLE("representation:BallModel3D",
-           position.x(), position.y(), 45, 0, // pen width
-           Drawings::solidPen, ColorRGBA::red,
-           Drawings::solidBrush, ColorRGBA::red);
-    ARROW("representation:BallModel3D", position.x(), position.y(),
-          position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, ColorRGBA::red);
-  }
-
-  DEBUG_DRAWING3D("representation:BallModel3D", "robot")
-  {
-    TRANSLATE3D("representation:BallModel3D", 0, 0, -230);
-    if(Time::getTimeSince(timeWhenLastSeen) < 5000 && Time::getTimeSince(timeWhenDisappeared) < 1000)
-    {
-      SPHERE3D("representation:BallModel3D", estimate.position.x(), estimate.position.y(), estimate.position.z(), estimate.radius, ColorRGBA::orange);
-    }
   }
 }

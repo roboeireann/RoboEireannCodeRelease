@@ -4,15 +4,17 @@
  * This file declares a class that represents a wheel of sectors around a center point.
  *
  * @author Arne Hasselbring
+ * @note [BH2021]: Includes functions ported from B-Human 2021 Code Release that 
+ *                 were not part of the B-Human 2025 Code Release.
  */
 
 #pragma once
 
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Math/Angle.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Range.h"
-#include "Tools/Streams/Enum.h"
+#include "Debugging/DebugDrawings.h"
+#include "Math/Angle.h"
+#include "Math/Eigen.h"
+#include "Math/Range.h"
+#include "Streaming/Enum.h"
 
 #include <list>
 
@@ -42,8 +44,9 @@ public:
   /**
    * Calculates the wheel for a given center position (e.g. hypothetical ball position).
    * @param positionOnField The center position.
+   * @param distance The distance from the wheel center at which this sector ends. Defaults to float::max.
    */
-  void begin(const Vector2f& positionOnField);
+  void begin(const Vector2f& positionOnField, float distance = std::numeric_limits<float>::max());
 
   /**
    * Post-processes and returns the calculated wheel.
@@ -72,22 +75,23 @@ public:
    * Adds a sector to the wheel.
    *
    * This is only a wrapper around the other addSector method.
-   * @param p1 The position of one edge of the object (in the same coordinate system as the wheel center).
-   * @param p2 The position of one edge of the object (in the same coordinate system as the wheel center).
-   * @param type The type of the new sector.
-   */
-  void addSector(const Vector2f& p1, const Vector2f& p2, Sector::Type type);
-
-  /**
-   * Adds a sector to the wheel.
-   *
-   * This is only a wrapper around the other addSector method.
    * @param center The position of the object (in the same coordinate system as the wheel center).
    * @param width The width of the object.
    * @param distance The distance of the new sector.
    * @param type The type of the new sector.
    */
   void addSector(const Vector2f& center, float width, float distance, Sector::Type type);
+
+  /**
+   * Adds a sector to the wheel.
+   *
+   * This is only a wrapper around the other addSector method.
+   * @param p1 The position of one edge of the object (in the same coordinate system as the wheel center).
+   * @param p2 The position of one edge of the object (in the same coordinate system as the wheel center).
+   * @param type The type of the new sector.
+   * @note [BH2021] port
+   */
+  void addSector(const Vector2f& p1, const Vector2f& p2, Sector::Type type);
 
   /**
    * Adds a sector to the wheel.
@@ -132,7 +136,7 @@ inline SectorWheel::Sector::Sector(const Rangea& angleRange, float distance, Typ
     for(const auto& sector : wheel) \
     { \
       ColorRGBA color; \
-      switch (sector.type) \
+      switch(sector.type) \
       { \
         case SectorWheel::Sector::free: \
           color = ColorRGBA(0, 255, 0, 125); \
@@ -144,7 +148,7 @@ inline SectorWheel::Sector::Sector(const Rangea& angleRange, float distance, Typ
           color = ColorRGBA(255, 0, 0, 125); \
           break; \
         case SectorWheel::Sector::goal: \
-          color = ColorRGBA(255, 255, 255, 125); \
+          color = ColorRGBA(0, 0, 255, 125); \
           break; \
         case SectorWheel::Sector::erased: \
           color = ColorRGBA(128, 128, 128, 125); \

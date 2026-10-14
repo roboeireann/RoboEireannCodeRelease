@@ -3,8 +3,8 @@
  *
  * This file contains the LEDRequest struct.
  * 
- * [RV] Added new convenience interface to provide greater control over LEDs
- * while providing a simpler interface
+ * Also contains a convenience interface to provide greater control over LEDs
+ * while providing a simpler interface than calling setLed repeatedly
  *
  * @author Thomas Röfer
  * @author Rudi Villing
@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Libs/Streaming/EnumIndexedArray.h"
 
 
 struct LEDColor
@@ -75,6 +75,7 @@ STREAMABLE(LEDRequest,
     faceLeftBlue225Deg,
     faceLeftBlue270Deg,
     faceLeftBlue315Deg,
+
     firstRightEyeLED,
     faceRightRed0Deg = firstRightEyeLED,
     faceRightRed45Deg,
@@ -100,6 +101,7 @@ STREAMABLE(LEDRequest,
     faceRightBlue225Deg,
     faceRightBlue270Deg,
     faceRightBlue315Deg,
+
     firstLeftEarLED,
     earsLeft0Deg = firstLeftEarLED,
     earsLeft36Deg,
@@ -111,6 +113,7 @@ STREAMABLE(LEDRequest,
     earsLeft252Deg,
     earsLeft288Deg,
     earsLeft324Deg,
+
     firstRightEarLED,
     earsRight0Deg = firstRightEarLED,
     earsRight36Deg,
@@ -122,10 +125,12 @@ STREAMABLE(LEDRequest,
     earsRight252Deg,
     earsRight288Deg,
     earsRight324Deg,
+
     firstChestLED,
     chestRed = firstChestLED,
     chestGreen,
     chestBlue,
+
     firstHeadLED,
     headFrontRight1 = firstHeadLED,
     headFrontRight0,
@@ -140,10 +145,12 @@ STREAMABLE(LEDRequest,
     headFrontLeft0,
     headFrontLeft1,
     lastHeadLED = headFrontLeft1,
+
     firstLeftFootLED,
     footLeftRed = firstLeftFootLED,
     footLeftGreen,
     footLeftBlue,
+
     firstRightFootLED,
     footRightRed = firstRightFootLED,
     footRightGreen,
@@ -151,6 +158,7 @@ STREAMABLE(LEDRequest,
   });
 
   static constexpr size_t numOfHeadLeds = LED::lastHeadLED - LED::firstHeadLED + 1;
+  static constexpr size_t numOfHeadLEDs = numOfHeadLeds; // BH legacy name
   static constexpr size_t numOfEarLeds = LED::earsLeft324Deg - LED::earsLeft0Deg + 1;
   static constexpr size_t numOfEyeLeds = LED::faceLeftRed315Deg - LED::faceLeftRed0Deg + 1;
 
@@ -160,8 +168,11 @@ STREAMABLE(LEDRequest,
     // for all following values, the float values in ledValues array are used
     on,
     blinking,
-    blinking2, // antiphase to blinking (i.e. on when blinking is off and vice versa)
     fastBlinking,
+    half, // deprecated legacy value
+
+    // RoboEireann LED states
+    blinking2, // antiphase to blinking (i.e. on when blinking is off and vice versa)
     fastBlinking2, // antiphase to fastBlinking
     slowDoubleBlink, // slower double blink and gap
     fastDoubleBlink, // faster double blink and gap
@@ -169,8 +180,6 @@ STREAMABLE(LEDRequest,
     tripleBlink2, // antiphase to tripleBlink
     fade, // 3000 ms period, 50% duty cycle
     fade2, // 3000 ms period, 75% duty cycle
-    // deprecated legacy interface
-    half,
   });
 
   ENUM(Side,

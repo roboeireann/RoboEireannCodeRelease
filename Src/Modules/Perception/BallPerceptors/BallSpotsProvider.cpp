@@ -4,10 +4,10 @@
  */
 
 #include "BallSpotsProvider.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/Debugging.h"
-#include "Tools/ImageProcessing/InImageSizeCalculations.h"
-#include "Tools/ImageProcessing/PixelTypes.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/Debugging.h"
+#include "Tools/Math/InImageSizeCalculations.h"
+#include "ImageProcessing/PixelTypes.h"
 #include "Tools/Math/Transformation.h"
 
 #include <cmath>
@@ -50,7 +50,7 @@ void BallSpotsProvider::searchScanLines(BallSpots& ballSpots) const
     int currentLengthNeeded = 0;
     for(const ScanLineRegion& region : theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].regions)
     {
-      if(region.color != PixelTypes::Color::field)
+      if(region.color != ScanLineRegion::field)
       {
         if(currentLengthNeeded == 0)
         {
@@ -78,13 +78,11 @@ void BallSpotsProvider::searchScanLines(BallSpots& ballSpots) const
             unsigned char luminanceRef = 0;
             unsigned char saturationRef = 0;
             int luminanceAverage = 0;
-            // int saturationAverage = 0;
             for(int i = region.range.lower; i < lowestYOfCurrentArea; i++)
             {
               const unsigned char luminance = theECImage.grayscaled[i][theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x];
               const unsigned char saturation = theECImage.saturated[i][theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x];
               luminanceAverage += luminance;
-              // saturationAverage += saturation;
               if(luminance > luminanceRef)
               {
                 luminanceRef = luminance;
@@ -286,4 +284,4 @@ float BallSpotsProvider::getNeededLengthFor(const int x, const int y, Geometry::
     return circle.radius + (startPoint - circle.center).norm() * ballSpotDistUsage;
 }
 
-MAKE_MODULE(BallSpotsProvider, perception);
+MAKE_MODULE(BallSpotsProvider);

@@ -5,46 +5,48 @@
  *
  * @author Matthias Jüngel
  * @author Thomas Röfer
+ * @author Rudi Villing (modifications)
  */
 
 #pragma once
 
-#include "Tools/Boundary.h"
-#include "Tools/Math/Pose2f.h"
-#include "Tools/Streams/Enum.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Math/Geometry.h"
-#include "Tools/Streams/EnumIndexedArray.h"
-
-#include <unordered_map>
+#include "Math/Boundary.h"
+#include "Math/Pose2f.h"
+#include "Math/Pose3f.h"
+#include "Streaming/Enum.h"
+#include "Streaming/AutoStreamable.h"
+#include "Math/Geometry.h"
+#include "Streaming/EnumIndexedArray.h"
 
 STREAMABLE(SimpleFieldDimensions,
 {,
   (float) xPosOpponentFieldBorder,
   (float) xPosOpponentGoal,
   (float) xPosOpponentGoalPost,
-  (float) xPosOpponentGroundLine,
+  (float) xPosOpponentGoalLine,
   (float) xPosOpponentPenaltyArea,
   (float) xPosOpponentPenaltyMark,
   (float) xPosPenaltyStrikerStartPosition,
-  (float) xPosHalfWayLine,
+  (float) xPosHalfwayLine,
   (float) xPosOwnPenaltyArea,
   (float) xPosOwnPenaltyMark,
-  (float) xPosOwnGroundLine,
+  (float) xPosOwnGoalLine,
   (float) xPosOwnGoalPost,
   (float) xPosOwnGoal,
   (float) xPosOwnFieldBorder,
   (float) xPosOpponentGoalArea,
   (float) xPosOwnGoalArea,
+  (float) xPosReturnFromPenalty,
 
   (float) yPosLeftFieldBorder,
-  (float) yPosLeftSideline,
+  (float) yPosLeftReturnFromPenalty,
+  (float) yPosLeftTouchline,
   (float) yPosLeftPenaltyArea,
   (float) yPosLeftGoal,
-  (float) yPosCenterGoal,
   (float) yPosRightGoal,
   (float) yPosRightPenaltyArea,
-  (float) yPosRightSideline,
+  (float) yPosRightTouchline,
+  (float) yPosRightReturnFromPenalty,
   (float) yPosRightFieldBorder,
   (float) yPosLeftGoalArea,
   (float) yPosRightGoalArea,
@@ -109,7 +111,7 @@ struct FieldDimensions : public SimpleFieldDimensions
     lCorner180,
     lCorner270,
   });
-  static const int numOfCornerClasses = numOfCornerClasss; // extra, because numOfCornerClasss isn't so nice
+  static ENUM_NUM_OF_ALIAS(CornerClass, numOfCornerClasses); // Fix wrong identifier.
 
 private:
   LinesTable straightFieldLines; /**< The field lines as read from the stream. */
@@ -159,18 +161,7 @@ public:
    */
   bool isInsideField(const Vector2f& p) const
   {
-    return p.x() <= xPosOpponentGroundLine && p.x() >= xPosOwnGroundLine && p.y() <= yPosLeftSideline && p.y() >= yPosRightSideline;
-  }
-
-  /**
-   * Returns true when p is inside the opponent goal.
-   * (Allows for optional tolerance)
-   */
-  bool isInsideOpponentGoal(const Vector2f& p, const Vector2f& tolerance = Vector2f(70.f, 100.f)) const
-  {
-    return (p.x() >= (xPosOpponentGroundLine + tolerance.x())) && // slightly inside goal (so we don't leave a ball sit on the line)
-           (p.y() < (yPosLeftGoal + tolerance.y())) && // slightly wider than real goal
-           (p.y() > (yPosRightGoal - tolerance.y()));
+    return p.x() <= xPosOpponentGoalLine && p.x() >= xPosOwnGoalLine && p.y() <= yPosLeftTouchline && p.y() >= yPosRightTouchline;
   }
 
   /**
@@ -178,7 +169,18 @@ public:
   */
   bool isInsideOwnHalf(const Vector2f& p) const
   {
-    return p.x() <= xPosHalfWayLine && p.x() >= xPosOwnGroundLine && p.y() <= yPosLeftSideline && p.y() >= yPosRightSideline;
+    return p.x() <= xPosHalfwayLine && p.x() >= xPosOwnGoalLine && p.y() <= yPosLeftTouchline && p.y() >= yPosRightTouchline;
+  }
+
+  /**
+   * Returns true when p is inside the opponent goal.
+   * (Allows for optional tolerance)
+   */
+  bool isInsideOpponentGoal(const Vector2f& p, const Vector2f& tolerance = Vector2f(150.f, 100.f)) const
+  {
+    return (p.x() >= (xPosOpponentGoalLine + tolerance.x())) && // slightly inside goal (so we don't leave a ball sit on the line)
+           (p.y() < (yPosLeftGoal + tolerance.y())) && // slightly wider than real goal
+           (p.y() > (yPosRightGoal - tolerance.y()));
   }
 
   /**
@@ -189,14 +191,14 @@ public:
   float clipToField(Vector2f& v) const
   {
     const Vector2f old = v;
-    if(v.x() > xPosOpponentGroundLine)
-      v.x() = xPosOpponentGroundLine;
-    else if(v.x() < xPosOwnGroundLine)
-      v.x() = xPosOwnGroundLine;
-    if(v.y() > yPosLeftSideline)
-      v.y() = yPosLeftSideline;
-    else if(v.y() < yPosRightSideline)
-      v.y() = yPosRightSideline;
+    if(v.x() > xPosOpponentGoalLine)
+      v.x() = xPosOpponentGoalLine;
+    else if(v.x() < xPosOwnGoalLine)
+      v.x() = xPosOwnGoalLine;
+    if(v.y() > yPosLeftTouchline)
+      v.y() = yPosLeftTouchline;
+    else if(v.y() < yPosRightTouchline)
+      v.y() = yPosRightTouchline;
     return (v - old).norm();
   }
 
@@ -218,15 +220,20 @@ public:
   void draw() const;
 
   /**
+   * The method draws the field in 3D.
+   */
+  void draw3D() const;
+
+  /**
    * Draws the goal frame.
    */
   void drawGoalFrame() const;
 
-
   /**
    * add symbols to a map so they can be used in other config files
    */
-  void populateSymbols(std::unordered_map<std::string, float>& symbols) const;
+  void populateSymbolMap(std::unordered_map<std::string, float>& symbols) const;
+
 
 protected:
   /**
@@ -258,4 +265,10 @@ private:
    * The method draws the field lines.
    */
   void drawCorners() const;
+
+  /**
+   * The method draws dimension names and to which distances they correspond.
+   * @param showValues Also draw the actual values of the dimensions.
+   */
+  void drawDimensions(bool showValues) const;
 };

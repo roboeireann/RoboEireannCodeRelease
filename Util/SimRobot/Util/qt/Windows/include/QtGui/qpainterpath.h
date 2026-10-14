@@ -41,12 +41,12 @@
 #define QPAINTERPATH_H
 
 #include <QtGui/qtguiglobal.h>
-#include <QtGui/qmatrix.h>
+#include <QtGui/qtransform.h>
 #include <QtCore/qglobal.h>
-#include <QtCore/qrect.h>
 #include <QtCore/qline.h>
-#include <QtCore/qvector.h>
-#include <QtCore/qscopedpointer.h>
+#include <QtCore/qlist.h>
+#include <QtCore/qrect.h>
+#include <QtCore/qshareddata.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -54,11 +54,11 @@ QT_BEGIN_NAMESPACE
 class QFont;
 class QPainterPathPrivate;
 struct QPainterPathPrivateDeleter;
-class QPainterPathData;
 class QPainterPathStrokerPrivate;
 class QPen;
 class QPolygonF;
 class QRegion;
+class QTransform;
 class QVectorPath;
 
 class Q_GUI_EXPORT QPainterPath
@@ -88,16 +88,18 @@ public:
         inline bool operator!=(const Element &e) const { return !operator==(e); }
     };
 
-    QPainterPath() Q_DECL_NOEXCEPT;
+    QPainterPath() noexcept;
     explicit QPainterPath(const QPointF &startPoint);
     QPainterPath(const QPainterPath &other);
     QPainterPath &operator=(const QPainterPath &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QPainterPath &operator=(QPainterPath &&other) Q_DECL_NOEXCEPT
-    { qSwap(d_ptr, other.d_ptr); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QPainterPath)
     ~QPainterPath();
-    inline void swap(QPainterPath &other) Q_DECL_NOEXCEPT { d_ptr.swap(other.d_ptr); }
+
+    inline void swap(QPainterPath &other) noexcept { d_ptr.swap(other.d_ptr); }
+
+    void clear();
+    void reserve(int size);
+    int capacity() const;
 
     void closeSubpath();
 
@@ -138,13 +140,6 @@ public:
                                qreal xRadius, qreal yRadius,
                                Qt::SizeMode mode = Qt::AbsoluteSize);
 
-    void addRoundRect(const QRectF &rect, int xRnd, int yRnd);
-    inline void addRoundRect(qreal x, qreal y, qreal w, qreal h,
-                             int xRnd, int yRnd);
-    inline void addRoundRect(const QRectF &rect, int roundness);
-    inline void addRoundRect(qreal x, qreal y, qreal w, qreal h,
-                             int roundness);
-
     void connectPath(const QPainterPath &path);
 
     bool contains(const QPointF &pt) const;
@@ -154,8 +149,8 @@ public:
     void translate(qreal dx, qreal dy);
     inline void translate(const QPointF &offset);
 
-    Q_REQUIRED_RESULT QPainterPath translated(qreal dx, qreal dy) const;
-    Q_REQUIRED_RESULT inline QPainterPath translated(const QPointF &offset) const;
+    [[nodiscard]] QPainterPath translated(qreal dx, qreal dy) const;
+    [[nodiscard]] inline QPainterPath translated(const QPointF &offset) const;
 
     QRectF boundingRect() const;
     QRectF controlPointRect() const;
@@ -165,13 +160,11 @@ public:
 
     bool isEmpty() const;
 
-    Q_REQUIRED_RESULT QPainterPath toReversed() const;
-    QList<QPolygonF> toSubpathPolygons(const QMatrix &matrix = QMatrix()) const;
-    QList<QPolygonF> toFillPolygons(const QMatrix &matrix = QMatrix()) const;
-    QPolygonF toFillPolygon(const QMatrix &matrix = QMatrix()) const;
-    QList<QPolygonF> toSubpathPolygons(const QTransform &matrix) const;
-    QList<QPolygonF> toFillPolygons(const QTransform &matrix) const;
-    QPolygonF toFillPolygon(const QTransform &matrix) const;
+    [[nodiscard]] QPainterPath toReversed() const;
+
+    QList<QPolygonF> toSubpathPolygons(const QTransform &matrix = QTransform()) const;
+    QList<QPolygonF> toFillPolygons(const QTransform &matrix = QTransform()) const;
+    QPolygonF toFillPolygon(const QTransform &matrix = QTransform()) const;
 
     int elementCount() const;
     QPainterPath::Element elementAt(int i) const;
@@ -185,12 +178,11 @@ public:
 
     bool intersects(const QPainterPath &p) const;
     bool contains(const QPainterPath &p) const;
-    Q_REQUIRED_RESULT QPainterPath united(const QPainterPath &r) const;
-    Q_REQUIRED_RESULT QPainterPath intersected(const QPainterPath &r) const;
-    Q_REQUIRED_RESULT QPainterPath subtracted(const QPainterPath &r) const;
-    Q_REQUIRED_RESULT QPainterPath subtractedInverted(const QPainterPath &r) const;
+    [[nodiscard]] QPainterPath united(const QPainterPath &r) const;
+    [[nodiscard]] QPainterPath intersected(const QPainterPath &r) const;
+    [[nodiscard]] QPainterPath subtracted(const QPainterPath &r) const;
 
-    Q_REQUIRED_RESULT QPainterPath simplified() const;
+    [[nodiscard]] QPainterPath simplified() const;
 
     bool operator==(const QPainterPath &other) const;
     bool operator!=(const QPainterPath &other) const;
@@ -205,22 +197,19 @@ public:
     QPainterPath &operator-=(const QPainterPath &other);
 
 private:
-    QScopedPointer<QPainterPathPrivate, QPainterPathPrivateDeleter> d_ptr;
+    QExplicitlySharedDataPointer<QPainterPathPrivate> d_ptr;
 
     inline void ensureData() { if (!d_ptr) ensureData_helper(); }
     void ensureData_helper();
     void detach();
-    void detach_helper();
     void setDirty(bool);
     void computeBoundingRect() const;
     void computeControlPointRect() const;
 
-    QPainterPathData *d_func() const { return reinterpret_cast<QPainterPathData *>(d_ptr.data()); }
+    QPainterPathPrivate *d_func() const { return d_ptr.data(); }
 
-    friend class QPainterPathData;
     friend class QPainterPathStroker;
     friend class QPainterPathStrokerPrivate;
-    friend class QMatrix;
     friend class QTransform;
     friend class QVectorPath;
     friend Q_GUI_EXPORT const QVectorPath &qtVectorPathForPath(const QPainterPath &);
@@ -231,7 +220,7 @@ private:
 #endif
 };
 
-Q_DECLARE_SHARED_NOT_MOVABLE_UNTIL_QT6(QPainterPath)
+Q_DECLARE_SHARED(QPainterPath)
 Q_DECLARE_TYPEINFO(QPainterPath::Element, Q_PRIMITIVE_TYPE);
 
 #ifndef QT_NO_DATASTREAM
@@ -263,8 +252,8 @@ public:
     qreal curveThreshold() const;
 
     void setDashPattern(Qt::PenStyle);
-    void setDashPattern(const QVector<qreal> &dashPattern);
-    QVector<qreal> dashPattern() const;
+    void setDashPattern(const QList<qreal> &dashPattern);
+    QList<qreal> dashPattern() const;
 
     void setDashOffset(qreal offset);
     qreal dashOffset() const;
@@ -333,30 +322,6 @@ inline void QPainterPath::addRoundedRect(qreal x, qreal y, qreal w, qreal h,
     addRoundedRect(QRectF(x, y, w, h), xRadius, yRadius, mode);
 }
 
-inline void QPainterPath::addRoundRect(qreal x, qreal y, qreal w, qreal h,
-                                       int xRnd, int yRnd)
-{
-    addRoundRect(QRectF(x, y, w, h), xRnd, yRnd);
-}
-
-inline void QPainterPath::addRoundRect(const QRectF &rect,
-                                       int roundness)
-{
-    int xRnd = roundness;
-    int yRnd = roundness;
-    if (rect.width() > rect.height())
-        xRnd = int(roundness * rect.height()/rect.width());
-    else
-        yRnd = int(roundness * rect.width()/rect.height());
-    addRoundRect(rect, xRnd, yRnd);
-}
-
-inline void QPainterPath::addRoundRect(qreal x, qreal y, qreal w, qreal h,
-                                       int roundness)
-{
-    addRoundRect(QRectF(x, y, w, h), roundness);
-}
-
 inline void QPainterPath::addText(qreal x, qreal y, const QFont &f, const QString &text)
 {
     addText(QPointF(x, y), f, text);
@@ -368,6 +333,8 @@ inline void QPainterPath::translate(const QPointF &offset)
 inline QPainterPath QPainterPath::translated(const QPointF &offset) const
 { return translated(offset.x(), offset.y()); }
 
+inline QPainterPath operator *(const QPainterPath &p, const QTransform &m)
+{ return m.map(p); }
 
 #ifndef QT_NO_DEBUG_STREAM
 Q_GUI_EXPORT QDebug operator<<(QDebug, const QPainterPath &);

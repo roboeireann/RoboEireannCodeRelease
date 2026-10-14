@@ -49,7 +49,6 @@ QT_BEGIN_NAMESPACE
 
 #ifndef QT_NO_ACCESSIBILITY
 
-class QStringList;
 class QAccessibleInterface;
 
 #define QAccessibleFactoryInterface_iid "org.qt-project.Qt.QAccessibleFactoryInterface"
@@ -60,7 +59,7 @@ class Q_GUI_EXPORT QAccessiblePlugin : public QObject
 {
     Q_OBJECT
 public:
-    explicit QAccessiblePlugin(QObject *parent = Q_NULLPTR);
+    explicit QAccessiblePlugin(QObject *parent = nullptr);
     ~QAccessiblePlugin();
 
     virtual QAccessibleInterface *create(const QString &key, QObject *object) = 0;

@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Tools/Modeling/Obstacle.h"
-#include "Tools/RingBuffer.h"
+#include "Math/RingBuffer.h"
 
 struct CameraInfo;
 struct CameraMatrix;
@@ -83,12 +83,16 @@ class ObstacleHypothesis : public Obstacle
   /**
    * EKF measurement step.
    * @param weightedSum Factor how much the measured width affects the actual width.
+   * @param minWidth The minimum width of an obstacle.
    */
-  void measurement(const ObstacleHypothesis& measurement, const float weightedSum,
-                   const float goalPostRadius);
+  void measurement(const ObstacleHypothesis& measurement, const float weightedSum, const float minWidth);
 
-  /** Trying to identify the type of the obstacle. */
-  void considerType(const ObstacleHypothesis& measurement, const int teamThreshold, const int uprightThreshold);
+  /** Trying to identify the type of the obstacle. Sets the team. upright, and type attributes.
+   * @param measurement A new measurement of an obstacle
+   * @param teamThreshold Fiddle parameter configured in module
+   * @param uprightThreshold Fiddle parameter configured in module
+   */
+  void determineAndSetType(const ObstacleHypothesis& measurement, const int teamThreshold, const int uprightThreshold);
 
   /**
    * Whether the field boundary is further as this obstacle.

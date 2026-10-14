@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2019 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtGui module of the Qt Toolkit.
@@ -47,6 +47,8 @@
 #include <QtCore/qvariant.h>
 #include <QtGui/qfont.h>
 #include <QtCore/qurl.h>
+#include <QtCore/qcontainerfwd.h>
+Q_MOC_INCLUDE(<QtGui/qtextcursor.h>)
 
 QT_BEGIN_NAMESPACE
 
@@ -62,22 +64,15 @@ class QTextObject;
 class QTextFormat;
 class QTextFrame;
 class QTextBlock;
-class QTextCodec;
 class QVariant;
 class QRectF;
 class QTextOption;
 class QTextCursor;
 
-template<typename T> class QVector;
-
 namespace Qt
 {
     Q_GUI_EXPORT bool mightBeRichText(const QString&);
     Q_GUI_EXPORT QString convertFromPlainText(const QString &plain, WhiteSpaceMode mode = WhiteSpacePre);
-
-#ifndef QT_NO_TEXTCODEC
-    Q_GUI_EXPORT QTextCodec *codecForHtml(const QByteArray &ba);
-#endif
 }
 
 class Q_GUI_EXPORT QAbstractUndoItem
@@ -116,11 +111,11 @@ class Q_GUI_EXPORT QTextDocument : public QObject
     Q_PROPERTY(QUrl baseUrl READ baseUrl WRITE setBaseUrl NOTIFY baseUrlChanged)
 
 public:
-    explicit QTextDocument(QObject *parent = Q_NULLPTR);
-    explicit QTextDocument(const QString &text, QObject *parent = Q_NULLPTR);
+    explicit QTextDocument(QObject *parent = nullptr);
+    explicit QTextDocument(const QString &text, QObject *parent = nullptr);
     ~QTextDocument();
 
-    QTextDocument *clone(QObject *parent = Q_NULLPTR) const;
+    QTextDocument *clone(QObject *parent = nullptr) const;
 
     bool isEmpty() const;
     virtual void clear();
@@ -141,14 +136,33 @@ public:
 
     enum MetaInformation {
         DocumentTitle,
-        DocumentUrl
+        DocumentUrl,
+        CssMedia
     };
     void setMetaInformation(MetaInformation info, const QString &);
     QString metaInformation(MetaInformation info) const;
 
 #ifndef QT_NO_TEXTHTMLPARSER
-    QString toHtml(const QByteArray &encoding = QByteArray()) const;
+    QString toHtml() const;
     void setHtml(const QString &html);
+#endif
+
+#if QT_CONFIG(textmarkdownwriter) || QT_CONFIG(textmarkdownreader)
+    enum MarkdownFeature {
+        MarkdownNoHTML = 0x0020 | 0x0040,
+        MarkdownDialectCommonMark = 0,
+        MarkdownDialectGitHub = 0x0004 | 0x0008 | 0x0400 | 0x0100 | 0x0200 | 0x0800 | 0x4000
+    };
+    Q_DECLARE_FLAGS(MarkdownFeatures, MarkdownFeature)
+    Q_FLAG(MarkdownFeatures)
+#endif
+
+#if QT_CONFIG(textmarkdownwriter)
+    QString toMarkdown(MarkdownFeatures features = MarkdownDialectGitHub) const;
+#endif
+
+#if QT_CONFIG(textmarkdownreader)
+    void setMarkdown(const QString &markdown, MarkdownFeatures features = MarkdownDialectGitHub);
 #endif
 
     QString toRawText() const;
@@ -168,12 +182,7 @@ public:
     QTextCursor find(const QString &subString, int from = 0, FindFlags options = FindFlags()) const;
     QTextCursor find(const QString &subString, const QTextCursor &cursor, FindFlags options = FindFlags()) const;
 
-#ifndef QT_NO_REGEXP
-    QTextCursor find(const QRegExp &expr, int from = 0, FindFlags options = FindFlags()) const;
-    QTextCursor find(const QRegExp &expr, const QTextCursor &cursor, FindFlags options = FindFlags()) const;
-#endif
-
-#ifndef QT_NO_REGULAREXPRESSION
+#if QT_CONFIG(regularexpression)
     QTextCursor find(const QRegularExpression &expr, int from = 0, FindFlags options = FindFlags()) const;
     QTextCursor find(const QRegularExpression &expr, const QTextCursor &cursor, FindFlags options = FindFlags()) const;
 #endif
@@ -199,24 +208,46 @@ public:
     void setDefaultFont(const QFont &font);
     QFont defaultFont() const;
 
+    void setSuperScriptBaseline(qreal baseline);
+    qreal superScriptBaseline() const;
+
+    void setSubScriptBaseline(qreal baseline);
+    qreal subScriptBaseline() const;
+
+    void setBaselineOffset(qreal baseline);
+    qreal baselineOffset() const;
+
     int pageCount() const;
 
     bool isModified() const;
 
+#ifndef QT_NO_PRINTER
     void print(QPagedPaintDevice *printer) const;
+#endif
 
     enum ResourceType {
+        UnknownResource = 0,
         HtmlResource  = 1,
         ImageResource = 2,
         StyleSheetResource = 3,
+        MarkdownResource = 4,
 
         UserResource  = 100
     };
+    Q_ENUM(ResourceType)
 
     QVariant resource(int type, const QUrl &name) const;
     void addResource(int type, const QUrl &name, const QVariant &resource);
 
-    QVector<QTextFormat> allFormats() const;
+    using ResourceProvider = std::function<QVariant(const QUrl&)>;
+
+    QTextDocument::ResourceProvider resourceProvider() const;
+    void setResourceProvider(const ResourceProvider &provider);
+
+    static QTextDocument::ResourceProvider defaultResourceProvider();
+    static void setDefaultResourceProvider(const ResourceProvider &provider);
+
+    QList<QTextFormat> allFormats() const;
 
     void markContentsDirty(int from, int length);
 
@@ -293,8 +324,6 @@ protected:
     Q_INVOKABLE virtual QVariant loadResource(int type, const QUrl &name);
 
     QTextDocument(QTextDocumentPrivate &dd, QObject *parent);
-public:
-    QTextDocumentPrivate *docHandle() const;
 private:
     Q_DISABLE_COPY(QTextDocument)
     Q_DECLARE_PRIVATE(QTextDocument)

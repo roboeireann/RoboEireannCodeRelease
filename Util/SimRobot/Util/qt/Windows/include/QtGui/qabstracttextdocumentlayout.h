@@ -78,7 +78,7 @@ public:
         int cursorPosition;
         QPalette palette;
         QRectF clip;
-        QVector<Selection> selections;
+        QList<Selection> selections;
     };
 
     virtual void draw(QPainter *painter, const PaintContext &context) = 0;
@@ -87,6 +87,7 @@ public:
     QString anchorAt(const QPointF& pos) const;
     QString imageAt(const QPointF &pos) const;
     QTextFormat formatAt(const QPointF &pos) const;
+    QTextBlock blockWithMarkerAt(const QPointF &pos) const;
 
     virtual int pageCount() const = 0;
     virtual QSizeF documentSize() const = 0;
@@ -100,7 +101,7 @@ public:
     QTextDocument *document() const;
 
     void registerHandler(int objectType, QObject *component);
-    void unregisterHandler(int objectType, QObject *component = Q_NULLPTR);
+    void unregisterHandler(int objectType, QObject *component = nullptr);
     QTextObjectInterface *handlerForObject(int objectType) const;
 
 Q_SIGNALS:
@@ -128,7 +129,6 @@ private:
     friend class QTextEngine;
     friend class QTextLayout;
     friend class QTextLine;
-    Q_PRIVATE_SLOT(d_func(), void _q_handlerDestroyed(QObject *obj))
     Q_PRIVATE_SLOT(d_func(), int _q_dynamicPageCountSlot())
     Q_PRIVATE_SLOT(d_func(), QSizeF _q_dynamicDocumentSizeSlot())
 };
@@ -143,7 +143,9 @@ public:
     virtual void drawObject(QPainter *painter, const QRectF &rect, QTextDocument *doc, int posInDocument, const QTextFormat &format) = 0;
 };
 
+#ifndef Q_CLANG_QDOC
 Q_DECLARE_INTERFACE(QTextObjectInterface, "org.qt-project.Qt.QTextObjectInterface")
+#endif
 
 QT_END_NAMESPACE
 

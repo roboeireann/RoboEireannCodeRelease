@@ -8,26 +8,24 @@
  */
 
 #include "FieldBall.h"
+#include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Module/Blackboard.h"
+#include "Representations/Infrastructure/SensorData/RawInertialSensorData.h"
+#include "Representations/Modeling/RobotPose.h"
+#include "Representations/Sensing/RobotModel.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Framework/Blackboard.h"
+#include "Tools/Modeling/BallPhysics.h"
 
 bool FieldBall::ballWasSeen(int timeInterval) const
 {
   return timeSinceBallWasSeen <= timeInterval;
 }
 
-bool FieldBall::anyBallWasSeen(int timeInterval) const
-{
-  return (timeSinceBallWasSeen <= timeInterval) || (timeSinceTeamBallWasValid <= timeInterval);
-}
-
-
 Vector2f FieldBall::recentBallPositionOnField(const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
-  ASSERT(ballSeenTimeout >= 0);
-  if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+  if(useTeamBall(ballSeenTimeout, ballDisappearedTimeout))
     return teamPositionOnField;
   else
     return positionOnField;
@@ -35,9 +33,7 @@ Vector2f FieldBall::recentBallPositionOnField(const int ballSeenTimeout, const i
 
 Vector2f FieldBall::recentBallPositionRelative(const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
-  ASSERT(ballSeenTimeout >= 0);
-  if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+  if(useTeamBall(ballSeenTimeout, ballDisappearedTimeout))
     return teamPositionRelative;
   else
     return positionRelative;
@@ -45,9 +41,7 @@ Vector2f FieldBall::recentBallPositionRelative(const int ballSeenTimeout, const 
 
 Vector2f FieldBall::recentBallEndPositionOnField(const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
-  ASSERT(ballSeenTimeout >= 0);
-  if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+  if(useTeamBall(ballSeenTimeout, ballDisappearedTimeout))
     return teamEndPositionOnField;
   else
     return endPositionOnField;
@@ -55,19 +49,35 @@ Vector2f FieldBall::recentBallEndPositionOnField(const int ballSeenTimeout, cons
 
 Vector2f FieldBall::recentBallEndPositionRelative(const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
-  ASSERT(ballSeenTimeout >= 0);
-  if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+  if(useTeamBall(ballSeenTimeout, ballDisappearedTimeout))
     return teamEndPositionRelative;
   else
     return endPositionRelative;
 }
 
+Vector2f FieldBall::recentBallPropagatedPositionOnField(const float t, const float friction, const int ballSeenTimeout, const int ballDisappearedTimeout) const
+{
+  const bool useTeamEstimate = useTeamBall(ballSeenTimeout, ballDisappearedTimeout);
+
+  const Vector2f& ballPosition = useTeamEstimate ? teamPositionOnField : positionOnField;
+  const Vector2f ballVelocity = useTeamEstimate ? teamVelocityOnField : velocityOnField;
+  const Vector2f propagatedBallPosition = BallPhysics::propagateBallPosition(ballPosition, ballVelocity, t, friction);
+  return propagatedBallPosition;
+}
+
+Vector2f FieldBall::recentBallPropagatedPositionRelative(const float t, const float friction, const int ballSeenTimeout, const int ballDisappearedTimeout) const
+{
+  const bool useTeamEstimate = useTeamBall(ballSeenTimeout, ballDisappearedTimeout);
+
+  const Vector2f& ballPosition = useTeamEstimate ? teamPositionRelative : positionRelative;
+  const Vector2f ballVelocity = useTeamEstimate ? teamVelocityRelative : velocityRelative;
+  const Vector2f propagatedBallPosition = BallPhysics::propagateBallPosition(ballPosition, ballVelocity, t, friction);
+  return propagatedBallPosition;
+}
+
 void FieldBall::recentBallPositions(Vector2f& ballPositionOnField, Vector2f& ballPositionRelative, const int ballSeenTimeout, const int ballDisappearedTimeout) const
 {
-  ASSERT(ballSeenTimeout >= 0);
-  if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+  if(useTeamBall(ballSeenTimeout, ballDisappearedTimeout))
   {
     ballPositionOnField = teamPositionOnField;
     ballPositionRelative = teamPositionRelative;
@@ -83,7 +93,7 @@ void FieldBall::recentBallEndPositions(Vector2f& ballEndPositionOnField, Vector2
 {
   ASSERT(ballSeenTimeout >= 0);
   if((timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
-     && timeSinceTeamBallWasValid < timeSinceBallWasSeen)
+     && teamBallIsValid && teamBallNewerThanOwnBall)
   {
     ballEndPositionOnField = teamEndPositionOnField;
     ballEndPositionRelative = teamEndPositionRelative;
@@ -93,6 +103,13 @@ void FieldBall::recentBallEndPositions(Vector2f& ballEndPositionOnField, Vector2
     ballEndPositionOnField = endPositionOnField;
     ballEndPositionRelative = endPositionRelative;
   }
+}
+
+bool FieldBall::useTeamBall(const int ballSeenTimeout, const int ballDisappearedTimeout) const
+{
+  ASSERT(ballSeenTimeout >= 0);
+  return (timeSinceBallWasSeen > ballSeenTimeout || timeSinceBallDisappeared > ballDisappearedTimeout)
+         && teamBallIsValid && teamBallNewerThanOwnBall;
 }
 
 void FieldBall::draw() const
@@ -126,49 +143,61 @@ void FieldBall::draw() const
     }
   }
 
-  if (secsUntilIntersectsOwnYAxis != std::numeric_limits<float>::max() &&
-      intersectionPositionWithOwnYAxis != Vector2f::Zero())
+  DEBUG_DRAWING("representation:FieldBall", "drawingOnField")
   {
-    ColorRGBA intersectionColor = ColorRGBA::blue;
-    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
-
-    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x(),
-          intersectionPositionWithOwnYAxis.y(), 40, 20, Drawings::solidPen, intersectionColor);
-    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnYAxis.x() * 1.5f,
-         intersectionPositionWithOwnYAxis.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
-    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnYAxis.x() * 1.5f,
-              intersectionPositionWithOwnYAxis.y() * 1.5f, 120, intersectionColor,
-              fmt::format("{:.3f} sec", secsUntilIntersectsOwnYAxis));
+    if(timeSinceBallWasSeen < 10000
+       && timeSinceBallDisappeared < 500)
+    {
+      const Vector2f& position(positionRelative);
+      const Vector2f& velocity(velocityRelative);
+      CIRCLE("representation:FieldBall",
+             position.x(), position.y(), 45, 0, // pen width
+             Drawings::solidPen, ColorRGBA::orange,
+             Drawings::solidBrush, ColorRGBA::orange);
+      ARROW("representation:FieldBall", position.x(), position.y(),
+            position.x() + velocity.x(), position.y() + velocity.y(), 5, 1, ColorRGBA::orange);
+    }
   }
 
-  if (secsUntilIntersectsOwnYAxisAggressive != std::numeric_limits<float>::max() &&
-      intersectionPositionWithOwnYAxisAggressive != Vector2f::Zero())
+  DEBUG_DRAWING3D("representation:FieldBall", "robot")
   {
-    ColorRGBA intersectionColor(0,150,220);
-    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
-
-    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnYAxisAggressive.x(),
-          intersectionPositionWithOwnYAxisAggressive.y(), 40, 20, Drawings::solidPen, intersectionColor);
-    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnYAxisAggressive.x() * 1.5f,
-         intersectionPositionWithOwnYAxisAggressive.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
-    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnYAxisAggressive.x() * 1.5f,
-              intersectionPositionWithOwnYAxisAggressive.y() * 1.5f, 120, intersectionColor,
-              fmt::format("{:.3f} sec", secsUntilIntersectsOwnYAxisAggressive));
+    if(timeSinceBallWasSeen < 10000
+       && timeSinceBallDisappeared < 500
+       && Blackboard::getInstance().exists("BallSpecification")
+       && Blackboard::getInstance().exists("RawInertialSensorData")
+       && Blackboard::getInstance().exists("RobotModel"))
+    {
+      const BallSpecification& theBallSpecification = static_cast<const BallSpecification&>(Blackboard::getInstance()["BallSpecification"]);
+      const RawInertialSensorData& theRawInertialSensorData = static_cast<const RawInertialSensorData&>(Blackboard::getInstance()["RawInertialSensorData"]);
+      const RobotModel& theRobotModel = static_cast<const RobotModel&>(Blackboard::getInstance()["RobotModel"]);
+      const Vector3f orientation = theRawInertialSensorData.angle.cast<float>();
+      TRANSLATE3D("representation:FieldBall", 0.f, 0.f, std::min(theRobotModel.soleLeft.translation.z(), theRobotModel.soleRight.translation.z()));
+      ROTATE3D("representation:FieldBall", -orientation.x(), -orientation.y(), -orientation.z());
+      RENDER_OPTIONS3D("representation:FieldBall", Drawings3D::disableOpacity | Drawings3D::disableDepth);
+      const Vector2f position = recentBallPositionRelative();
+      SPHERE3D("representation:FieldBall", position.x(), position.y(), theBallSpecification.radius,
+               theBallSpecification.radius, ColorRGBA(255, 128, 0, 128));
+    }
   }
 
-
-  if (secsUntilIntersectsOwnXAxis != std::numeric_limits<float>::max() &&
-      intersectionPositionWithOwnXAxis != Vector2f::Zero())
+  DEBUG_DRAWING3D("representation:FieldBall:sector", "robot")
   {
-    ColorRGBA intersectionColor(0, 150, 148);
-    ColorRGBA refLineColor = intersectionColor.lighter(0.25f).alpha(0.6f);
-
-    CROSS("representation:FieldBall:relative", intersectionPositionWithOwnXAxis.x(),
-          intersectionPositionWithOwnXAxis.y(), 30, 20, Drawings::solidPen, intersectionColor);
-    LINE("representation:FieldBall:relative", 0.f, 0.f, intersectionPositionWithOwnXAxis.x() * 1.5f,
-         intersectionPositionWithOwnXAxis.y() * 1.5f, 10, Drawings::dashedPen, refLineColor);
-    DRAW_TEXT("representation:FieldBall:relative", intersectionPositionWithOwnXAxis.x() * 1.5f,
-              intersectionPositionWithOwnXAxis.y() * 1.5f, 100, intersectionColor,
-              fmt::format("{:.3f} sec", secsUntilIntersectsOwnXAxis));
+    if(timeSinceBallWasSeen < 10000
+       && timeSinceBallDisappeared < 500
+       && Blackboard::getInstance().exists("BallSpecification")
+       && Blackboard::getInstance().exists("RawInertialSensorData")
+       && Blackboard::getInstance().exists("RobotModel"))
+    {
+      const BallSpecification& theBallSpecification = static_cast<const BallSpecification&>(Blackboard::getInstance()["BallSpecification"]);
+      const RawInertialSensorData& theRawInertialSensorData = static_cast<const RawInertialSensorData&>(Blackboard::getInstance()["RawInertialSensorData"]);
+      const RobotModel& theRobotModel = static_cast<const RobotModel&>(Blackboard::getInstance()["RobotModel"]);
+      const Vector3f orientation = theRawInertialSensorData.angle.cast<float>();
+      TRANSLATE3D("representation:FieldBall:sector", 0.f, 0.f, std::min(theRobotModel.soleLeft.translation.z(), theRobotModel.soleRight.translation.z()));
+      ROTATE3D("representation:FieldBall:sector", -orientation.x(), -orientation.y(), -orientation.z());
+      const Vector2f position = recentBallPositionRelative();
+      const Angle range = std::max(1_deg, static_cast<Angle>(std::asin(std::min(1.f, theBallSpecification.radius / position.norm()))));
+      const Angle angle = position.angle();
+      RING_SECTOR3D("representation:FieldBall:sector", Vector3f(0, 0, 4.f), angle - range, angle + range, 120.f, 180.f, ColorRGBA::orange);
+    }
   }
 }

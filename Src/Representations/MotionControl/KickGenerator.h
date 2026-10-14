@@ -9,12 +9,13 @@
 #pragma once
 
 #include "Representations/MotionControl/KickRequest.h"
-#include "Tools/Function.h"
+#include "Streaming/Function.h"
 #include "Tools/Motion/MotionPhase.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 #include <memory>
 
 STREAMABLE(KickGenerator,
 {
-  FUNCTION(std::unique_ptr<MotionPhase>(const KickRequest&, const MotionPhase&)) createPhase, /**< Creates a phase for the given motion request. */
+  FUNCTION(std::unique_ptr<MotionPhase>(const KickRequest&, const MotionPhase&)) createPhase; /**< Creates a phase for the given motion request. */
+  FUNCTION(bool(const MotionPhase&)) wasLeftPhase, /**< Returns whether the kick was a left kick. */
 });

@@ -4,12 +4,13 @@
  * This file declares a representation of a player's role.
  *
  * @author Arne Hasselbring
+ * @note BH2021 Code release - only required for RE2025 and older behaviours
  */
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Streams/Enum.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/Enum.h"
 #include <string>
 
 STREAMABLE(PlayerRole,

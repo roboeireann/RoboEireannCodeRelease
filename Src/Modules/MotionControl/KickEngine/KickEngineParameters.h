@@ -8,8 +8,8 @@
 
 #include <vector>
 
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/Enum.h"
+#include "Math/Eigen.h"
+#include "Streaming/Enum.h"
 #include "Representations/Infrastructure/JointAngles.h"
 
 class Phase : public Streamable
@@ -71,7 +71,15 @@ STREAMABLE(KickEngineParameters,
     (std::vector<BoostAngle>) boost,
   });
 
-  using stdVectorBoostAngles = std::vector<BoostAngle>;
+  STREAMABLE(ArmBalancing,
+  {,
+    (Rangei) startAndEndKeyframe,
+    (Rangef) startAndEndRatio,
+    (Angle) maxAdjustment,
+    (Rangef) upperRange,
+    (Rangef) lowerRange,
+    (float) i,
+  });
 
   int numberOfPhases = 0;
   char name[260];
@@ -87,10 +95,13 @@ STREAMABLE(KickEngineParameters,
   void initFirstPhase(const Vector3f* origins, const Vector2f& head);
   void initFirstPhaseLoop(const Vector3f* origins, const Vector2f& lastCom, const Vector2f& head);
 
+  float getArmCompensationRatio(const int phaseNumber, const float phase);
+
   void onRead(),
 
-  (stdVectorBoostAngles) boostAngles, /**< Used joints for boosting. */
   (std::vector<JointOffset>) offsetList, /**< Adjust trajectory of specific joint. */
+
+  (ArmBalancing) armBalancing, /**< Balance with the ShoulderRolls to prevent the robot from falling sideways. */
 
   /**< Reference values for the limbs. */
   (Vector3f)(Vector3f::Zero()) footOrigin,
@@ -103,10 +114,8 @@ STREAMABLE(KickEngineParameters,
   /**< PID-Controller balance parameters. */
   (float)(0.f) kpx,
   (float)(0.f) kix,
-  (float)(0.f) kdx,
   (float)(0.f) kpy,
   (float)(0.f) kiy,
-  (float)(0.f) kdy,
 
   (bool)(false) loop, /**< Repeat the kick . */
   (bool)(true)  standLeft, /**< Is the left foot the support foot. */

@@ -1,0 +1,30 @@
+call ../../Includes/BoosterNormal
+
+# press any key to activate the joystick
+jc press 1 call Includes/Joystick
+jc press 2 call Includes/Joystick
+jc press 3 call Includes/Joystick
+jc press 4 call Includes/Joystick
+
+gc gamePenaltyShootout
+gc set
+
+robot robot2
+
+echo -- Switch to set state (`gc set`) before choosing any robots.
+echo -- Green/white has Kick initially so choose its player first. 
+echo -- The robot numbers are robot1,robot2, robot21, robot22
+echo -- Choose one player from each team to participate in the penalty:
+echo --   Select a player by doubleclicking it. Then type `pr none` to unpenalize it.
+echo -- Finally execute `gc playing` to execute the penalty.
+echo -- After the penalty has concluded, the red/blue team takes the next one.
+echo -- Start from the first line above to select players etc. again.
+echo -- (Note: each penalty shot goes to a different goal for some reason.)
+echo
+echo gc set
+echo robot robot2
+echo pr none
+echo robot robot21
+echo pr none
+echo
+echo gc playing

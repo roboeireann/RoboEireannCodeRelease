@@ -4,11 +4,12 @@
  * Representation of the estimated time to reach the ball
  *
  * @author Andreas Stolpmann
+ * @note BH2021 Code release - only required for RE2025 and older behaviours
  */
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 #include <limits>
 
 /**

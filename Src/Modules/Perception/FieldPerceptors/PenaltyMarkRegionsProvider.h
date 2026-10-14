@@ -18,7 +18,7 @@
 #include "Representations/Perception/ImagePreprocessing/ColorScanLineRegions.h"
 #include "Representations/Perception/ImagePreprocessing/ScanGrid.h"
 #include "Tools/Math/Transformation.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 MODULE(PenaltyMarkRegionsProvider,
 {,
@@ -27,12 +27,10 @@ MODULE(PenaltyMarkRegionsProvider,
   REQUIRES(ColorScanLineRegionsVerticalClipped),
   REQUIRES(FieldDimensions),
   REQUIRES(ScanGrid),
-  REQUIRES(PenaltyMarkRegions),
   PROVIDES(PenaltyMarkRegions),
-  PROVIDES(CNSPenaltyMarkRegions),
   DEFINES_PARAMETERS(
   {,
-    (float)(2000.f) maxDistanceOnField, /**< The maximum distance in which penalty marks are detected. */
+    (float)(3000.f) maxDistanceOnField, /**< The maximum distance in which penalty marks are detected. */
     (int)(3) regionExtensionFactor, /**< Region heights are extended by this value times the expected line width to better merge diagonal lines. */
     (float)(0.5f) sizeToleranceRatio, /**< Acceptable deviation of the measured size from the expected one. */
     (float)(0.9f) minWhiteRatio, /**< Ratio of pixels that must be white in a candidate region. */
@@ -89,10 +87,8 @@ class PenaltyMarkRegionsProvider : public PenaltyMarkRegionsProviderBase
 
   std::vector<Region> regions; /**< The regions of non-green pixels (left to right, bottom to bottom). */
   std::vector<unsigned short> extendedLower; /**< A table that maps y coordinates to y coordinates with region extension. */
-  std::vector<Boundaryi> cnsRegions; /**< The CNS regions that will be provided. */
 
   void update(PenaltyMarkRegions& thePenaltyMarkRegions) override;
-  void update(CNSPenaltyMarkRegions& theCNSPenaltyMarkRegions) override {theCNSPenaltyMarkRegions.regions = cnsRegions;}
 
   /**
    * Initializes the extendedLower table.
@@ -122,7 +118,7 @@ class PenaltyMarkRegionsProvider : public PenaltyMarkRegionsProviderBase
    * @param xStep The distance between neighboring low-res scan lines.
    * @param searchRegions The regions that should be searched for the center of a penalty mark.
    */
-  void analyseRegions(unsigned short upperBound, int xStep, std::vector<Boundaryi>& searchRegions);
+  void analyzeRegions(unsigned short upperBound, int xStep, std::vector<Boundaryi>& searchRegions);
 
 public:
   PenaltyMarkRegionsProvider() {regions.reserve(1000);}

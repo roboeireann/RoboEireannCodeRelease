@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QScrollBar>
 #include <QSet>
 #include <QSettings>
@@ -106,7 +107,7 @@ void EditorObject::loadFromSettings()
 EditorObject::~EditorObject()
 {
   QSettings& settings = EditorModule::application->getLayoutSettings();
-  settings.beginWriteArray(fullName, editors.size());
+  settings.beginWriteArray(fullName, static_cast<int>(editors.size()));
   int i = 0;
   for(const EditorObject* editor : editors)
   {
@@ -148,51 +149,21 @@ SimRobot::Widget* FileEditorObject::createWidget()
 }
 
 EditorWidget::EditorWidget(FileEditorObject* editorObject, const QString& fileContent) :
-  editorObject(editorObject),
-  canCopy(false), canUndo(false), canRedo(false),
-  highlighter(0), editorSettingsDialog(0), findAndReplaceDialog(0)
+  editorObject(editorObject)
 {
-  if(editorObject->filePath.endsWith(".ros2") || editorObject->filePath.endsWith(".ros2d") ||
-     editorObject->filePath.endsWith(".rsi2") || editorObject->filePath.endsWith(".rsi2d"))
-    highlighter = new SyntaxHighlighter(document());
+  if(editorObject->filePath.endsWith(".ros3") || editorObject->filePath.endsWith(".ros2d") ||
+     editorObject->filePath.endsWith(".rsi3") || editorObject->filePath.endsWith(".rsi2d"))
+    highlighter = new SyntaxHighlighter(document(), this);
   setFrameStyle(QFrame::NoFrame);
 
-#ifdef WINDOWS
-  QFont font("Courier New", 10);
-#elif defined MACOS
-  QFont font("Monaco", 11);
-#else
-  QFont font("Bitstream Vera Sans Mono", 9);
-#endif
-  setFont(font);
   setLineWrapMode(QTextEdit::NoWrap);
   setAcceptRichText(false);
   setPlainText(fileContent);
   document()->setModified(false);
 
-  QSettings& settings = EditorModule::application->getLayoutSettings();
-  settings.beginGroup(editorObject->fullName);
-  int selectionStart = settings.value("selectionStart").toInt();
-  int selectionEnd = settings.value("selectionEnd").toInt();
-  if(selectionStart || selectionEnd)
-  {
-    QTextCursor cursor = textCursor();
-    cursor.setPosition(selectionStart);
-    cursor.setPosition(selectionEnd, QTextCursor::KeepAnchor);
-    setTextCursor(cursor);
-  }
-  verticalScrollBar()->setValue(settings.value("verticalScrollPosition").toInt());
-  horizontalScrollBar()->setValue(settings.value("horizontalScrollPosition").toInt());
-  useTabStop = settings.value("useTabStop", false).toBool();
-  tabStopWidth = settings.value("tabStopWidth", 2).toInt();
-  settings.endGroup();
-
-  setTabStopWidth(tabStopWidth * QFontMetrics(font).width(' '));
-
-  connect(this, SIGNAL(copyAvailable(bool)), this, SLOT(copyAvailable(bool)));
-  connect(this, SIGNAL(undoAvailable(bool)), this, SLOT(undoAvailable(bool)));
-  connect(this, SIGNAL(redoAvailable(bool)), this, SLOT(redoAvailable(bool)));
-  connect(&openFileMapper, SIGNAL(mapped(const QString&)), this, SLOT(openFile(const QString&)));
+  connect(this, &QTextEdit::copyAvailable, this, &EditorWidget::copyAvailable);
+  connect(this, &QTextEdit::undoAvailable, this, &EditorWidget::undoAvailable);
+  connect(this, &QTextEdit::redoAvailable, this, &EditorWidget::redoAvailable);
 }
 
 EditorWidget::~EditorWidget()
@@ -236,12 +207,14 @@ QMenu* EditorWidget::createFileMenu() const
 {
   QMenu* menu = new QMenu(tr("&File"));
 
-  QAction* action = menu->addAction(QIcon(":/Icons/disk.png"), tr("&Save"));
+  QIcon icon(":/Icons/icons8-save-50.png");
+  icon.setIsMask(true);
+  QAction* action = menu->addAction(icon, tr("&Save"));
   action->setShortcut(QKeySequence(QKeySequence::Save));
   action->setStatusTip(tr("Save the document to disk"));
   action->setEnabled(document()->isModified());
-  connect(action, SIGNAL(triggered()), this, SLOT(save()));
-  connect(document(), SIGNAL(modificationChanged(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::save);
+  connect(document(), &QTextDocument::modificationChanged, action, &QAction::setEnabled);
 
   return menu;
 }
@@ -249,7 +222,7 @@ QMenu* EditorWidget::createFileMenu() const
 QMenu* EditorWidget::createEditMenu() const
 {
   QMenu* menu = new QMenu(tr("&Edit"));
-  connect(menu, SIGNAL(aboutToShow()), this, SLOT(updateEditMenu()));
+  connect(menu, &QMenu::aboutToShow, this, static_cast<void (EditorWidget::*)()>(&EditorWidget::updateEditMenu));
   updateEditMenu(menu, false);
   return menu;
 }
@@ -263,19 +236,19 @@ void EditorWidget::updateEditMenu(QMenu* menu, bool aboutToShow) const
     QRegularExpression rx(editorObject->subFileRegExpPattern, QRegularExpression::CaseInsensitiveOption);
     QString fileContent = toPlainText();
     QStringList includeFiles;
-    QSet<QString> inculdeFilesSet;
+    QSet<QString> includeFilesSet;
     QString suffix = QFileInfo(editorObject->name).suffix();
     QRegularExpressionMatch match;
-    int pos = 0;
+    decltype(match.capturedEnd()) pos = 0;
     while((match = rx.match(fileContent, pos)).hasMatch())
     {
       QString file = match.captured(1).remove('\"');
       if(QFileInfo(file).suffix().isEmpty())
         (file += '.') += suffix;
-      if(!inculdeFilesSet.contains(file))
+      if(!includeFilesSet.contains(file))
       {
         includeFiles.append(file);
-        inculdeFilesSet.insert(file);
+        includeFilesSet.insert(file);
       }
       pos = match.capturedEnd();
     }
@@ -285,77 +258,86 @@ void EditorWidget::updateEditMenu(QMenu* menu, bool aboutToShow) const
       for(const QString& str : includeFiles)
       {
         QAction* action = menu->addAction(tr("Open \"%1\"").arg(str));
-        openFileMapper.setMapping(action, str);
-        connect(action, SIGNAL(triggered()), &openFileMapper, SLOT(map()));
+        connect(action, &QAction::triggered, this, [this, str]{ const_cast<EditorWidget*>(this)->openFile(str); });
       }
       menu->addSeparator();
     }
   }
 
-  QAction* action = menu->addAction(QIcon(":/Icons/arrow_undo.png"), tr("&Undo"));
+  QIcon icon(":/Icons/icons8-undo-50.png");
+  icon.setIsMask(true);
+  QAction* action = menu->addAction(icon, tr("&Undo"));
   action->setShortcut(QKeySequence(QKeySequence::Undo));
   action->setStatusTip(tr("Undo the last action"));
   action->setEnabled(canUndo);
-  connect(action, SIGNAL(triggered()), this, SLOT(undo()));
-  connect(this, SIGNAL(undoAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::undo);
+  connect(this, &QTextEdit::undoAvailable, action, &QAction::setEnabled);
 
-  action = menu->addAction(QIcon(":/Icons/arrow_redo.png"), tr("&Redo"));
+  icon = QIcon(":/Icons/icons8-redo-50.png");
+  icon.setIsMask(true);
+  action = menu->addAction(icon, tr("&Redo"));
   action->setShortcut(QKeySequence(QKeySequence::Redo));
   action->setStatusTip(tr("Redo the previously undone action"));
   action->setEnabled(canRedo);
-  connect(action, SIGNAL(triggered()), this, SLOT(redo()));
-  connect(this, SIGNAL(redoAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::redo);
+  connect(this, &QTextEdit::redoAvailable, action, &QAction::setEnabled);
 
   menu->addSeparator();
 
-  action = menu->addAction(QIcon(":/Icons/cut.png"), tr("Cu&t"));
+  icon = QIcon(":/Icons/icons8-cut-50.png");
+  icon.setIsMask(true);
+  action = menu->addAction(icon, tr("Cu&t"));
   action->setShortcut(QKeySequence(QKeySequence::Cut));
   action->setStatusTip(tr("Cut the current selection's contents to the clipboard"));
   action->setEnabled(canCopy);
-  connect(action, SIGNAL(triggered()), this, SLOT(cut()));
-  connect(this, SIGNAL(copyAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::cut);
+  connect(this, &QTextEdit::copyAvailable, action, &QAction::setEnabled);
 
-  action = menu->addAction(QIcon(":/Icons/page_copy.png"), tr("&Copy"));
+  icon = QIcon(":/Icons/icons8-copy-to-clipboard-50.png");
+  icon.setIsMask(true);
+  action = menu->addAction(icon, tr("&Copy"));
   action->setShortcut(QKeySequence(QKeySequence::Copy));
   action->setStatusTip(tr("Copy the current selection's contents to the clipboard"));
   action->setEnabled(canCopy);
-  connect(action, SIGNAL(triggered()), this, SLOT(copy()));
-  connect(this, SIGNAL(copyAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::copy);
+  connect(this, &QTextEdit::copyAvailable, action, &QAction::setEnabled);
 
-  action = menu->addAction(QIcon(":/Icons/page_paste.png"), tr("&Paste"));
+  icon = QIcon(":/Icons/icons8-paste-50.png");
+  icon.setIsMask(true);
+  action = menu->addAction(icon, tr("&Paste"));
   action->setShortcut(QKeySequence(QKeySequence::Paste));
   action->setStatusTip(tr("Paste the clipboard's contents into the current selection"));
   action->setEnabled(canPaste());
-  connect(action, SIGNAL(triggered()), this, SLOT(paste()));
-  connect(this, SIGNAL(pasteAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::paste);
+  connect(this, &EditorWidget::pasteAvailable, action, &QAction::setEnabled);
 
   action = menu->addAction(tr("&Delete"));
   action->setShortcut(QKeySequence(QKeySequence::Delete));
   action->setStatusTip(tr("Delete the currently selected content"));
   action->setEnabled(canCopy);
-  connect(action, SIGNAL(triggered()), this, SLOT(deleteText()));
-  connect(this, SIGNAL(copyAvailable(bool)), action, SLOT(setEnabled(bool)));
+  connect(action, &QAction::triggered, this, &EditorWidget::deleteText);
+  connect(this, &QTextEdit::copyAvailable, action, &QAction::setEnabled);
 
   menu->addSeparator();
 
   action = menu->addAction(tr("Select &All"));
   action->setShortcut(QKeySequence(QKeySequence::SelectAll));
   action->setStatusTip(tr("Select the whole document"));
-  connect(action, SIGNAL(triggered()), this, SLOT(selectAll()));
+  connect(action, &QAction::triggered, this, &EditorWidget::selectAll);
 
   menu->addSeparator();
 
   action = menu->addAction(tr("&Find and Replace"));
   action->setShortcut(QKeySequence(QKeySequence::Find));
   action->setStatusTip(tr("Find and replace text in the document"));
-  connect(action, SIGNAL(triggered()), this, SLOT(openFindAndReplace()));
+  connect(action, &QAction::triggered, this, &EditorWidget::openFindAndReplace);
 
   menu->addSeparator();
 
   action = menu->addAction(tr("Editor &Settings"));
   action->setShortcut(QKeySequence(QKeySequence::Preferences));
   action->setStatusTip(tr("Open the editor settings"));
-  connect(action, SIGNAL(triggered()), this, SLOT(openSettings()));
+  connect(action, &QAction::triggered, this, &EditorWidget::openSettings);
 }
 
 void EditorWidget::focusInEvent(QFocusEvent* event)
@@ -488,6 +470,56 @@ void EditorWidget::keyPressEvent(QKeyEvent* event)
   }
 }
 
+void EditorWidget::showEvent(QShowEvent* event)
+{
+  if(!shownYet)
+  {
+    shownYet = true;
+
+#ifdef WINDOWS
+    QFont font("Courier New", 10);
+#elif defined MACOS
+    QFont font("Monaco", 11);
+#else
+    QFont font("Bitstream Vera Sans Mono", 9);
+#endif
+    setFont(font);
+
+    QSettings& settings = EditorModule::application->getLayoutSettings();
+    settings.beginGroup(editorObject->fullName);
+    int selectionStart = settings.value("selectionStart").toInt();
+    int selectionEnd = settings.value("selectionEnd").toInt();
+    if(selectionStart || selectionEnd)
+    {
+      QTextCursor cursor = textCursor();
+      cursor.setPosition(selectionStart);
+      cursor.setPosition(selectionEnd, QTextCursor::KeepAnchor);
+      setTextCursor(cursor);
+    }
+    verticalScrollBar()->setValue(settings.value("verticalScrollPosition").toInt());
+    horizontalScrollBar()->setValue(settings.value("horizontalScrollPosition").toInt());
+    useTabStop = settings.value("useTabStop", false).toBool();
+    tabStopWidth = settings.value("tabStopWidth", 2).toInt();
+    settings.endGroup();
+
+    setTabStopDistance(tabStopWidth * QFontMetrics(font).horizontalAdvance(' '));
+  }
+
+  return QTextEdit::showEvent(event);
+}
+
+void EditorWidget::changeEvent(QEvent* event)
+{
+  if(event->type() == QEvent::PaletteChange && highlighter)
+  {
+    highlighter->updateColors();
+    bool modified = document()->isModified();
+    setPlainText(toPlainText());
+    document()->setModified(modified);
+  }
+  QTextEdit::changeEvent(event);
+}
+
 void EditorWidget::contextMenuEvent(QContextMenuEvent* event)
 {
   // disable QTextEdit context menu to use our own
@@ -550,15 +582,10 @@ void EditorWidget::openFindAndReplace()
   if(!findAndReplaceDialog)
   {
     findAndReplaceDialog = new FindAndReplaceDialog(this);
-    findAndReplaceMapper.setMapping(findAndReplaceDialog->nextPushButton, find);
-    findAndReplaceMapper.setMapping(findAndReplaceDialog->previousPushButton, findBackwards);
-    findAndReplaceMapper.setMapping(findAndReplaceDialog->replacePushButton, replace);
-    findAndReplaceMapper.setMapping(findAndReplaceDialog->replaceAllPushButton, replaceAll);
-    connect(findAndReplaceDialog->nextPushButton, SIGNAL(clicked()), &findAndReplaceMapper, SLOT(map()));
-    connect(findAndReplaceDialog->previousPushButton, SIGNAL(clicked()), &findAndReplaceMapper, SLOT(map()));
-    connect(findAndReplaceDialog->replacePushButton, SIGNAL(clicked()), &findAndReplaceMapper, SLOT(map()));
-    connect(findAndReplaceDialog->replaceAllPushButton, SIGNAL(clicked()), &findAndReplaceMapper, SLOT(map()));
-    connect(&findAndReplaceMapper, SIGNAL(mapped(int)), this, SLOT(findAndReplace(int)));
+    connect(findAndReplaceDialog->nextPushButton, &QPushButton::clicked, this, [this]{ findAndReplace(find); });
+    connect(findAndReplaceDialog->previousPushButton, &QPushButton::clicked, this, [this]{ findAndReplace(findBackwards); });
+    connect(findAndReplaceDialog->replacePushButton, &QPushButton::clicked, this, [this]{ findAndReplace(replace); });
+    connect(findAndReplaceDialog->replaceAllPushButton, &QPushButton::clicked, this, [this]{ findAndReplace(replaceAll); });
   }
 
   findAndReplaceDialog->show();
@@ -573,7 +600,7 @@ void EditorWidget::findAndReplace(int action)
   if(findText.isEmpty())
     return;
 
-  QTextDocument::FindFlags findFlags = 0;
+  QTextDocument::FindFlags findFlags({});
   if(action == findBackwards)
     findFlags |= QTextDocument::FindBackward;
   if(findAndReplaceDialog->caseCheckBox->isChecked())
@@ -629,7 +656,7 @@ void EditorWidget::openSettings()
   if(!editorSettingsDialog)
   {
     editorSettingsDialog = new EditorSettingsDialog(this);
-    connect(editorSettingsDialog->okayPushButton, SIGNAL(clicked()), this, SLOT(updateSettingsFromDialog()));
+    connect(editorSettingsDialog->okayPushButton, &QPushButton::clicked, this, &EditorWidget::updateSettingsFromDialog);
   }
 
   editorSettingsDialog->useTabStopCheckBox->setChecked(useTabStop);
@@ -644,7 +671,7 @@ void EditorWidget::updateSettingsFromDialog()
 {
   useTabStop = editorSettingsDialog->useTabStopCheckBox->isChecked();
   tabStopWidth = editorSettingsDialog->tabStopWidthSpinBox->value();
-  setTabStopWidth(tabStopWidth * QFontMetrics(font()).width(' '));
+  setTabStopDistance(tabStopWidth * QFontMetrics(font()).horizontalAdvance(' '));
 }
 
 void EditorWidget::openFile(const QString& fileName)
@@ -669,8 +696,8 @@ EditorWidget::EditorSettingsDialog::EditorSettingsDialog(QWidget* parent) :
   okayPushButton = new QPushButton(tr("OK"));
   closePushButton = new QPushButton(tr("Close"));
 
-  connect(okayPushButton, SIGNAL(clicked()), this, SLOT(accept()));
-  connect(closePushButton, SIGNAL(clicked()), this, SLOT(reject()));
+  connect(okayPushButton, &QPushButton::clicked, this, &EditorWidget::EditorSettingsDialog::accept);
+  connect(closePushButton, &QPushButton::clicked, this, &EditorWidget::EditorSettingsDialog::reject);
 
   QFormLayout* settingsLayout = new QFormLayout;
   settingsLayout->addRow(useTabStopLabel, useTabStopCheckBox);

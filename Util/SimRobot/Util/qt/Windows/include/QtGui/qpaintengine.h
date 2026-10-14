@@ -195,7 +195,6 @@ public:
         Windows,
         QuickDraw, CoreGraphics, MacPrinter,
         QWindowSystem,
-        PostScript,   // ### Qt 6: Remove, update documentation
         OpenGL,
         Picture,
         SVG,
@@ -225,6 +224,9 @@ public:
 
     void syncState();
     inline bool isExtended() const { return extended; }
+
+    virtual QPixmap createPixmap(QSize size);
+    virtual QPixmap createPixmapFromImage(QImage image, Qt::ImageConversionFlags flags = Qt::AutoColor);
 
 protected:
     QPaintEngine(QPaintEnginePrivate &data, PaintEngineFeatures devcaps=PaintEngineFeatures());
@@ -273,7 +275,6 @@ public:
     QBrush backgroundBrush() const;
     Qt::BGMode backgroundMode() const;
     QFont font() const;
-    QMatrix matrix() const;
     QTransform transform() const;
 
     Qt::ClipOperation clipOperation() const;

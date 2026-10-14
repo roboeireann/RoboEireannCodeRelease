@@ -6,25 +6,15 @@
 #include "FieldFeature.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/RobotParts/Joints.h"
-#include "Tools/Math/Geometry.h"
+#include "Debugging/DebugDrawings.h"
 
 void FieldFeature::draw() const
 {
   if(Blackboard::getInstance().exists("CameraInfo"))
   {
-    std::string thread = static_cast<const CameraInfo&>(Blackboard::getInstance()["CameraInfo"]).camera == CameraInfo::upper ? "Upper" : "Lower";
+    const CameraInfo& theCameraInfo = static_cast<const CameraInfo&>(Blackboard::getInstance()["CameraInfo"]);
     DEBUG_DRAWING("representation:FieldFeature:field", "drawingOnField")
-      THREAD("representation:FieldFeature:field", thread);
-    DEBUG_DRAWING("representation:MarkedField:field", "drawingOnField")
-      THREAD("representation:MarkedField:field", thread);
-    DEBUG_DRAWING("representation:MarkedField:imageText", "drawingOnImage")
-      THREAD("representation:MarkedField:imageText", thread);
-    DEBUG_DRAWING("representation:MarkedField:image", "drawingOnImage")
-      THREAD("representation:MarkedField:image", thread);
-    DECLARE_DEBUG_DRAWING3D("representation:MarkedField", "robot");
+      THREAD("representation:FieldFeature:field", theCameraInfo.getThreadName());
 
     if(!isValid)
       return;
@@ -44,23 +34,7 @@ void FieldFeature::draw() const
         DRAW_ROBOT_POSE("representation:FieldFeature:field", poses.pos2, ColorRGBA::blue);
       }
     }
-
-    for(auto& markedPoint : markedPoints)
-      markedPoint.draw();
-
-    for(auto& markedLine : markedLines)
-      markedLine.draw();
-
-    for(auto& markedIntersection : markedIntersections)
-      markedIntersection.draw();
   }
-}
-
-void FieldFeature::clear()
-{
-  markedIntersections.clear();
-  markedLines.clear();
-  markedPoints.clear();
 }
 
 const FieldFeature::RobotPoseToFF FieldFeature::getGlobalRobotPosition() const
@@ -68,50 +42,27 @@ const FieldFeature::RobotPoseToFF FieldFeature::getGlobalRobotPosition() const
   return FieldFeature::RobotPoseToFF(getGlobalFeaturePosition() * this->inverse());
 }
 
-bool FieldFeature::isLikeEnoughACorrectPerception(const float searchXRadius, const float searchYRadius, const FieldLines& theFieldLines, const Vector2f offset, const unsigned allowedLines)
+bool FieldFeature::pickMorePlausiblePose(const Pose2f& robotPose, Pose2f& pickedPose) const
 {
-  auto isMarked = [&](const size_t i)
-  {
-    for(const MarkedLine& mark : markedLines)
-      if(mark.lineIndex == i)
-        return true;
-
+  if(!isValid)
     return false;
-  };
-
-  const Pose2f theInverse((*this + Pose2f(offset)).inverse());
-
-  auto goesThroughBox = [&](const FieldLines::Line& line)
+  const Pose2f& p1 = getGlobalRobotPosition().pos1;
+  const Pose2f& p2 = getGlobalRobotPosition().pos2;
+  const float sqrDst1 = (robotPose.translation - p1.translation).squaredNorm();
+  const float sqrDst2 = (robotPose.translation - p2.translation).squaredNorm();
+  float angle1 = robotPose.rotation - p1.rotation;
+  float angle2 = robotPose.rotation - p2.rotation;
+  angle1 = std::abs(Angle::normalize(angle1));
+  angle2 = std::abs(Angle::normalize(angle2));
+  if(angle1 < angle2 && sqrDst1 < sqrDst2)
   {
-    Vector2f point1(theInverse * line.first);
-    Vector2f point2(theInverse * line.last);
-
-    if((std::abs(point1.x()) <= searchXRadius && std::abs(point1.y()) <= searchYRadius)
-       || (std::abs(point2.x()) <= searchXRadius && std::abs(point2.y()) <= searchYRadius))
-      return true;
-
-    auto isIntersecting = [&](float(*getPrimaryValue)(const Vector2f&, const float), float(*getSecondaryValue)(const Vector2f&),
-                              const float rPrimary, const float rSecundary)
-    {
-      auto getPrimaryValue2 = [&](const Vector2f& a) {return getPrimaryValue(a, rPrimary); };
-
-      return getPrimaryValue2(point1) * getPrimaryValue2(point2) < 0.f
-             && std::abs(getSecondaryValue(point1 +
-                                           std::abs(getPrimaryValue2(point1)) / (std::abs(getPrimaryValue2(point1)) + std::abs(getPrimaryValue2(point2)))
-                                           * (point2 - point1))) < rSecundary + 1.f;
-    };
-
-    return isIntersecting([](const Vector2f& a, const float) {return a.x(); }, [](const Vector2f& a) {return a.y(); }, searchXRadius, searchYRadius)
-      || isIntersecting([](const Vector2f& a, const float r) {return a.y() - r; }, [](const Vector2f& a) {return a.x(); }, searchYRadius, searchXRadius)
-      || isIntersecting([](const Vector2f& a, const float r) {return a.y() + r; }, [](const Vector2f& a) {return a.x(); }, searchYRadius, searchXRadius);
-  };
-
-  unsigned count = 0u;
-
-  for(size_t i = 0; i < theFieldLines.lines.size(); ++i)
-    if(!isMarked(i) && goesThroughBox(theFieldLines.lines[i]))
-      if(++count > allowedLines)
-        return false;
-
-  return true;
+    pickedPose = p1;
+    return true;
+  }
+  else if(angle2 < angle1 && sqrDst2 < sqrDst1)
+  {
+    pickedPose = p2;
+    return true;
+  }
+  return false;
 }

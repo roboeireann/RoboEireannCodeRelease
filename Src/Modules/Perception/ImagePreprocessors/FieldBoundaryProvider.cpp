@@ -13,12 +13,12 @@
 #include "FieldBoundaryProvider.h"
 #include "Platform/BHAssert.h"
 #include "Platform/File.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Global.h"
-#include "Tools/ImageProcessing/PatchUtilities.h"
+#include "Debugging/DebugDrawings.h"
+#include "Streaming/Global.h"
+#include "ImageProcessing/PatchUtilities.h"
 #include "Tools/Math/Transformation.h"
 
-MAKE_MODULE(FieldBoundaryProvider, perception);
+MAKE_MODULE(FieldBoundaryProvider);
 
 FieldBoundaryProvider::FieldBoundaryProvider() :
   network(&Global::getAsmjitRuntime())
@@ -63,12 +63,12 @@ void FieldBoundaryProvider::update(FieldBoundary& fieldBoundary)
       std::vector<Spot> spots;
       predictSpots(spots);
       bool odd = boundaryIsOdd(spots);
-      (odd && ! theOtherFieldBoundary.extrapolated) ? projectPrevious(fieldBoundary) : validatePrediction(fieldBoundary, spots);
+      (useOtherFieldBoundary && odd && !theOtherFieldBoundary.extrapolated) ? projectPrevious(fieldBoundary) : validatePrediction(fieldBoundary, spots);
       fieldBoundary.odd = odd;
     }
     else if(theCameraInfo.camera == CameraInfo::lower)
     {
-      if(theOtherFieldBoundary.odd || theOtherFieldBoundary.extrapolated || theOtherFieldBoundary.boundaryInImage.size() == 0)
+      if(useOtherFieldBoundary && (theOtherFieldBoundary.odd || theOtherFieldBoundary.extrapolated || theOtherFieldBoundary.boundaryInImage.empty()))
       {
         std::vector<Spot> spots;
         predictSpots(spots);
@@ -92,7 +92,7 @@ void FieldBoundaryProvider::validatePrediction(FieldBoundary& fieldBoundary, std
 {
   if((fieldBoundary.isValid = (spots.size() >= minNumberOfSpots)))
   {
-    if(fittingMethod == Ransac)
+    if(fittingMethod == ransac)
     {
       std::vector<Spot> newSpots;
       for(auto s : spots)
@@ -103,7 +103,7 @@ void FieldBoundaryProvider::validatePrediction(FieldBoundary& fieldBoundary, std
       STOPWATCH("FieldBoundaryProvider:fitBoundaryRansac")
         fitBoundaryRansac(newSpots, fieldBoundary);
     }
-    else if(fittingMethod == NotRansac)
+    else if(fittingMethod == notRansac)
     {
       std::vector<Spot> newSpots;
       for(auto s : spots)
@@ -114,7 +114,7 @@ void FieldBoundaryProvider::validatePrediction(FieldBoundary& fieldBoundary, std
       STOPWATCH("FieldBoundaryProvider:fitBoundaryNotRansac")
         fitBoundaryNotRansac(newSpots, fieldBoundary);
     }
-    else if(fittingMethod == NoFitting)
+    else if(fittingMethod == noFitting)
     {
       for(const Spot& spot : spots)
       {
@@ -128,7 +128,7 @@ void FieldBoundaryProvider::validatePrediction(FieldBoundary& fieldBoundary, std
 
 void FieldBoundaryProvider::projectPrevious(FieldBoundary& fieldBoundary)
 {
-  const Pose2f invOdometryOffset = theOdometer.odometryOffset.inverse();
+  const Pose2f invOdometryOffset = theOdometryData.inverse() * theOtherOdometryData;
   for(Vector2f spotOnField : theOtherFieldBoundary.boundaryOnField)
   {
     Vector2f spotInImage;
@@ -156,7 +156,7 @@ void FieldBoundaryProvider::predictSpots(std::vector<Spot>& spots)
 
   const unsigned int xScale = theCameraInfo.width / patchSize(0);
   const unsigned int stepSize = network.output(0).rank() == 2 ? 2 : 1;
-  for(int x = 0, idx = 0; x < patchSize(0); ++x, idx += stepSize)
+  for(int x = 0, idx = 0; x < patchSize(0); ++x, idx += static_cast<int>(stepSize))
   {
     const Vector2f spotInImage(x * xScale + xScale / 2, std::max(0.f, std::min(output[idx], 1.f)) * static_cast<float>(theCameraInfo.height - 1));
     DOT("module:FieldBoundaryProvider:prediction", spotInImage.x(), spotInImage.y(), ColorRGBA::orange, ColorRGBA::orange);
@@ -207,26 +207,26 @@ bool FieldBoundaryProvider::boundaryIsOdd(const std::vector<Spot>& spots) const
       if(spots[i].inImage.y() > yMaxBorder)
         toLowSum += spots[i].inImage.y() - yMaxBorder;
 
-      uncertaintySum += spots[i].uncertanty;
+      uncertaintySum += spots[i].uncertainty;
 
       if(i + 2 >= spots.size())
         continue;
 
       //compute the discrepancy of the middle point to the line between the first and third
-      gradient = ((float) spots[i].inImage.y() - spots[i + 2].inImage.y()) / (spots[i].inImage.x() - spots[i + 2].inImage.x());
+      gradient = static_cast<float>(spots[i].inImage.y() - spots[i + 2].inImage.y()) / static_cast<float>(spots[i].inImage.x() - spots[i + 2].inImage.x());
       sum += std::abs((spots[i].inImage.y() + gradient * (spots[i + 1].inImage.x() - spots[i].inImage.x())) - spots[i + 1].inImage.y());
       LINE("module:FieldBoundaryProvider:prediction", spots[i + 1].inImage.x(), spots[i + 1].inImage.y(), spots[i + 1].inImage.x(), (spots[i].inImage.y() + gradient * (spots[i + 1].inImage.x() - spots[i].inImage.x())), 1, Drawings::solidPen, ColorRGBA::red);
     }
   }
   //if one of the limits is violated
-  if(((float)num / spots.size() < nonTopPoints) || uncertaintySum / num > uncertaintyLimit  || toLowSum / num > maxPointsUnderBorder || sum / num > threshold)
+  if((static_cast<float>(num) / static_cast<float>(spots.size()) < nonTopPoints) || uncertaintySum / static_cast<float>(num) > uncertaintyLimit  || toLowSum / num > maxPointsUnderBorder || sum / static_cast<float>(num) > threshold)
   {
     DEBUG_RESPONSE("module:FieldBoundaryProvider:debugPrints")
     {
       if(num)
       {
-        OUTPUT_TEXT(((float)num / spots.size() < nonTopPoints) << ", " << (uncertaintySum / num > uncertaintyLimit) << ", " << (toLowSum / num > maxPointsUnderBorder) << ", " << (sum / num > threshold));
-        OUTPUT_TEXT((float)num / spots.size() << ", " << uncertaintySum / num <<  ", " << toLowSum / num << ", " << sum / num);
+        OUTPUT_TEXT((static_cast<float>(num) / spots.size() < nonTopPoints) << ", " << (uncertaintySum / num > uncertaintyLimit) << ", " << (toLowSum / num > maxPointsUnderBorder) << ", " << (sum / num > threshold));
+        OUTPUT_TEXT(static_cast<float>(num) / spots.size() << ", " << uncertaintySum / num <<  ", " << toLowSum / num << ", " << sum / num);
       }
       else
         OUTPUT_TEXT("num = " << num);
@@ -239,8 +239,8 @@ bool FieldBoundaryProvider::boundaryIsOdd(const std::vector<Spot>& spots) const
 
 void FieldBoundaryProvider::fitBoundaryRansac(const std::vector<Spot>& spots, FieldBoundary& fieldBoundary)
 {
-  std::vector<Spot> fbmodel;
-  fbmodel.reserve(3);
+  std::vector<Spot> fbModel;
+  fbModel.reserve(3);
 
   int minError = std::numeric_limits<int>::max();
   const int goodEnough = static_cast<int>(static_cast<float>(maxSquaredError * spots.size()) * acceptanceRatio);
@@ -290,7 +290,7 @@ void FieldBoundaryProvider::fitBoundaryRansac(const std::vector<Spot>& spots, Fi
 
     // Accumulate errors in image coordinates, assuming both a continuing left line and a separate right line.
     int errorRightLine = 0; // Assuming a separate line on the right.
-    int errorRightStraight = 0;// Assuming left line continues.
+    int errorRightStraight = 0; // Assuming left line continues.
     const int abortError = minError - errorLeft;
     while(j < spots.size() && std::min(errorRightLine, errorRightStraight) < abortError)
     {
@@ -304,20 +304,20 @@ void FieldBoundaryProvider::fitBoundaryRansac(const std::vector<Spot>& spots, Fi
     if(error < minError)
     {
       minError = error;
-      fbmodel.clear();
-      fbmodel.emplace_back(leftSpot);
+      fbModel.clear();
+      fbModel.emplace_back(leftSpot);
 
       if(errorRightLine < errorRightStraight)
       {
-        fbmodel.emplace_back(corner);
-        fbmodel.emplace_back(rightSpot);
+        fbModel.emplace_back(corner);
+        fbModel.emplace_back(rightSpot);
       }
       else
-        fbmodel.emplace_back(middleSpot);
+        fbModel.emplace_back(middleSpot);
     }
   }
 
-  for(const Spot& spot : fbmodel)
+  for(const Spot& spot : fbModel)
   {
     fieldBoundary.boundaryInImage.emplace_back(spot.inImage);
     fieldBoundary.boundaryOnField.emplace_back(spot.onField);

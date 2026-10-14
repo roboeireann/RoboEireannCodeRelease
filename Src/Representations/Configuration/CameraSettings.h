@@ -9,8 +9,8 @@
 #pragma once
 
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/EnumIndexedArray.h"
 #include <array>
 
 STREAMABLE(CameraSettings,
@@ -19,7 +19,7 @@ STREAMABLE(CameraSettings,
   {
     ENUM(CameraSetting,
     {,
-      autoExposure, /**< Auto exposure mode (0: on, 1: off). (converted to true: on, false: off in cameraSettings.cfg */
+      autoExposure, /**< Auto exposure mode (0: on, 1: off). */
       autoExposureBrightness, /**< The brightness the auto exposure tries to achieve in the range [-255 .. 255]. */
       exposure, /**< The exposure time in the range [0 .. 1048575] when auto exposure is disabled. */
       gain, /**< The gain level in the range [0 .. 1023]. */

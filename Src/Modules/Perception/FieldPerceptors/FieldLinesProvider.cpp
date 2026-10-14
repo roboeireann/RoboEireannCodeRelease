@@ -4,15 +4,13 @@
 
 #include "FieldLinesProvider.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Math/Geometry.h"
+#include "Math/Geometry.h"
 #include "Tools/Math/Projection.h"
 #include "Tools/Math/Transformation.h"
 
 #include <algorithm>
 
-using namespace std;
-
-MAKE_MODULE(FieldLinesProvider, perception);
+MAKE_MODULE(FieldLinesProvider);
 
 bool FieldLinesProvider::isPointInSegment(const SpotLine& line, const Vector2f& point) const
 {
@@ -24,20 +22,18 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
 {
   internalListOfLines.clear();
   spotLineUsage.clear();
-  lineIndexTable.clear();
 
   midLine = nullptr;
 
   for(const SpotLine& line : theLinesPercept.lines)
   {
-    if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
+    if(theGameState.isPenaltyShootout())
     {
       if(std::abs(std::abs((theRobotPose * line.firstField - theRobotPose * line.lastField).angle()) - 90_deg) > 30_deg
          && (std::abs((theRobotPose * line.firstField).y()) < theFieldDimensions.yPosLeftPenaltyArea - 150
              || std::abs((theRobotPose * line.lastField).y()) < theFieldDimensions.yPosLeftPenaltyArea - 150))
       {
         spotLineUsage.push_back(thrown);
-        lineIndexTable.push_back(lostIndex);
         continue;
       }
 
@@ -47,7 +43,6 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
          || !Geometry::isPointInsideRectangle2(corner1, corner2, theRobotPose * line.lastField))
       {
         spotLineUsage.push_back(thrown);
-        lineIndexTable.push_back(lostIndex);
         continue;
       }
     }
@@ -56,22 +51,20 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
     {
       //FieldLines should not contain lines that are on the circle
       spotLineUsage.push_back(thrown);
-      lineIndexTable.push_back(lostIndex);
       continue;
     }
 
     {
       //is line most likely in/of center circle
-      if((theCirclePercept.wasSeen || lastCircleWasSeen)
-         && theFrameInfo.getTimeSince(lastFrameTime) <= maxTimeOffset) // because of log backjumps
+      if((theCirclePercept.wasSeen || lastCirclePercept.wasSeen)
+         && theFrameInfo.getTimeSince(lastFrameTime) <= maxTimeOffset) // because of log back jumps
       {
-        const Vector2f centerCirclePosition = theCirclePercept.wasSeen ? theCirclePercept.pos : theOdometer.odometryOffset.inverse() * theCirclePercept.pos;
+        const Vector2f centerCirclePosition = theCirclePercept.wasSeen ? theCirclePercept.pos : theOdometryData.inverse() * lastOdometryData * lastCirclePercept.pos;
 
-        if(std::abs(std::abs(Geometry::getDistanceToLine(line.line, centerCirclePosition)) - theFieldDimensions.centerCircleRadius) < maxLineDeviationFromAssumedCenterCircle)
+        if(std::abs(Geometry::getDistanceToLine(line.line, centerCirclePosition) - theFieldDimensions.centerCircleRadius) < maxLineDeviationFromAssumedCenterCircle)
         {
           //(again) FieldLines should not contain lines that are on the circle
           spotLineUsage.push_back(thrown);
-          lineIndexTable.push_back(lostIndex);
           continue;
         }
       }
@@ -87,7 +80,6 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
       if((line.firstImg - line.lastImg).squaredNorm() < static_cast<int>(sqr(inImageRadius * 2.5f) * std::abs(std::cos(line.line.direction.angle()))))
       {
         spotLineUsage.push_back(thrown);
-        lineIndexTable.push_back(lostIndex);
         continue;
       }
     }
@@ -103,7 +95,6 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
 
     internalListOfLines.emplace_back();
     PerceptLine& pLine = internalListOfLines.back();
-    lineIndexTable.push_back(static_cast<unsigned>(internalListOfLines.size() - 1));
     if(theCirclePercept.wasSeen)
     {
       //check if this is the midline
@@ -121,7 +112,7 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
             (theCirclePercept.pos - line.lastField).squaredNorm() < sqr(theFieldDimensions.centerCircleRadius) &&
             (firstInField - lastInField).squaredNorm() > bigLineThreshold*bigLineThreshold / 2))
         {
-          midLine = const_cast<SpotLine*>(&line);
+          midLine = &line;
         }
       }
     }
@@ -130,20 +121,25 @@ void FieldLinesProvider::update(FieldLines& fieldLines)
     pLine.last = lastInField;
     pLine.length = (firstInField - lastInField).norm();
     pLine.alpha = Vector2f(pLine.last - pLine.first).rotateLeft().angle();
+    const Vector2f linePerceptCenter = (pLine.first + pLine.last) * 0.5f;
+    const Vector2f linePerceptClosestPoint = Geometry::getOrthogonalProjectionOfPointOnEdge(pLine.first, pLine.last - pLine.first, Vector2f(0.f,0.f));
+    float closestWeighting = 1.f - centerWeighting;
+    pLine.cov = theMeasurementCovariance.computeForRelativePosition(linePerceptCenter*centerWeighting + linePerceptClosestPoint*closestWeighting);
   }
   // Sort final list of lines from long to short:
-  std::vector<size_t> sortedLineIndizes;
+  std::vector<size_t> sortedLineIndices;
   for(size_t i = 0; i < internalListOfLines.size(); i++)
-    sortedLineIndizes.emplace_back(i);
-  std::sort(sortedLineIndizes.begin(), sortedLineIndizes.end(), [&](const size_t a, const size_t b)
+    sortedLineIndices.emplace_back(i);
+  std::sort(sortedLineIndices.begin(), sortedLineIndices.end(), [&](const size_t a, const size_t b)
   {
     return internalListOfLines[a].length > internalListOfLines[b].length;
   });
   // Copy sorted list to representation:
   fieldLines.lines.clear();
-  for(size_t i = 0; i < sortedLineIndizes.size(); i++)
-    fieldLines.lines.emplace_back(internalListOfLines[sortedLineIndizes[i]]);
-  lastCircleWasSeen = theCirclePercept.wasSeen;
+  for(size_t i = 0; i < sortedLineIndices.size(); i++)
+    fieldLines.lines.emplace_back(internalListOfLines[sortedLineIndices[i]]);
+  lastCirclePercept = theCirclePercept;
+  lastOdometryData = theOdometryData;
   lastFrameTime = theFrameInfo.time;
 }
 
@@ -154,7 +150,6 @@ void FieldLinesProvider::update(FieldLineIntersections& fieldLineIntersections)
   if(SystemCall::getMode() == SystemCall::logFileReplay && spotLineUsage.size() != theLinesPercept.lines.size())
     return;
   ASSERT(spotLineUsage.size() == theLinesPercept.lines.size());
-  ASSERT(lineIndexTable.size() == theLinesPercept.lines.size());
 
   for(const IntersectionsPercept::Intersection& i : theIntersectionsPercept.intersections)
   {
@@ -162,47 +157,23 @@ void FieldLinesProvider::update(FieldLineIntersections& fieldLineIntersections)
       continue;
 
     fieldLineIntersections.intersections.emplace_back();
-    fieldLineIntersections.intersections.back().ownIndex = unsigned(fieldLineIntersections.intersections.size()) - 1u;
     fieldLineIntersections.intersections.back().pos = i.pos;
+    fieldLineIntersections.intersections.back().cov = i.cov;
     fieldLineIntersections.intersections.back().type = static_cast<FieldLineIntersections::Intersection::IntersectionType>(i.type);
     fieldLineIntersections.intersections.back().dir1 = i.dir1.normalized();
-    fieldLineIntersections.intersections.back().indexDir1 = lineIndexTable[i.line1Index];
     fieldLineIntersections.intersections.back().dir2 = i.dir2.normalized();
-    fieldLineIntersections.intersections.back().indexDir2 = lineIndexTable[i.line2Index];
-    ASSERT(fieldLineIntersections.intersections.back().indexDir1 != fieldLineIntersections.intersections.back().indexDir2
-           && fieldLineIntersections.intersections.back().indexDir1 != lostIndex
-           && fieldLineIntersections.intersections.back().indexDir2 != lostIndex);
 
     auto equalLines = [](const SpotLine* l1, const SpotLine* l2)
     {
       return l1->firstField == l2->firstField && l1->lastField == l2->lastField;
     };
 
-    const bool line1IsMid = midLine && equalLines(midLine, &theLinesPercept.lines[i.line1Index]);
+    [[maybe_unused]] const bool line1IsMid = midLine && equalLines(midLine, &theLinesPercept.lines[i.line1Index]);
     const bool line2IsMid = midLine && equalLines(midLine, &theLinesPercept.lines[i.line2Index]);
 
     ASSERT(!line1IsMid || !line2IsMid);
     if((i.type == IntersectionsPercept::Intersection::T && line2IsMid) || theLinesPercept.lines[i.line1Index].belongsToCircle || theLinesPercept.lines[i.line2Index].belongsToCircle)
       continue;
-
-    if(line1IsMid || line2IsMid)
-      fieldLineIntersections.intersections.back().additionalType = FieldLineIntersections::Intersection::mid;
-    else if(theFieldLines.lines[fieldLineIntersections.intersections.back().indexDir1].length > bigLineThreshold
-            && theFieldLines.lines[fieldLineIntersections.intersections.back().indexDir2].length > bigLineThreshold)
-      fieldLineIntersections.intersections.back().additionalType = FieldLineIntersections::Intersection::big;
-
-    if(fieldLineIntersections.intersections.back().type == FieldLineIntersections::Intersection::X &&
-       fieldLineIntersections.intersections.back().additionalType == FieldLineIntersections::Intersection::big &&
-       (theLinesPercept.lines[i.line1Index].firstField - theLinesPercept.lines[i.line1Index].lastField).squaredNorm() < (theLinesPercept.lines[i.line2Index].firstField - theLinesPercept.lines[i.line2Index].lastField).squaredNorm()) //this will be "asserted" in GoalFramePerceptor
-    {
-      const Vector2f temp = fieldLineIntersections.intersections.back().dir1;
-      fieldLineIntersections.intersections.back().dir1 = fieldLineIntersections.intersections.back().dir2;
-      fieldLineIntersections.intersections.back().dir2 = temp;
-
-      fieldLineIntersections.intersections.back().indexDir2 += fieldLineIntersections.intersections.back().indexDir1;
-      fieldLineIntersections.intersections.back().indexDir1 = fieldLineIntersections.intersections.back().indexDir2 - fieldLineIntersections.intersections.back().indexDir1;
-      fieldLineIntersections.intersections.back().indexDir2 -= fieldLineIntersections.intersections.back().indexDir1;
-    }
 
     //ensure dir2 is left of dir1
     if(fieldLineIntersections.intersections.back().type == FieldLineIntersections::Intersection::L &&
@@ -211,14 +182,6 @@ void FieldLinesProvider::update(FieldLineIntersections& fieldLineIntersections)
       const Vector2f temp = fieldLineIntersections.intersections.back().dir2;
       fieldLineIntersections.intersections.back().dir2 = fieldLineIntersections.intersections.back().dir1;
       fieldLineIntersections.intersections.back().dir1 = temp;
-
-      fieldLineIntersections.intersections.back().indexDir2 += fieldLineIntersections.intersections.back().indexDir1;
-      fieldLineIntersections.intersections.back().indexDir1 = fieldLineIntersections.intersections.back().indexDir2 - fieldLineIntersections.intersections.back().indexDir1;
-      fieldLineIntersections.intersections.back().indexDir2 -= fieldLineIntersections.intersections.back().indexDir1;
     }
-
-    ASSERT(fieldLineIntersections.intersections.back().indexDir1 != fieldLineIntersections.intersections.back().indexDir2
-           && fieldLineIntersections.intersections.back().indexDir1 != lostIndex
-           && fieldLineIntersections.intersections.back().indexDir2 != lostIndex);
   }
 }

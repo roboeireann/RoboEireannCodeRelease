@@ -9,9 +9,8 @@
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Range.h"
-#include <algorithm>
+#include "Streaming/AutoStreamable.h"
+#include "Math/Range.h"
 
 STREAMABLE(RelativeFieldColorsParameters,
 {,

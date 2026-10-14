@@ -10,9 +10,10 @@
 
 #include "Representations/Configuration/KickInfo.h"
 #include "Representations/MotionControl/KeyframeMotionRequest.h"
-#include "Tools/Math/BHMath.h"
+#include "Representations/MotionControl/OdometryData.h"
+#include "Math/BHMath.h"
 #include "Tools/Motion/MotionPhase.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 
 STREAMABLE(MotionInfo,
 {
@@ -39,6 +40,11 @@ STREAMABLE(MotionInfo,
   bool isKeyframeMotion(KeyframeMotionRequest::KeyframeMotionID motion, bool mirror) const
   {
     return executedPhase == MotionPhase::keyframeMotion && executedKeyframeMotion.keyframeMotion == motion && executedKeyframeMotion.mirror == mirror;
+  }
+
+  void verify() const
+  {
+    ASSERT(lastKickType <= KickInfo::numOfKickTypes);
   },
 
   (MotionPhase::Type)(MotionPhase::playDead) executedPhase, /**< The type of the phase currently being executed. */
@@ -47,6 +53,11 @@ STREAMABLE(MotionInfo,
   // walk phase
   (Pose2f) speed, /**< The current speed at which the robot is walking */
   (bool)(false) isWalkPhaseInWalkKick, /**< Whether the current walk phase is an in walk kick. */
+
+  (unsigned int)(0) lastStandTimeStamp, /**< Timestamp when last stand started. */
+  (unsigned int)(0) lastMotionPhaseStarted, /**< Timestamp when last motion phase started. */
+
+  (bool)(true) walkPhaseIsLeftPhase, /**< If the current motion phase is a walk phase, then is the current phase a left swing phase? */
 
   // kick or walk-kick phase
   (unsigned)(0) lastKickTimestamp, /**< The timestamp of the most recently finished kick. */
@@ -57,4 +68,7 @@ STREAMABLE(MotionInfo,
 
   // keyframe motion phase
   (KeyframeMotionRequest) executedKeyframeMotion, /**< The specific type of keyframe motion. */
+
+  (OdometryData) odometryAtLastPhaseSwitch,
+  (OdometryTranslationRequest) odometryRequestAtLastPhaseSwitch,
 });

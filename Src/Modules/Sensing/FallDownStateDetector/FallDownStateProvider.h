@@ -6,80 +6,85 @@
 
 #pragma once
 
-#include "Representations/Configuration/FootOffset.h"
+#include "Debugging/Annotation.h"
+#include "Framework/Module.h"
+#include "Framework/Settings.h"
+#include "Math/Geometry.h"
+#include "Math/UnscentedKalmanFilter.h"
 #include "Representations/Configuration/MassCalibration.h"
+#include "Representations/Configuration/RobotDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
-#include "Representations/Infrastructure/SensorData/FsrSensorData.h"
-#include "Representations/Infrastructure/SensorData/InertialSensorData.h"
 #include "Representations/Sensing/FallDownState.h"
 #include "Representations/Sensing/GroundContactState.h"
 #include "Representations/Sensing/InertialData.h"
+#include "Representations/Sensing/InertialSensorData.h"
 #include "Representations/Sensing/RobotModel.h"
-#include "Tools/Cabsl.h"
-#include "Tools/Math/Geometry.h"
-#include "Tools/Math/UnscentedKalmanFilter.h"
-#include "Tools/Module/Module.h"
+#include "Representations/Sensing/SolePressureState.h"
+#include "Streaming/Global.h"
+#include "Tools/BehaviorControl/Cabsl.h"
 
 MODULE(FallDownStateProvider,
 {,
-  REQUIRES(FootOffset),
   REQUIRES(FrameInfo),
-  REQUIRES(FsrSensorData),
   REQUIRES(GroundContactState),
   REQUIRES(InertialData),
   REQUIRES(InertialSensorData),
   REQUIRES(MassCalibration),
+  REQUIRES(RobotDimensions),
   REQUIRES(RobotModel),
+  REQUIRES(SolePressureState),
   PROVIDES(FallDownState),
-  DEFINES_PARAMETERS(
+  LOADS_PARAMETERS(
   {,
-    (Angle)(10_deg) maxGyroToRegainStableState,
-    (Angle)(100_deg) maxVelForPrediction,
-    (bool)(true) useInertiaData,
-    (bool)(false) playSounds,
-    (float)(.9f) velocityDiscountFactor,
-    (float)(0.1f) forwardingTime,
-    (float)(0.5f) minNormalizedFallVectorScalar,
-    (float)(0.65f) minFallVectorScalar,
-    (float)(0.91f) minPredictNormalizedFallVectorScalar,
-    (float)(1.1f) minPredictFallVectorScalar,
-    (float)(10.f) minComDistanceToFootCenter,
-    (float)(110.f) minComDistanceToDetetctFall,
-    (float)(225.f) maxTorsoHeightToKeepSquatting,
-    (float)(210.f) minTorsoHeightToKeepUpright,
-    (float)(3.f) sigmaArea,
-    (float)(80.f) maxFootHeightDiff,
-    (int)(150) minTimeBetweenSound,
-    (int)(0) minTimeWithoutGroundContactToAssumePickup,
-    (Vector2a)(55_deg, 55_deg) minTorsoOrientationToDetermineDirection,
+    (Angle) maxGyroToRegainStableState,
+    (Angle) maxVelForPrediction,
+    (bool) useInertiaData,
+    (bool) playSounds,
+    (float) velocityDiscountFactor,
+    (float) forwardingTime,
+    (float) minNormalizedFallVectorScalar,
+    (float) minFallVectorScalar,
+    (float) minPredictNormalizedFallVectorScalar,
+    (float) minPredictFallVectorScalar,
+    (float) minComDistanceToFootCenter,
+    (float) minComDistanceToDetectFall,
+    (float) maxTorsoHeightToKeepSquatting,
+    (float) minTorsoHeightToKeepUpright,
+    (float) sigmaArea,
+    (int) minTimeBetweenSound,
+    (int) minTimeWithoutGroundContactToAssumePickup,
+    (Vector2a) minTorsoOrientationToDetermineDirection,
+    (int) maxTimeStaggering, /**< If the robot stays this long staggering, something is wrong and the filter is reset. */
 
-    (Vector3f)(16.f, 16.f, 16.f) positionProcessDeviation, //  dynamic noise density of the com-position
-    (Vector2a)(Vector2a::Constant(22_deg)) velocityProcessDeviation, // dynamic noise density of the velocity
-    (Vector3f)(2.f, 2.f, 2.f) positionMeasurementDeviation, // measure noise of the com position
-    (Vector2a)(Vector2a::Constant(3_deg)) velocityMeasurementDeviation, // measure noise of the gyro
+    (Vector3f) positionProcessDeviation, //  dynamic noise density of the com-position
+    (Vector2a) velocityProcessDeviation, // dynamic noise density of the velocity
+    (Vector3f) positionMeasurementDeviation, // measure noise of the com position
+    (Vector2a) velocityMeasurementDeviation, // measure noise of the gyro
   }),
 });
 
-class FallDownStateProvider : public FallDownStateProviderBase, public Cabsl<FallDownStateProvider>
+class FallDownStateProvider : public FallDownStateProviderBase, public cabsl::Cabsl<FallDownStateProvider>
 {
 public:
   FallDownStateProvider();
 private:
-  bool falling; /** Is the com outside of the support polygon */
-  bool stable; /** Torso has very limited rotational motion. */
-  bool torsoUpright; /** Is the com within sub support polygon? */
-  bool toSquatting; /** Are all conditions for a return to squatting from a fall met? */
-  bool toUpright; /** Are all conditions for a return to upright from a fall met? */
-  bool useTorsoOrientation; /** Torso orientation is big enough to be used. */
-  const InertialSensorData* theSensorData; /** Pointer to the sensor data.*/
-  FallDownState* theFallDownState; /** Pointer to the fall down state updated.*/
-  FallDownState::Direction direction; /** The fall direction. Always computed, even if not falling. */
+  bool falling; /**< Is the com outside of the support polygon */
+  bool stable; /**< Torso has very limited rotational motion. */
+  bool torsoUpright; /**< Is the com within sub support polygon? */
+  bool toSquatting; /**< Are all conditions for a return to squatting from a fall met? */
+  bool toUpright; /**< Are all conditions for a return to upright from a fall met? */
+  bool isPickedUp; /**< Are all conditions for a return to picked up from a fall met? */
+  bool useTorsoOrientation; /**< Torso orientation is big enough to be used. */
+  bool disablePickUp; /**< For simulated robots, pick up is disabled. */
+  const InertialSensorData* theSensorData; /**< Pointer to the sensor data.*/
+  FallDownState* theFallDownState; /**< Pointer to the fall down state updated.*/
+  FallDownState::Direction direction; /**< The fall direction. Always computed, even if not falling. */
   float torsoAboveGround; /**< The distance of the torso above the ground (in mm). */
-  float footShapeToeX; /**< The foot toe x position (in mm). */
 
   UKF<5> ukf = UKF<5>(Vector5f::Zero()); // The statevector of the ukf is composed of: com, velocity;
   Vector5f dynamicNoise;
   Vector5f measurementNoise;
+  bool resetFilter = false;
 
   Legs::Leg supportFoot;
   Vector3f supportFootCenter; // relative to tilting edge
@@ -92,7 +97,7 @@ private:
 
   void initUKF(const Vector5f& initMean);
   void updateUKF();
-  void dynamicModel(const Pose3f& originToTorso, const Matrix3f& I, Vector5f& state, float dt = Constants::motionCycleTime) const;
+  void dynamicModel(const Pose3f& originToTorso, const Matrix3f& I, Vector5f& state, float dt = Global::getSettings().motionCycleTime) const;
   Matrix3f calcInertiaTensor(const Pose3f& originToTorso) const;
   Vector5f measure() const;
   void convertToNewOrigin(const Pose3f& originToTorso, const Pose3f& newOriginToTorso, Vector5f& state) const;
@@ -122,10 +127,10 @@ private:
   bool isFalling() const;
 
   /**
-   * Check if the point is inside of the polgyon.
+   * Check if the point is inside of the polygon.
    * @param point The point to check.
    * @param polygon The polygon of the support foot.
-   * @return ture, if the point is inside of the polgyon.
+   * @return true, if the point is inside of the polygon.
    */
   bool isPointInsidePolygon(const Vector3f& point, const std::vector<Vector3f>& polygon) const;
 
@@ -161,235 +166,5 @@ private:
    */
   void say(const char* text);
 
-  /**
-   * The root option sets the fall down states for undefined, upright, and
-   * staggering. A fall is handled by the suboption Fall.
-   */
-  option(Root)
-  {
-    initial_state(pickedUp)
-    {
-      transition
-      {
-        if(toUpright)
-          goto upright;
-        else if(toSquatting)
-          goto squatting;
-      }
-      action
-      {
-        setState(FallDownState::pickedUp);
-      }
-    }
-
-    state(upright)
-    {
-      transition
-      {
-        if(falling)
-        {
-          goto preFall;
-        }
-        else if(!torsoUpright)
-          goto staggering;
-        else if(!theGroundContactState.contact)
-          goto uprightToPickedUp;
-        else if(toSquatting)
-        {
-          say("squatting");
-          goto squatting;
-        }
-      }
-      action
-      {
-        setState(FallDownState::upright);
-      }
-    }
-
-    state(uprightToPickedUp)
-    {
-      transition
-      {
-        if(falling)
-        {
-          goto preFall;
-        }
-        else if(!torsoUpright)
-          goto staggering;
-        else if(theGroundContactState.contact)
-          goto upright;
-        else if(state_time >= minTimeWithoutGroundContactToAssumePickup)
-        {
-          say("Picked up");
-          goto pickedUp;
-        }
-      }
-      action
-      {
-        setState(FallDownState::upright);
-      }
-    }
-
-    state(staggering)
-    {
-      transition
-      {
-        if(falling)
-        {
-          goto preFall;
-        }
-        else if(torsoUpright)
-          goto upright;
-      }
-      action
-      {
-        setState(FallDownState::staggering);
-      }
-    }
-
-    state(preFall)
-    {
-      transition
-      {
-        if(falling)
-        {
-          say("Falling");
-          goto fall;
-        }
-        else if(toUpright && stable)
-        {
-          say("Upright");
-          goto upright;
-        }
-        else if(toSquatting && stable)
-        {
-          say("Squatting");
-          goto squatting;
-        }
-        else
-        {
-          goto staggering;
-        }
-      }
-      action
-      {
-        setState(FallDownState::staggering);
-      }
-    }
-
-    state(fall)
-    {
-      transition
-      {
-        if(toUpright && stable)
-        {
-          say("Upright");
-          goto upright;
-        }
-        else if(toSquatting && stable)
-        {
-          say("Squatting");
-          goto squatting;
-        }
-      }
-      action
-      {
-        Fall();
-      }
-    }
-
-    state(squatting)
-    {
-      transition
-      {
-        if(falling)
-        {
-          say("Falling");
-          goto fall;
-        }
-        else if(toUpright)
-        {
-          say("Upright");
-          goto upright;
-        }
-        else if(!theGroundContactState.contact)
-          goto squattingToPickedUp;
-      }
-      action
-      {
-        setState(FallDownState::squatting, direction);
-      }
-    }
-
-    state(squattingToPickedUp)
-    {
-      transition
-      {
-        if(falling)
-        {
-          say("Falling");
-          goto fall;
-        }
-        else if(theGroundContactState.contact)
-          goto squatting;
-        else if(state_time >= minTimeWithoutGroundContactToAssumePickup)
-        {
-          say("Picked up");
-          goto pickedUp;
-        }
-      }
-      action
-      {
-        setState(FallDownState::squatting);
-      }
-    }
-  }
-
-  /**
-   * This option handles a fall and sets the fall down states falling and onGround.
-   * If the torso's orientation is big enough, it also updates the odometry to
-   * handle situations where the robot is on its side and then rolls on its front
-   * or back.
-   */
-  option(Fall)
-  {
-    initial_state(fallingWithoutOdometryUpdate)
-    {
-      transition
-      {
-        if(useTorsoOrientation)
-          goto fallingWithOdometryUpdate;
-      }
-      action
-      {
-        setState(FallDownState::falling, direction);
-      }
-    }
-
-    state(fallingWithOdometryUpdate)
-    {
-      transition
-      {
-        if(!useTorsoOrientation)
-          goto fallingWithoutOdometryUpdate;
-        else if(stable)
-        {
-          say("Fallen");
-          goto fallen;
-        }
-      }
-      action
-      {
-        setStateWithPossibleDirectionChange(FallDownState::falling);
-      }
-    }
-
-    state(fallen)
-    {
-      action
-      {
-        setStateWithPossibleDirectionChange(FallDownState::fallen);
-      }
-    }
-  }
+#include "Options.h"
 };

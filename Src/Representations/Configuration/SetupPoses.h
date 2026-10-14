@@ -11,11 +11,9 @@
 #pragma once
 
 #include "Platform/BHAssert.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
 #include <vector>
-
-#include "Tools/TextLogging.h"
 
 /**
  * @struct SetupPoses
@@ -27,10 +25,13 @@ STREAMABLE(SetupPoses,
   /** The pose of a robot before entering the field */
   STREAMABLE(SetupPose,
   {,
-    (int) playerNumber,           /*< The player number of the robot */
-    (Vector2f) position,          /*< The position (in global field coordinates) at which the robot is placed */
-    (Vector2f) turnedTowards,     /*< The position (in global field coordinates) at which the robot is turned (looking at) */
+    (int) playerNumber,           /**< The player number of the robot */
+    (Vector2f) position,          /**< The position (in global field coordinates) at which the robot is placed */
+    (Vector2f) turnedTowards,     /**< The position (in global field coordinates) at which the robot is turned (looking at) */
   });
+
+  /** Implements a debug request to place a player at its setup pose. */
+  void draw() const;
 
   /** Convenience function to find the correct pose given the player number.
    *  The list of poses is not ordered by numbers.
@@ -41,19 +42,5 @@ STREAMABLE(SetupPoses,
    */
   const SetupPose& getPoseOfRobot(int number) const,
 
-  (std::vector<SetupPose>) poses, /*< A list of all available robot poses, not ordered by number */
+  (std::vector<SetupPose>) poses, /**< A list of all available robot poses, not ordered by number */
 });
-
-inline const SetupPoses::SetupPose& SetupPoses::getPoseOfRobot(int number) const
-{
-  ASSERT(poses.size() > 0);
-  if(poses.size() == 1)
-    return poses[0];
-  for(const auto& pose : poses)
-    if(pose.playerNumber == number)
-      return pose;
-
-  TLOGF_ABORT(TextLogging::get("SetupPoses"), "setupPoses.cfg missing a pose for player number {}", number);
-
-  return poses[0]; // Dummy line to avoid compiler complaints
-}

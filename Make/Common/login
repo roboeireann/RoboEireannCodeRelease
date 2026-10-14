@@ -1,0 +1,26 @@
+#!/bin/bash
+# Login on a NAO robot using our private key.
+# The ip address of the robot must be passed as an argument.
+# The ip address is remembered as default address for the
+# SimRobot scene RemoteRobot.ros3. This behavior can be
+# suppressed by specifying the option '-b'.
+
+cd "$(dirname "$(which "$0")")"
+
+if [ "$1" = "-b" ]; then
+  # called from deploy dialog
+  shift
+  clear
+else
+  echo "sc Remote $1" >../../Config/Scenes/Includes/connect.con
+fi
+
+source setupSSH
+source setupTarget "$1"
+
+ssh ${SSHOPTIONS} $TARGET_USER@$*
+
+if [ $? = 255 ]; then
+  echo "Error: Cannot connect to $1" >&2
+  exit 255
+fi

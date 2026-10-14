@@ -4,16 +4,16 @@
  */
 
 #pragma once
-#include "Tools/Function.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/Enum.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/Function.h"
+#include "Math/Eigen.h"
+#include "Streaming/Enum.h"
+#include "Streaming/AutoStreamable.h"
 
 STREAMABLE(DynPoint,
 {
   DynPoint() = default;
   DynPoint(int limb, int phaseNumber, int duration, const Vector3f& translation, const Vector3f& angle, const Vector3f& odometryOffset);
-  DynPoint(int limb, int phaseNumber, const Vector3f& translationl, const int duration = -1);
+  DynPoint(int limb, int phaseNumber, const Vector3f& translation, const int duration = -1);
 
   bool operator==(const DynPoint& other) const,
 
@@ -51,12 +51,9 @@ STREAMABLE(KickRequest,
   {,
     kickForwardFast,
     kickForwardFastLong,
-    otherSideKick,
-    stopBallStart,
-    stopBallEnd,
-    kickForwardAndUp,
     // kicks up to here are loaded by the KickEngine
-    newKick,
+    standRLK1KickLongRight,
+    standRLK1KickLongLeft,
     none,
   });
 

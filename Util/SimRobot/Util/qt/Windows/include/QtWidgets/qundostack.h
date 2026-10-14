@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtWidgets module of the Qt Toolkit.
@@ -37,121 +37,12 @@
 **
 ****************************************************************************/
 
-#ifndef QUNDOSTACK_H
-#define QUNDOSTACK_H
+#if 0
+// syncqt: header is already part of QtGui/QtGui
+#pragma qt_no_master_include
+#endif
 
-#include <QtWidgets/qtwidgetsglobal.h>
-#include <QtCore/qobject.h>
-#include <QtCore/qstring.h>
+#include <QtGui/QUndoStack>
 
 QT_BEGIN_NAMESPACE
-
-
-class QAction;
-class QUndoCommandPrivate;
-class QUndoStackPrivate;
-
-#ifndef QT_NO_UNDOCOMMAND
-
-class Q_WIDGETS_EXPORT QUndoCommand
-{
-    QUndoCommandPrivate *d;
-
-public:
-    explicit QUndoCommand(QUndoCommand *parent = Q_NULLPTR);
-    explicit QUndoCommand(const QString &text, QUndoCommand *parent = Q_NULLPTR);
-    virtual ~QUndoCommand();
-
-    virtual void undo();
-    virtual void redo();
-
-    QString text() const;
-    QString actionText() const;
-    void setText(const QString &text);
-
-    bool isObsolete() const;
-    void setObsolete(bool obsolete);
-
-    virtual int id() const;
-    virtual bool mergeWith(const QUndoCommand *other);
-
-    int childCount() const;
-    const QUndoCommand *child(int index) const;
-
-private:
-    Q_DISABLE_COPY(QUndoCommand)
-    friend class QUndoStack;
-};
-
-#endif // QT_NO_UNDOCOMMAND
-
-#ifndef QT_NO_UNDOSTACK
-
-class Q_WIDGETS_EXPORT QUndoStack : public QObject
-{
-    Q_OBJECT
-    Q_DECLARE_PRIVATE(QUndoStack)
-    Q_PROPERTY(bool active READ isActive WRITE setActive)
-    Q_PROPERTY(int undoLimit READ undoLimit WRITE setUndoLimit)
-
-public:
-    explicit QUndoStack(QObject *parent = Q_NULLPTR);
-    ~QUndoStack();
-    void clear();
-
-    void push(QUndoCommand *cmd);
-
-    bool canUndo() const;
-    bool canRedo() const;
-    QString undoText() const;
-    QString redoText() const;
-
-    int count() const;
-    int index() const;
-    QString text(int idx) const;
-
-#ifndef QT_NO_ACTION
-    QAction *createUndoAction(QObject *parent,
-                                const QString &prefix = QString()) const;
-    QAction *createRedoAction(QObject *parent,
-                                const QString &prefix = QString()) const;
-#endif // QT_NO_ACTION
-
-    bool isActive() const;
-    bool isClean() const;
-    int cleanIndex() const;
-
-    void beginMacro(const QString &text);
-    void endMacro();
-
-    void setUndoLimit(int limit);
-    int undoLimit() const;
-
-    const QUndoCommand *command(int index) const;
-
-public Q_SLOTS:
-    void setClean();
-    void resetClean();
-    void setIndex(int idx);
-    void undo();
-    void redo();
-    void setActive(bool active = true);
-
-Q_SIGNALS:
-    void indexChanged(int idx);
-    void cleanChanged(bool clean);
-    void canUndoChanged(bool canUndo);
-    void canRedoChanged(bool canRedo);
-    void undoTextChanged(const QString &undoText);
-    void redoTextChanged(const QString &redoText);
-
-private:
-    Q_DISABLE_COPY(QUndoStack)
-    friend class QUndoGroup;
-};
-
-#endif // QT_NO_UNDOSTACK
-
 QT_END_NAMESPACE
-
-#endif // QUNDOSTACK_H

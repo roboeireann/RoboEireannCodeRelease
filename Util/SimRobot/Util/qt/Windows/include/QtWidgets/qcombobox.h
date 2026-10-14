@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtWidgets module of the Qt Toolkit.
@@ -45,10 +45,11 @@
 #include <QtWidgets/qabstractitemdelegate.h>
 #include <QtCore/qabstractitemmodel.h>
 #include <QtCore/qvariant.h>
+#include <QtGui/qvalidator.h>
+
+QT_REQUIRE_CONFIG(combobox);
 
 QT_BEGIN_NAMESPACE
-
-#ifndef QT_NO_COMBOBOX
 
 class QAbstractItemView;
 class QLineEdit;
@@ -61,7 +62,8 @@ class Q_WIDGETS_EXPORT QComboBox : public QWidget
 
     Q_PROPERTY(bool editable READ isEditable WRITE setEditable)
     Q_PROPERTY(int count READ count)
-    Q_PROPERTY(QString currentText READ currentText WRITE setCurrentText NOTIFY currentTextChanged USER true)
+    Q_PROPERTY(QString currentText READ currentText WRITE setCurrentText NOTIFY currentTextChanged
+               USER true)
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     Q_PROPERTY(QVariant currentData READ currentData)
     Q_PROPERTY(int maxVisibleItems READ maxVisibleItems WRITE setMaxVisibleItems)
@@ -70,18 +72,13 @@ class Q_WIDGETS_EXPORT QComboBox : public QWidget
     Q_PROPERTY(SizeAdjustPolicy sizeAdjustPolicy READ sizeAdjustPolicy WRITE setSizeAdjustPolicy)
     Q_PROPERTY(int minimumContentsLength READ minimumContentsLength WRITE setMinimumContentsLength)
     Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize)
-
-#ifndef QT_NO_COMPLETER
-    Q_PROPERTY(bool autoCompletion READ autoCompletion WRITE setAutoCompletion DESIGNABLE false)
-    Q_PROPERTY(Qt::CaseSensitivity autoCompletionCaseSensitivity READ autoCompletionCaseSensitivity WRITE setAutoCompletionCaseSensitivity DESIGNABLE false)
-#endif // QT_NO_COMPLETER
-
+    Q_PROPERTY(QString placeholderText READ placeholderText WRITE setPlaceholderText)
     Q_PROPERTY(bool duplicatesEnabled READ duplicatesEnabled WRITE setDuplicatesEnabled)
     Q_PROPERTY(bool frame READ hasFrame WRITE setFrame)
     Q_PROPERTY(int modelColumn READ modelColumn WRITE setModelColumn)
 
 public:
-    explicit QComboBox(QWidget *parent = Q_NULLPTR);
+    explicit QComboBox(QWidget *parent = nullptr);
     ~QComboBox();
 
     int maxVisibleItems() const;
@@ -90,14 +87,6 @@ public:
     int count() const;
     void setMaxCount(int max);
     int maxCount() const;
-
-#ifndef QT_NO_COMPLETER
-    bool autoCompletion() const;
-    void setAutoCompletion(bool enable);
-
-    Qt::CaseSensitivity autoCompletionCaseSensitivity() const;
-    void setAutoCompletionCaseSensitivity(Qt::CaseSensitivity sensitivity);
-#endif
 
     bool duplicatesEnabled() const;
     void setDuplicatesEnabled(bool enable);
@@ -128,7 +117,6 @@ public:
     enum SizeAdjustPolicy {
         AdjustToContents,
         AdjustToContentsOnFirstShow,
-        AdjustToMinimumContentsLength, // ### Qt 6: remove
         AdjustToMinimumContentsLengthWithIcon
     };
     Q_ENUM(SizeAdjustPolicy)
@@ -140,6 +128,9 @@ public:
     QSize iconSize() const;
     void setIconSize(const QSize &size);
 
+    void setPlaceholderText(const QString &placeholderText);
+    QString placeholderText() const;
+
     bool isEditable() const;
     void setEditable(bool editable);
     void setLineEdit(QLineEdit *edit);
@@ -149,7 +140,7 @@ public:
     const QValidator *validator() const;
 #endif
 
-#ifndef QT_NO_COMPLETER
+#if QT_CONFIG(completer)
     void setCompleter(QCompleter *c);
     QCompleter *completer() const;
 #endif
@@ -158,7 +149,7 @@ public:
     void setItemDelegate(QAbstractItemDelegate *delegate);
 
     QAbstractItemModel *model() const;
-    void setModel(QAbstractItemModel *model);
+    virtual void setModel(QAbstractItemModel *model);
 
     QModelIndex rootModelIndex() const;
     void setRootModelIndex(const QModelIndex &index);
@@ -195,14 +186,14 @@ public:
     QAbstractItemView *view() const;
     void setView(QAbstractItemView *itemView);
 
-    QSize sizeHint() const Q_DECL_OVERRIDE;
-    QSize minimumSizeHint() const Q_DECL_OVERRIDE;
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
 
     virtual void showPopup();
     virtual void hidePopup();
 
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
-    QVariant inputMethodQuery(Qt::InputMethodQuery) const Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
+    QVariant inputMethodQuery(Qt::InputMethodQuery) const override;
     Q_INVOKABLE QVariant inputMethodQuery(Qt::InputMethodQuery query, const QVariant &argument) const;
 
 public Q_SLOTS:
@@ -215,33 +206,32 @@ public Q_SLOTS:
 Q_SIGNALS:
     void editTextChanged(const QString &);
     void activated(int index);
-    void activated(const QString &);
+    void textActivated(const QString &);
     void highlighted(int index);
-    void highlighted(const QString &);
+    void textHighlighted(const QString &);
     void currentIndexChanged(int index);
-    void currentIndexChanged(const QString &);
     void currentTextChanged(const QString &);
 
 protected:
-    void focusInEvent(QFocusEvent *e) Q_DECL_OVERRIDE;
-    void focusOutEvent(QFocusEvent *e) Q_DECL_OVERRIDE;
-    void changeEvent(QEvent *e) Q_DECL_OVERRIDE;
-    void resizeEvent(QResizeEvent *e) Q_DECL_OVERRIDE;
-    void paintEvent(QPaintEvent *e) Q_DECL_OVERRIDE;
-    void showEvent(QShowEvent *e) Q_DECL_OVERRIDE;
-    void hideEvent(QHideEvent *e) Q_DECL_OVERRIDE;
-    void mousePressEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    void mouseReleaseEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    void keyPressEvent(QKeyEvent *e) Q_DECL_OVERRIDE;
-    void keyReleaseEvent(QKeyEvent *e) Q_DECL_OVERRIDE;
-#ifndef QT_NO_WHEELEVENT
-    void wheelEvent(QWheelEvent *e) Q_DECL_OVERRIDE;
+    void focusInEvent(QFocusEvent *e) override;
+    void focusOutEvent(QFocusEvent *e) override;
+    void changeEvent(QEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
+    void paintEvent(QPaintEvent *e) override;
+    void showEvent(QShowEvent *e) override;
+    void hideEvent(QHideEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseReleaseEvent(QMouseEvent *e) override;
+    void keyPressEvent(QKeyEvent *e) override;
+    void keyReleaseEvent(QKeyEvent *e) override;
+#if QT_CONFIG(wheelevent)
+    void wheelEvent(QWheelEvent *e) override;
 #endif
 #ifndef QT_NO_CONTEXTMENU
-    void contextMenuEvent(QContextMenuEvent *e) Q_DECL_OVERRIDE;
+    void contextMenuEvent(QContextMenuEvent *e) override;
 #endif // QT_NO_CONTEXTMENU
-    void inputMethodEvent(QInputMethodEvent *) Q_DECL_OVERRIDE;
-    void initStyleOption(QStyleOptionComboBox *option) const;
+    void inputMethodEvent(QInputMethodEvent *) override;
+    virtual void initStyleOption(QStyleOptionComboBox *option) const;
 
 
 protected:
@@ -262,7 +252,7 @@ private:
     Q_PRIVATE_SLOT(d_func(), void _q_rowsRemoved(const QModelIndex & parent, int start, int end))
     Q_PRIVATE_SLOT(d_func(), void _q_modelDestroyed())
     Q_PRIVATE_SLOT(d_func(), void _q_modelReset())
-#ifndef QT_NO_COMPLETER
+#if QT_CONFIG(completer)
     Q_PRIVATE_SLOT(d_func(), void _q_completerActivated(const QModelIndex &index))
 #endif
 };
@@ -276,8 +266,6 @@ inline void QComboBox::addItem(const QIcon &aicon, const QString &atext,
 inline void QComboBox::insertItem(int aindex, const QString &atext,
                                   const QVariant &auserData)
 { insertItem(aindex, QIcon(), atext, auserData); }
-
-#endif // QT_NO_COMBOBOX
 
 QT_END_NAMESPACE
 

@@ -8,12 +8,16 @@
  */
 
 #include "MotionRequest.h"
+#include "Representations/BehaviorControl/FieldInterceptBall.h"
+#include "Representations/Modeling/RobotPose.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Framework/Blackboard.h"
 #include "Platform/BHAssert.h"
-#include "Tools/Debugging/DebugDrawings.h"
 
 void MotionRequest::draw() const
 {
-  auto drawObstacleAvoidance = [this]()
+  auto drawObstacleAvoidance = [this]
   {
     if(obstacleAvoidance.avoidance != Vector2f::Zero())
       ARROW("representation:MotionRequest", 0, 0, obstacleAvoidance.avoidance.x() * 100.f, obstacleAvoidance.avoidance.y() * 100.f, 0, Drawings::solidPen, ColorRGBA(0x8e, 0, 0, 127));
@@ -54,10 +58,54 @@ void MotionRequest::draw() const
         CROSS("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), 50, 0, Drawings::solidPen, ColorRGBA(0xcd, 0, 0));
         Vector2f rotation(500.f, 0.f);
         rotation.rotate(targetDirection);
-        LINE("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), ballEstimate.position.x() + rotation.x() * 1000, ballEstimate.position.y() * rotation.y() + 1000, 10, Drawings::dashedPen, ColorRGBA::cyan);
+        ARROW("representation:MotionRequest", ballEstimate.position.x(), ballEstimate.position.y(), ballEstimate.position.x() + rotation.x(), ballEstimate.position.y() + rotation.y(), 0, Drawings::solidPen, ColorRGBA(0xcd, 0, 0, 127));
         drawObstacleAvoidance();
         break;
       }
+    }
+  }
+
+  DEBUG_DRAWING3D("representation:MotionRequest:kickDirection", "field")
+  {
+    // Only those requests kick the ball
+    if((motion == MotionRequest::walkToBallAndKick || motion == MotionRequest::dribble) &&
+       Blackboard::getInstance().exists("FieldInterceptBall") && Blackboard::getInstance().exists("RobotPose"))
+    {
+      const FieldInterceptBall& theFieldInterceptBall = static_cast<FieldInterceptBall&>(Blackboard::getInstance()["FieldInterceptBall"]);
+      const RobotPose& theRobotPose = static_cast<RobotPose&>(Blackboard::getInstance()["RobotPose"]);
+      const Vector2f ballTarget = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(kickLength, targetDirection + theRobotPose.rotation);
+      const Vector2f ballTargetMin = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(kickLength, targetDirection + theRobotPose.rotation + directionPrecision.min);
+      const Vector2f ballTargetMax = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(kickLength, targetDirection + theRobotPose.rotation + directionPrecision.max);
+      LINE3D("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), 0, ballTargetMin.x(), ballTargetMin.y(), 0,
+             5, ColorRGBA::blue);
+      LINE3D("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), 0, ballTargetMax.x(), ballTargetMax.y(), 0,
+             5, ColorRGBA::blue);
+      LINE3D("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), 0, ballTarget.x(), ballTarget.y(), 0,
+             5, ColorRGBA::red);
+      CROSS3D("representation:MotionRequest:kickDirection", ballTarget.x(), ballTarget.y(), 0,
+              15, 15, ColorRGBA::red);
+    }
+  }
+
+  DEBUG_DRAWING("representation:MotionRequest:kickDirection", "drawingOnField")
+  {
+    // Only those requests kick the ball
+    if((motion == MotionRequest::walkToBallAndKick || motion == MotionRequest::dribble) &&
+       Blackboard::getInstance().exists("FieldInterceptBall") && Blackboard::getInstance().exists("RobotPose"))
+    {
+      const FieldInterceptBall& theFieldInterceptBall = static_cast<FieldInterceptBall&>(Blackboard::getInstance()["FieldInterceptBall"]);
+      const RobotPose& theRobotPose = static_cast<RobotPose&>(Blackboard::getInstance()["RobotPose"]);
+      const float useKickLength = std::min(10000.f, kickLength);
+      const Vector2f ballTarget = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(useKickLength, targetDirection + theRobotPose.rotation);
+      const Vector2f ballTargetMin = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(useKickLength, targetDirection + theRobotPose.rotation + directionPrecision.min);
+      const Vector2f ballTargetMax = theFieldInterceptBall.interceptedEndPositionOnField + Vector2f::polar(useKickLength, targetDirection + theRobotPose.rotation + directionPrecision.max);
+      LINE("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), ballTargetMin.x(), ballTargetMin.y(),
+           5, Drawings::solidPen, ColorRGBA::blue);
+      LINE("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), ballTargetMax.x(), ballTargetMax.y(),
+           5, Drawings::solidPen, ColorRGBA::blue);
+      LINE("representation:MotionRequest:kickDirection", theFieldInterceptBall.interceptedEndPositionOnField.x(), theFieldInterceptBall.interceptedEndPositionOnField.y(), ballTarget.x(), ballTarget.y(),
+           5, Drawings::solidPen, ColorRGBA::red);
+      CROSS("representation:MotionRequest:kickDirection", ballTarget.x(), ballTarget.y(), 15, 15, Drawings::solidPen, ColorRGBA::red);
     }
   }
 }
@@ -66,7 +114,15 @@ void MotionRequest::verify() const
 {
   ASSERT(motion >= static_cast<Motion>(0) && motion < numOfMotions);
   if(motion == walkAtAbsoluteSpeed || motion == walkAtRelativeSpeed || motion == walkToPose || motion == walkToBallAndKick || motion == dribble)
+  {
     ASSERT(walkSpeed.isFinite());
+    if(motion != walkAtAbsoluteSpeed)
+    {
+      ASSERT(Rangef::OneRange().isInside(walkSpeed.rotation));
+      ASSERT(Rangef::OneRange().isInside(walkSpeed.translation.x()));
+      ASSERT(Rangef::OneRange().isInside(walkSpeed.translation.y()));
+    }
+  }
 
   if(motion == walkToPose)
     ASSERT(walkTarget.isFinite());
@@ -75,7 +131,7 @@ void MotionRequest::verify() const
   {
     ASSERT(std::isfinite(obstacleAvoidance.avoidance.x()));
     ASSERT(std::isfinite(obstacleAvoidance.avoidance.y()));
-    for(const auto& segment : obstacleAvoidance.path)
+    for([[maybe_unused]] const auto& segment : obstacleAvoidance.path)
     {
       ASSERT(std::isfinite(segment.obstacle.center.x()));
       ASSERT(std::isfinite(segment.obstacle.center.y()));
@@ -95,9 +151,13 @@ void MotionRequest::verify() const
   if(motion == walkToBallAndKick)
   {
     ASSERT(kickType >= static_cast<KickInfo::KickType>(0) && kickType < KickInfo::numOfKickTypes);
-    ASSERT(kickPower >= 0.f && kickPower <= 1.f);
+    ASSERT(kickLength >= 0.f);
+    ASSERT(std::isfinite(kickLength));
   }
 
-  if(motion == keyframeMotion)
-    ASSERT(keyframeMotionRequest.keyframeMotion >= KeyframeMotionRequest::firstNonGetUpAction && keyframeMotionRequest.keyframeMotion < KeyframeMotionRequest::numOfKeyframeMotionIDs);
+  if(motion == dive)
+    ASSERT(diveRequest >= static_cast<Dive::Request>(0) && diveRequest < Dive::numOfRequests);
+
+  if(motion == special)
+    ASSERT(specialRequest >= static_cast<Special::Request>(0) && specialRequest < Special::numOfRequests);
 }

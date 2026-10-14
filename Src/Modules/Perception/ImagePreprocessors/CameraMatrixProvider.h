@@ -6,12 +6,11 @@
 
 #pragma once
 
-
 #include "Representations/Configuration/CameraCalibration.h"
 #include "Representations/Configuration/FieldDimensions.h"
-#include "Representations/Communication/GameInfo.h"
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Infrastructure/SensorData/JointSensorData.h"
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/MotionControl/MotionInfo.h"
@@ -19,7 +18,7 @@
 #include "Representations/Sensing/FallDownState.h"
 #include "Representations/Sensing/RobotModel.h"
 #include "Representations/Sensing/TorsoMatrix.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 MODULE(CameraMatrixProvider,
 {,
@@ -28,11 +27,11 @@ MODULE(CameraMatrixProvider,
   REQUIRES(FallDownState),
   REQUIRES(FieldDimensions), // for debug drawing
   REQUIRES(FrameInfo),
-  REQUIRES(JointSensorData),
+  REQUIRES(GameState),
+  REQUIRES(JointAngles),
   REQUIRES(MotionInfo),
   REQUIRES(RobotCameraMatrix),
   REQUIRES(RobotModel),
-  REQUIRES(GameInfo),
   REQUIRES(TorsoMatrix),
   REQUIRES(RobotPose), // for debug drawing
   PROVIDES(CameraMatrix),

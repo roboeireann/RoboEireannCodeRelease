@@ -1,7 +1,7 @@
 #include "InertialData.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/Math/Rotation.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Debugging/Plot.h"
+#include "Math/Rotation.h"
 
 void InertialData::draw()
 {
@@ -23,9 +23,16 @@ void InertialData::draw()
   PLOT("representation:InertialData:orientation3D:y", orientation3DVec.y().toDegrees());
   PLOT("representation:InertialData:orientation3D:z", orientation3DVec.z().toDegrees());
 
+  PLOT("representation:InertialData:cov:x", orientation3DCov(0, 0));
+  PLOT("representation:InertialData:cov:y", orientation3DCov(1, 1));
+  PLOT("representation:InertialData:cov:z", orientation3DCov(2, 2));
+
   DEBUG_DRAWING3D("representation:InertialData:down", "robot")
   {
     const Vector3f zRotated = orientation3D.inverse() * Vector3f(0.f, 0.f, -1000.f);
-    CYLINDERARROW3D("representation:InertialData:down", Vector3f::Zero(), zRotated, 5.f, 35.f, 35.f, ColorRGBA::blue);
+    CYLINDER_ARROW3D("representation:InertialData:down", Vector3f::Zero(), zRotated, 5.f, 35.f, 35.f, ColorRGBA::blue);
   }
+
+  DEBUG_RESPONSE("representation:InertialData:asRaw")
+    OUTPUT(idRawInertialSensorData, bin, static_cast<RawInertialSensorData>(*this));
 }

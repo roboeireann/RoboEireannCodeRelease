@@ -21,8 +21,11 @@ extern "C" DLL_EXPORT SimRobot::Module* createModule(SimRobot::Application& simR
 EditorModule* EditorModule::module;
 SimRobot::Application* EditorModule::application;
 
-EditorModule::EditorModule(SimRobot::Application& application) : EditorObject("Editor", 0), fileIcon(":/Icons/page_white_text.png"), folderIcon(":/Icons/folder.png"), editorIcon(":/Icons/page_white_stack.png")
+EditorModule::EditorModule(SimRobot::Application& application) : EditorObject("Editor", 0), fileIcon(":/Icons/icons8-document-50.png"), folderIcon(":/Icons/icons8-folder-50.png"), editorIcon(":/Icons/icons8-documents-50.png")
 {
+  fileIcon.setIsMask(true);
+  folderIcon.setIsMask(true);
+  editorIcon.setIsMask(true);
   this->module = this;
   this->application = &application;
 }

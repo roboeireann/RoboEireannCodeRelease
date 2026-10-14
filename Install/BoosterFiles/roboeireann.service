@@ -1,0 +1,11 @@
+[Unit]
+Description=RoboEireann service
+
+[Service]
+Environment="LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH"
+ExecStart=/home/booster/bin/roboeireann -b
+TimeoutStopSec=7s
+RestartSec=1s
+
+[Install]
+WantedBy=default.target

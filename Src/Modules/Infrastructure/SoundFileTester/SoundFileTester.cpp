@@ -8,9 +8,9 @@
 
 #include "SoundFileTester.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Debugging/Modify.h"
+#include "Debugging/Modify.h"
 
-MAKE_MODULE(SoundFileTester, infrastructure);
+MAKE_MODULE(SoundFileTester);
 
 void SoundFileTester::update(DummyRepresentation& dummyRepresentation)
 {
@@ -20,6 +20,13 @@ void SoundFileTester::update(DummyRepresentation& dummyRepresentation)
   {
     if(fileName != "")
       SystemCall::playSound(fileName.c_str());
+  }
+  std::string text = "";
+  MODIFY("module:SoundFileTester:text", text);
+  DEBUG_RESPONSE_ONCE("module:SoundFileTester:say")
+  {
+    if(text != "")
+      SystemCall::say(text.c_str());
   }
   dummyRepresentation.dummy = 1;
 }

@@ -40,16 +40,15 @@
 #ifndef QVARIANTANIMATION_H
 #define QVARIANTANIMATION_H
 
-#include <QtCore/qeasingcurve.h>
 #include <QtCore/qabstractanimation.h>
-#include <QtCore/qvector.h>
-#include <QtCore/qvariant.h>
+#include <QtCore/qeasingcurve.h>
+#include <QtCore/qlist.h>
 #include <QtCore/qpair.h>
+#include <QtCore/qvariant.h>
+
+QT_REQUIRE_CONFIG(animation);
 
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_ANIMATION
 
 class QVariantAnimationPrivate;
 class Q_CORE_EXPORT QVariantAnimation : public QAbstractAnimation
@@ -58,14 +57,15 @@ class Q_CORE_EXPORT QVariantAnimation : public QAbstractAnimation
     Q_PROPERTY(QVariant startValue READ startValue WRITE setStartValue)
     Q_PROPERTY(QVariant endValue READ endValue WRITE setEndValue)
     Q_PROPERTY(QVariant currentValue READ currentValue NOTIFY valueChanged)
-    Q_PROPERTY(int duration READ duration WRITE setDuration)
-    Q_PROPERTY(QEasingCurve easingCurve READ easingCurve WRITE setEasingCurve)
+    Q_PROPERTY(int duration READ duration WRITE setDuration BINDABLE bindableDuration)
+    Q_PROPERTY(QEasingCurve easingCurve READ easingCurve WRITE setEasingCurve
+               BINDABLE bindableEasingCurve)
 
 public:
     typedef QPair<qreal, QVariant> KeyValue;
-    typedef QVector<KeyValue> KeyValues;
+    typedef QList<KeyValue> KeyValues;
 
-    QVariantAnimation(QObject *parent = Q_NULLPTR);
+    QVariantAnimation(QObject *parent = nullptr);
     ~QVariantAnimation();
 
     QVariant startValue() const;
@@ -82,11 +82,13 @@ public:
 
     QVariant currentValue() const;
 
-    int duration() const Q_DECL_OVERRIDE;
+    int duration() const override;
     void setDuration(int msecs);
+    QBindable<int> bindableDuration();
 
     QEasingCurve easingCurve() const;
     void setEasingCurve(const QEasingCurve &easing);
+    QBindable<QEasingCurve> bindableEasingCurve();
 
     typedef QVariant (*Interpolator)(const void *from, const void *to, qreal progress);
 
@@ -94,11 +96,11 @@ Q_SIGNALS:
     void valueChanged(const QVariant &value);
 
 protected:
-    QVariantAnimation(QVariantAnimationPrivate &dd, QObject *parent = Q_NULLPTR);
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    QVariantAnimation(QVariantAnimationPrivate &dd, QObject *parent = nullptr);
+    bool event(QEvent *event) override;
 
-    void updateCurrentTime(int) Q_DECL_OVERRIDE;
-    void updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState) Q_DECL_OVERRIDE;
+    void updateCurrentTime(int) override;
+    void updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState) override;
 
     virtual void updateCurrentValue(const QVariant &value);
     virtual QVariant interpolated(const QVariant &from, const QVariant &to, qreal progress) const;
@@ -113,10 +115,8 @@ private:
 
 template <typename T>
 void qRegisterAnimationInterpolator(QVariant (*func)(const T &from, const T &to, qreal progress)) {
-    QVariantAnimation::registerInterpolator(reinterpret_cast<QVariantAnimation::Interpolator>(func), qMetaTypeId<T>());
+    QVariantAnimation::registerInterpolator(reinterpret_cast<QVariantAnimation::Interpolator>(reinterpret_cast<void(*)()>(func)), qMetaTypeId<T>());
 }
-
-#endif //QT_NO_ANIMATION
 
 QT_END_NAMESPACE
 

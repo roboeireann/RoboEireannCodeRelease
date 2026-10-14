@@ -8,27 +8,28 @@
 
 #pragma once
 
+#include "Representations/BehaviorControl/FieldInterceptBall.h"
 #include "Representations/BehaviorControl/FieldRating.h"
-#include "Representations/Communication/GameInfo.h"
-#include "Representations/Communication/TeamData.h"
+#include "Representations/BehaviorControl/IndirectKick.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Modeling/BallModel.h"
+#include "Representations/Modeling/GlobalTeammatesModel.h"
 #include "Representations/Modeling/ObstacleModel.h"
 #include "Representations/Modeling/RobotPose.h"
-#include "Representations/Modeling/BallModel.h"
-#include "Representations/BehaviorControl/FieldBall.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 #include <vector>
+#include "Debugging/ColorRGBA.h"
 
 MODULE(FieldRatingProvider,
 {,
-  REQUIRES(FieldBall),
+  REQUIRES(FieldInterceptBall),
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
-  REQUIRES(GameInfo),
+  REQUIRES(GlobalTeammatesModel),
+  REQUIRES(IndirectKick),
   REQUIRES(ObstacleModel),
   REQUIRES(RobotPose),
-  REQUIRES(TeamData),
   PROVIDES(FieldRating),
   DEFINES_PARAMETERS(
   {,
@@ -41,48 +42,59 @@ MODULE(FieldRatingProvider,
     (float)(125.f) minRepelDifferenceRange, // min width of min and max value
     (float)(1500) maxRepelDifferenceRange, // max width of min and max value
     (float)(2000.f) opponentDistanceToGoal,
-    (float)(0.075f) malusForOpponentTurnFactor,
+    (float)(1000.f) goalPostMaxRadius,
+    (float)(0.5f) malusForOpponentTurnFactor, // point behind the opponent are weaker and better for us
+    (float)(0.7f) selfAndOpponentShiftFactor, // A point between us and an opponent is better for us, as long as the distance is lower than 70% of overall distance to the opponent.
+    (float)(100.f) opponentBackRangeY, // Scale obstacle back rating over this range (in mm)
+    (float)(200.f) opponentBackShiftY, // Shift obstacle y-coordinate by this range (in mm) in direction of the ball
+    (float)(300.f) opponentBackRangeX, // Scale the obstacle back rating down to 0 over this x-coordinate range
+    (float)(0.3f) opponentBackValue, // Max obstacle back rating
 
     // opponentGoal
     (float)(1.5f) attractValue, // max possible attract value for the potentialfield
+    (float)(-750) indirectGoalOffset, // If a goal shot is not allowed, shift the target position by this amount in the x-axis
     (float) attractRange, // if distance exceeds this range, the potentialfield has no influence
 
     // teammate
     (float)(0.6f) teammateValue, // max possible attract value for a teammate
-    (float)(800.f) teammateAttractRange, // max distance a teammate influences the potential field.
-    (float)(500.f) bestRelativePose, // best relativ pass pose relative from the teammate in direction of the goal
-    (float)(1000.f) minTeammatePassDistance, // teammate must stand at least this distance far away from us
+    (float)(3000.f) teammateAttractRange, // max distance a teammate influences the potential field.
+    (float)(300.f) bestRelativePose, // best relative pass pose relative from the teammate in direction of the goal
+    (float)(500.f) minTeammatePassDistance, // teammate must stand at least this distance far away from us
     (float)(2000.f) maxTeammatePassDistance, // if teammate stands this far away (or more) then the rating is not reduced
+    (float)(1000.f) teammateMinDistanceToObstacle,
+    (int)(1000) estimateTeammateIntoFuture, /**< Estimate the teammates position this much into the future (in ms). */
+    (float)(500.f) interpolationZoneInOwnHalf,
 
-    // other side
-    (float)(0.5f) percentOnSide,
-    (float) otherSideYCoordinate,
-    (float)(1800.f) otherSideWidth,
-    (float)(0.5f) otherSideMaxRating,
+    // pass target
+    (float)(2.f) passTargetValue, // pass target attract value
+    (float)(3000.f) passAttractRange, // max distance a teammate influences the potential field.
+    (float)(1000.f) teammateAttractRangeMin, // Reduce the pass rating range this this minimum.
 
     // get better goal angle
     (float)(0.5f) betterGoalAngleValue,
     (float) betterGoalAngleRange,
 
-    // robot direction
-    (Angle)(45_deg) maxFacingAngle,
-    (float)(3000.f) facingRange,
-    (float)(0.35f) facingValue,
-    (float)(100.f) facingBackShift,
-    (float)(1.f) lowPassFilterFactorPerSecond, // filter factor (per second)
-
     // ball distance
-    (float)(750.f) bestDistanceForBall,
-    (float)(250.f) bestDistanceWidth, // bestDistanceForBall +- bestDistanceWidth shall produce the best rating
+    (float)(1000.f) bestDistanceForBall,
+    (float)(500.f) bestDistanceWidth, // bestDistanceForBall +- bestDistanceWidth shall produce the best rating
     (float)(500.f) ballRange,
     (float)(0.5f) ballRating,
+    (Angle)(110_deg) ballGoalSectorWidth, // Only direction from the ball to the goal +- 110 degrees are allowed
+    (Angle)(10_deg) ballGoalSectorBorderWidth,
 
     // drawing
+    (ColorRGBA)(213, 17, 48, 125) badRatingColor,
+    (ColorRGBA)(0, 140, 0, 125) middleRatingColor,
+    (ColorRGBA)(0, 104, 180, 125) goodRatingColor,
+
     (float) drawMinX,
     (float) drawMaxX,
     (float) drawMinY,
     (float) drawMaxY,
-    (Vector2f)(Vector2f(50.f, 50.f)) drawGrid, // size of the draw grid
+    (Vector2f)(50.f, 50.f) drawGrid, // size of the draw grid
+    (Vector2f)(Vector2f(20.f, 20.f)) drawGridArrow, // size of the draw grid
+    (int)(20) arrowWidth,
+    (float)(0.5f) arrowLength,
   }),
 });
 
@@ -103,41 +115,57 @@ public:
 
 private:
 
-  bool fieldBorderDrawing;
-  bool goalDrawing;
-  bool goalAngleDrawing;
-  bool opponentDrawing;
-  bool teammateDrawing;
-  bool otherSideDrawing;
-  bool facingDrawing;
-  bool ballNearDrawing;
+  bool fieldBorderDrawing = false;
+  bool goalDrawing = false;
+  bool goalAngleDrawing = false;
+  bool opponentDrawing = false;
+  bool teammateDrawing = false;
+  bool ballNearDrawing = false;
+  bool passTargetDrawing = false;
+  bool modifyDrawingRating = false;
 
+  // TODO what does RTV mean? I wrote this code, but have no idea, lol
   float fieldBorderRTV;
   float attractRTV;
   float teammateRTV;
+  float passRTV;
   float betterGoalAngleRTV;
-  float facingRTV;
   float ballRTV;
+  float obstacleBackRTV;
   Rangef bestBallPositionRange;
-  float lowPassFilterFactor;
+  float minXCoordinateForPass;
 
   std::vector<Angle> teammateAngleToGoal;
+  std::vector<Angle> teammateBallAngle;
   std::vector<Vector2f> teammateOffsetToGoal;
+  std::vector<Vector2f> teammateInField;
   std::vector<float> teammateRangeInterpolation;
   std::vector<float> teammateObstacleInfluenceRange;
-  std::vector<std::vector<Vector2f>> teammateObstacleOnField;
-  std::vector<Vector2f> obstaclesOnField;
+  std::vector<Vector2f> obstacleOnField;
+
+  struct ObstacleOnField
+  {
+    Vector2f position;
+    bool isGoalPost;
+  };
+
+  std::vector<ObstacleOnField> obstaclesOnField;
   unsigned int lastTeammateUpdate;
   unsigned int lastObstacleOnFieldUpdate;
-
-  Vector2f robotRotation;
+  unsigned int lastTeammateInFieldUpdate;
 
   Vector2f rightInnerGoalPost;
   Vector2f leftInnerGoalPost;
 
+  Obstacle leftGoalPost;
+  Obstacle rightGoalPost;
+
   float leftInnerGoalPostY;
   float rightInnerGoalPostY;
   float outerGoalPostX;
+  int lastRequestedPassTarget = -1;
+
+  Rangef drawMinMax = Rangef(-1.f, 1.f);
 
   float functionLinear(const float distance, const float radius, const float radiusTimesValue);
   Vector2f functionLinearDer(const Vector2f& distanceVector, const float distance, const float valueSign);
@@ -157,11 +185,11 @@ private:
 
   PotentialValue getGoalAnglePotential(const float x, const float y, const bool calculateFieldDirection);
 
-  PotentialValue getTeammatesPotential(const float x, const float y, const bool calculateFieldDirection);
-
-  PotentialValue getPotentialOtherSide(const float x, const float y, const bool calculateFieldDirection);
-
-  PotentialValue getRobotFacingPotential(const float x, const float y, const bool calculateFieldDirection);
+  PotentialValue getTeammatesPotential(const float x, const float y, const bool calculateFieldDirection, const int passTarget);
 
   PotentialValue getBallNearPotential(const float x, const float y, const bool calculateFieldDirection);
+
+  void updateTeammateData(const Vector2f& useBallPose);
+
+  std::vector<Vector2f> getPossiblePassTargets();
 };

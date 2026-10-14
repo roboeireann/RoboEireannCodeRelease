@@ -54,10 +54,14 @@ class Q_WIDGETS_EXPORT QFormLayout : public QLayout
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(QFormLayout)
-    Q_PROPERTY(FieldGrowthPolicy fieldGrowthPolicy READ fieldGrowthPolicy WRITE setFieldGrowthPolicy RESET resetFieldGrowthPolicy)
-    Q_PROPERTY(RowWrapPolicy rowWrapPolicy READ rowWrapPolicy WRITE setRowWrapPolicy RESET resetRowWrapPolicy)
-    Q_PROPERTY(Qt::Alignment labelAlignment READ labelAlignment WRITE setLabelAlignment RESET resetLabelAlignment)
-    Q_PROPERTY(Qt::Alignment formAlignment READ formAlignment WRITE setFormAlignment RESET resetFormAlignment)
+    Q_PROPERTY(FieldGrowthPolicy fieldGrowthPolicy READ fieldGrowthPolicy WRITE setFieldGrowthPolicy
+               RESET resetFieldGrowthPolicy)
+    Q_PROPERTY(RowWrapPolicy rowWrapPolicy READ rowWrapPolicy WRITE setRowWrapPolicy
+               RESET resetRowWrapPolicy)
+    Q_PROPERTY(Qt::Alignment labelAlignment READ labelAlignment WRITE setLabelAlignment
+               RESET resetLabelAlignment)
+    Q_PROPERTY(Qt::Alignment formAlignment READ formAlignment WRITE setFormAlignment
+               RESET resetFormAlignment)
     Q_PROPERTY(int horizontalSpacing READ horizontalSpacing WRITE setHorizontalSpacing)
     Q_PROPERTY(int verticalSpacing READ verticalSpacing WRITE setVerticalSpacing)
 
@@ -88,7 +92,7 @@ public:
         QLayoutItem *fieldItem;
     };
 
-    explicit QFormLayout(QWidget *parent = Q_NULLPTR);
+    explicit QFormLayout(QWidget *parent = nullptr);
     ~QFormLayout();
 
     void setFieldGrowthPolicy(FieldGrowthPolicy policy);
@@ -105,8 +109,8 @@ public:
     void setVerticalSpacing(int spacing);
     int verticalSpacing() const;
 
-    int spacing() const;
-    void setSpacing(int);
+    int spacing() const override;
+    void setSpacing(int) override;
 
     void addRow(QWidget *label, QWidget *field);
     void addRow(QWidget *label, QLayout *field);
@@ -142,19 +146,19 @@ public:
     QWidget *labelForField(QLayout *field) const;
 
     // reimplemented from QLayout
-    void addItem(QLayoutItem *item) Q_DECL_OVERRIDE;
-    QLayoutItem *itemAt(int index) const Q_DECL_OVERRIDE;
-    QLayoutItem *takeAt(int index) Q_DECL_OVERRIDE;
+    void addItem(QLayoutItem *item) override;
+    QLayoutItem *itemAt(int index) const override;
+    QLayoutItem *takeAt(int index) override;
 
-    void setGeometry(const QRect &rect) Q_DECL_OVERRIDE;
-    QSize minimumSize() const Q_DECL_OVERRIDE;
-    QSize sizeHint() const Q_DECL_OVERRIDE;
-    void invalidate() Q_DECL_OVERRIDE;
+    void setGeometry(const QRect &rect) override;
+    QSize minimumSize() const override;
+    QSize sizeHint() const override;
+    void invalidate() override;
 
-    bool hasHeightForWidth() const Q_DECL_OVERRIDE;
-    int heightForWidth(int width) const Q_DECL_OVERRIDE;
-    Qt::Orientations expandingDirections() const Q_DECL_OVERRIDE;
-    int count() const Q_DECL_OVERRIDE;
+    bool hasHeightForWidth() const override;
+    int heightForWidth(int width) const override;
+    Qt::Orientations expandingDirections() const override;
+    int count() const override;
 
     int rowCount() const;
 

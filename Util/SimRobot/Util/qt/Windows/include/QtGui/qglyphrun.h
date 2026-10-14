@@ -41,9 +41,9 @@
 #define QGLYPHRUN_H
 
 #include <QtGui/qtguiglobal.h>
-#include <QtCore/qsharedpointer.h>
-#include <QtCore/qvector.h>
+#include <QtCore/qlist.h>
 #include <QtCore/qpoint.h>
+#include <QtCore/qsharedpointer.h>
 #include <QtGui/qrawfont.h>
 
 #if !defined(QT_NO_RAWFONT)
@@ -66,13 +66,11 @@ public:
 
     QGlyphRun();
     QGlyphRun(const QGlyphRun &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QGlyphRun &operator=(QGlyphRun &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QGlyphRun)
     QGlyphRun &operator=(const QGlyphRun &other);
     ~QGlyphRun();
 
-    void swap(QGlyphRun &other) Q_DECL_NOTHROW { qSwap(d, other.d); }
+    void swap(QGlyphRun &other) noexcept { d.swap(other.d); }
 
     QRawFont rawFont() const;
     void setRawFont(const QRawFont &rawFont);
@@ -81,11 +79,11 @@ public:
                     const QPointF *glyphPositionArray,
                     int size);
 
-    QVector<quint32> glyphIndexes() const;
-    void setGlyphIndexes(const QVector<quint32> &glyphIndexes);
+    QList<quint32> glyphIndexes() const;
+    void setGlyphIndexes(const QList<quint32> &glyphIndexes);
 
-    QVector<QPointF> positions() const;
-    void setPositions(const QVector<QPointF> &positions);
+    QList<QPointF> positions() const;
+    void setPositions(const QList<QPointF> &positions);
 
     void clear();
 

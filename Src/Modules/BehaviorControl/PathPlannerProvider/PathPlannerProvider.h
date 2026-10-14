@@ -10,48 +10,48 @@
  */
 
 #include "Representations/BehaviorControl/FieldBall.h"
+#include "Representations/BehaviorControl/IllegalAreas.h"
 #include "Representations/BehaviorControl/PathPlanner.h"
-#include "Representations/BehaviorControl/TeamBehaviorStatus.h"
-#include "Representations/BehaviorControl/Libraries/LibTeammates.h"
-#include "Representations/Communication/GameInfo.h"
+#include "Representations/BehaviorControl/StrategyStatus.h"
+#include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Modeling/ObstacleModel.h"
 #include "Representations/Modeling/RobotPose.h"
-#include "Representations/Modeling/TeamPlayersObstacleModel.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 #include <limits>
 
 MODULE(PathPlannerProvider,
 {,
+  REQUIRES(BallSpecification),
   REQUIRES(FieldBall),
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
-  REQUIRES(GameInfo),
-  REQUIRES(LibTeammates),
+  REQUIRES(GameState),
+  REQUIRES(IllegalAreas),
   REQUIRES(ObstacleModel),
   REQUIRES(RobotPose),
-  REQUIRES(TeamBehaviorStatus),
-  REQUIRES(TeamPlayersObstacleModel),
+  REQUIRES(StrategyStatus),
   PROVIDES(PathPlanner),
   LOADS_PARAMETERS(
   {,
-    (bool) useObstacles, /**< Use TeamPlayersObstacleModel or ObstacleModel? */
-    (float) goalPostRadius, /**< Radius to walk around a goal post (in mm). */
+    (float) goalPostDistance, /**< Distance to walk around a goal post (in mm). */
     (float) uprightRobotRadius, /**< Radius to walk around an upright robot (in mm). */
     (float) fallenRobotRadius, /**< Radius to walk around a fallen robot (in mm). */
     (float) readyRobotRadius, /**< Radius to walk around a robot in ready state (in mm). */
-    (float) centerCircleRadius, /**< If != 0: Radius to walk around a the center circle in ready state in defensive kickoff (in mm). */
+    (float) centerCircleDistance, /**< If != 0: Radius to walk around a the center circle in ready state in defensive kick-off (in mm). */
     (float) penaltyAreaRadius, /**< Radius to walk around a corner of the own penalty area (in mm). */
-    (float) ballRadius, /**< Radius to walk around the ball (in mm). */
+    (float) ballDistance, /**< Distance to walk around the ball (in mm). */
     (float) freeKickRadius, /**< Radius to walk around the ball when defending a free kick (in mm). */
     (float) wrongBallSideCostFactor, /**< How much of a full circle is it more expensive to pass the ball on the wrong side? */
     (float) wrongBallSideRadius, /**< How far from the ball is passing it on the wrong side penalized? */
-    (float) fieldBorderLimit, /**< Distance outside the side lines that is still used for walking (in mm). */
+    (float) fieldBorderLimit, /**< Distance outside the touchlines that is still used for walking (in mm). */
     (float) radiusControlOffset, /**< Plan closer to obstacles by this offset, but keep original distance when executing plan (in mm). */
     (float) radiusAvoidanceTolerance, /**< Radius range in which robot is partially pushed away (in mm). */
     (float) rotationPenalty, /**< Penalty factor for rotating towards first intermediate target in mm/radian. Stabilizes path selection. */
     (float) switchPenalty, /**< Penalty for selecting a different turn direction around first obstacle in mm. */
+    (bool) useFastestWalkLeaderboardBarriers, /**< Whether the barriers for the Fastest Walk Leaderboard Challenge should be used. */
   }),
 });
 
@@ -105,7 +105,7 @@ class PathPlannerProvider : public PathPlannerProviderBase
   /** The nodes of the visibility graph, i.e. the obstacles. */
   struct Node : public Geometry::Circle
   {
-    std::vector<Edge> edges[numOfRotations]; /** The outgoing edges per rotation. */
+    std::vector<Edge> edges[numOfRotations]; /**< The outgoing edges per rotation. */
     std::vector<BlockedSector> blockedSectors; /**< Angular sectors that are blocked by overlapping other obstacles. */
     Edge* fromEdge[numOfRotations]; /**< From which edge was this node reached first (per rotation) during the A* search? */
     bool expanded = false; /**< Were the outgoing edges of this node already expanded? */
@@ -218,7 +218,7 @@ class PathPlannerProvider : public PathPlannerProviderBase
      * @param dummy Is this just a helper and should not be transformed into a real edge?
      */
     Tangent(const Edge& edge, Side side, float circleDistance, bool dummy)
-    : Edge(edge), side(side), circleDistance(circleDistance), dummy(dummy) {}
+      : Edge(edge), side(side), circleDistance(circleDistance), dummy(dummy) {}
   };
 
   using Tangents = std::array<std::vector<Tangent>, numOfRotations>;
@@ -226,7 +226,7 @@ class PathPlannerProvider : public PathPlannerProviderBase
   std::vector<Node> nodes; /**< All nodes of the visibility graph, i.e. all obstacles, and starting point (1st entry) and target (2nd entry). */
   std::vector<Candidate> candidates; /**< All open edges during the A* search. */
   std::vector<Barrier> barriers; /**< Barrier lines that cannot be crossed during planning. */
-  std::vector<Geometry::Line> borders; /**< The border of the field plus a tolerance. */
+  const std::vector<Geometry::Line> borders; /**< The border of the field plus a tolerance. */
   Rotation lastDir = cw; /**< Last direction selected when walking around first obstacle. */
   unsigned timeWhenLastPlayedSound = 0; /**< Used to limit frequency of sound playback. */
   bool pathPlannerWasActive = false; /**< Was the path planner active in previous frame? */
@@ -259,8 +259,9 @@ class PathPlannerProvider : public PathPlannerProviderBase
    * @param target The target the robot tries to reach.
    * @param excludeOwnPenaltyArea Filter out obstacles inside the own penalty area and the own goal.
    * @param excludeOpponentPenaltyArea Filter out obstacles inside the opponents penalty area and the own goal.
+   * @param excludeCenterCircle Add the center circle as an obstacle.
    */
-  void createNodes(const Pose2f& target, bool excludeOwnPenaltyArea, bool excludeOpponentPenaltyArea);
+  void createNodes(const Pose2f& target, bool excludeOwnPenaltyArea, bool excludeOpponentPenaltyArea, bool excludeCenterCircle);
 
   /**
    * Determine the radius of an obstacle.
@@ -304,7 +305,7 @@ class PathPlannerProvider : public PathPlannerProviderBase
    * on whether the nodes are circles or points (one for point to point, two for a point and a circle, four for two
    * circles) and whether they overlap (none if one node is inside the other one, two if they intersect, four if two
    * circles do not overlap). If another circle overlaps, the angular range of the overlap is also marked as being
-   * blocked in the node passed, i.e. no tangents can start from this ranges.
+   * blocked in the node passed, i.e. no tangents can start from this range.
    * @param node The node from which the tangents to all neighbors are created.
    * @param tangents The tangents found are returned here. Must be empty when passed. There are two sets of tangents,
    *                 i.e. the ones that start in clockwise direction and the ones that start in counter clockwise

@@ -7,7 +7,7 @@
 #pragma once
 
 #include "Representations/MotionControl/ArmMotionRequest.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 
 STREAMABLE_WITH_BASE(ArmMotionInfo, ArmMotionRequest,
 {
@@ -17,5 +17,5 @@ STREAMABLE_WITH_BASE(ArmMotionInfo, ArmMotionRequest,
   },
 
   (ENUM_INDEXED_ARRAY(bool, Arms::Arm))({false, false}) isFree,
-  (ENUM_INDEXED_ARRAY(bool, Arms::Arm))({true, true}) isLastMotionFinished,
+  (ENUM_INDEXED_ARRAY(bool, Arms::Arm))({false, false}) isFinished,
 });

@@ -1,0 +1,22 @@
+vf ratingRole
+vfd ratingRole fieldPolygons
+
+vfd ratingRole cognition:Reset
+set module:ExpectedGoalsProvider:drawHeatmap false
+set module:PassEvaluationProvider:drawHeatmap false
+set behavior:RatingRole:drawHeatmap true
+
+vfd ratingRole behavior:RatingRole:heatmap
+
+vfd ratingRole fieldLines
+vfd ratingRole goalFrame
+vfd ratingRole behavior:Tactic:voronoiDiagram
+vfd ratingRole representation:TeamBallModel
+vfd ratingRole cognition:RobotPose
+vfd ratingRole representation:ObstacleModel:rectangle
+vfd ratingRole cognition:Reset
+
+vfd ratingRole behavior:RatingRole:position
+
+echo set behavior:RatingRole:drawHeatmap true
+echo set behavior:RatingRole:drawHeatmap false

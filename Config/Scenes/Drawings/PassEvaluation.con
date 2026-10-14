@@ -1,0 +1,24 @@
+vf passEvaluation
+vfd passEvaluation fieldPolygons
+
+vfd passEvaluation cognition:Reset
+vfd passEvaluation module:PassEvaluationProvider:heatmap
+set module:ExpectedGoalsProvider:drawHeatmap false
+set module:PassEvaluationProvider:drawHeatmap true
+
+vfd passEvaluation fieldLines
+vfd passEvaluation goalFrame
+vfd passEvaluation representation:TeamBallModel
+vfd passEvaluation cognition:RobotPose
+vfd passEvaluation representation:ObstacleModel:rectangle
+vfd passEvaluation cognition:Reset
+
+echo set module:PassEvaluationProvider:drawHeatmap true
+echo set module:PassEvaluationProvider:drawHeatmap false
+echo set module:PassEvaluationProvider:drawCombinedHeatmap true
+echo set module:PassEvaluationProvider:drawCombinedHeatmap false
+echo set module:PassEvaluationProvider:calcPassTargetFree false
+echo set module:PassEvaluationProvider:calcPassLineFree false
+echo set module:PassEvaluationProvider:calcPassTargetInField false
+echo set module:PassEvaluationProvider:calcShotLineFree false
+echo set module:PassEvaluationProvider:calcShotDistance false

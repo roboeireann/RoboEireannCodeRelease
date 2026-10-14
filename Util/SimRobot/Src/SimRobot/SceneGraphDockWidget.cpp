@@ -8,9 +8,11 @@
 
 #include "SceneGraphDockWidget.h"
 #include "MainWindow.h"
+#include "Theme.h"
 
 SceneGraphDockWidget::SceneGraphDockWidget(QMenu* contextMenu, QWidget* parent) : QDockWidget(parent), contextMenu(contextMenu)
 {
+  setFeatures(features() & ~DockWidgetFloatable);
   setAllowedAreas(Qt::TopDockWidgetArea);
   setFocusPolicy(Qt::ClickFocus);
   setObjectName(".SceneGraph");
@@ -24,22 +26,18 @@ SceneGraphDockWidget::SceneGraphDockWidget(QMenu* contextMenu, QWidget* parent) 
   setWidget(treeWidget);
   setFocusProxy(treeWidget);
   treeWidget->setExpandsOnDoubleClick(false);
-  treeWidget->header()->hide();
+  treeWidget->setHeaderHidden(true);
 
-  connect(treeWidget, SIGNAL(activated(const QModelIndex&)), this, SLOT(itemActivated(const QModelIndex&)));
-  connect(treeWidget, SIGNAL(collapsed(const QModelIndex&)), this, SLOT(itemCollapsed(const QModelIndex&)));
-  connect(treeWidget, SIGNAL(expanded(const QModelIndex&)), this, SLOT(itemExpanded(const QModelIndex&)));
+  connect(treeWidget, &QTreeWidget::activated, this, &SceneGraphDockWidget::itemActivated);
+  connect(treeWidget, &QTreeWidget::collapsed, this, &SceneGraphDockWidget::itemCollapsed);
+  connect(treeWidget, &QTreeWidget::expanded, this, &SceneGraphDockWidget::itemExpanded);
 
   // load layout settings
   QSettings& settings = MainWindow::application->getLayoutSettings();
   settings.beginGroup(".SceneGraph");
-  expandedItems = QSet<QString>::fromList(settings.value("ExpandedItems").toStringList());
+  QStringList expandedItemsList = settings.value("ExpandedItems").toStringList();
+  expandedItems = QSet<QString>(expandedItemsList.begin(), expandedItemsList.end());
   settings.endGroup();
-
-#ifdef FIX_MACOS_DOCKED_WIDGETS_DRAG_BUG
-  connect(this, SIGNAL(topLevelChanged(bool)), this, SLOT(topLevelChanged(bool)));
-  topLevelChanged(isFloating());
-#endif
 }
 
 SceneGraphDockWidget::~SceneGraphDockWidget()
@@ -59,19 +57,17 @@ void SceneGraphDockWidget::registerObject(const SimRobot::Module* module, SimRob
 {
   QTreeWidgetItem* parentItem = parent ? registeredObjectsByObject.value(parent) : treeWidget->invisibleRootItem();
   RegisteredObject* newItem = new RegisteredObject(module, object, parentItem, flags);
-  const int parentFullNameLength = parent ? static_cast<RegisteredObject*>(parentItem)->fullName.length() : 0;
+  const auto parentFullNameLength = parent ? static_cast<RegisteredObject*>(parentItem)->fullName.length() : 0;
   newItem->setText(0, parent ? newItem->fullName.mid(parentFullNameLength + 1) : newItem->fullName);
   const QIcon* icon = object->getIcon();
   if(icon)
-    newItem->setIcon(0, *icon);
+    newItem->setIcon(0, Theme::updateIcon(this, *icon));
   if(flags & SimRobot::Flag::hidden)
     newItem->setHidden(true);
   if(flags & SimRobot::Flag::windowless)
     newItem->setFont(0, italicFont);
-  else
-    newItem->setDisabled(true);
   parentItem->addChild(newItem);
-  if(!parent)
+  if(!parent || (flags & SimRobot::Flag::sorted))
     parentItem->sortChildren(0, Qt::AscendingOrder);
   if(expandedItems.contains(newItem->fullName))
     treeWidget->expandItem(newItem);
@@ -138,7 +134,7 @@ SimRobot::Object* SceneGraphDockWidget::resolveObject(const QString& fullName, i
 
 SimRobot::Object* SceneGraphDockWidget::resolveObject(const SimRobot::Object* parent, const QVector<QString>& parts, int kind)
 {
-  const int partsCount = parts.count();
+  const auto partsCount = parts.count();
   if(partsCount <= 0)
     return nullptr;
   for(QHash<int, QHash<QString, RegisteredObject*>*>::iterator i = kind ? registeredObjectsByKindAndName.find(kind) : registeredObjectsByKindAndName.begin(); i != registeredObjectsByKindAndName.end(); ++i)
@@ -152,7 +148,7 @@ SimRobot::Object* SceneGraphDockWidget::resolveObject(const SimRobot::Object* pa
       if(object->fullName.endsWith(lastPart))
       {
         RegisteredObject* currentObject = object;
-        for(int i = partsCount - 2; i >= 0; --i)
+        for(auto i = partsCount - 2; i >= 0; --i)
         {
           currentObject = static_cast<RegisteredObject*>(currentObject->parent());
           const QString& currentPart = parts.at(i);
@@ -225,29 +221,31 @@ bool SceneGraphDockWidget::setOpened(const SimRobot::Object* object, bool opened
   if(!item)
     return false;
   item->opened = opened;
-  //item->setFont(0, opened ? boldFont : QFont());
-  item->setDisabled(!opened);
+  item->setFont(0, opened ? boldFont : QFont());
   if(!opened)
-    item->setFont(0, QFont());
+    item->setSelected(false);
   return true;
 }
 
 bool SceneGraphDockWidget::setActive(const SimRobot::Object* object, bool active)
 {
+  treeWidget->selectionModel()->clearSelection();
   RegisteredObject* item = registeredObjectsByObject.value(object);
   if(!item)
     return false;
-  item->setFont(0, active ? boldFont : QFont());
-  if(active)
-    treeWidget->setCurrentItem(item);
+  item->setSelected(active);
   return true;
 }
 
 QAction* SceneGraphDockWidget::toggleViewAction() const
 {
   QAction* action = QDockWidget::toggleViewAction();
-  action->setIcon(QIcon(":/Icons/application_side_tree.png"));
+  QIcon icon(":/Icons/icons8-stacked-organizational-chart-50.png");
+  icon.setIsMask(true);
+  action->setIcon(icon);
   action->setShortcut(QKeySequence(Qt::Key_F2));
+  action->setText(tr("Scene Graph"));
+  action->setStatusTip(tr("Show or hide the scene graph"));
   return action;
 }
 
@@ -287,7 +285,7 @@ void SceneGraphDockWidget::contextMenuEvent(QContextMenuEvent* event)
     // click on window frame
     QDockWidget::contextMenuEvent(event);
     return;
-  };
+  }
 
   clickedItem = static_cast<RegisteredObject*>(treeWidget->itemAt(treeWidget->mapFromParent(event->pos())));
 
@@ -297,13 +295,13 @@ void SceneGraphDockWidget::contextMenuEvent(QContextMenuEvent* event)
     if(!(clickedItem->flags & SimRobot::Flag::windowless))
     {
       QAction* action = menu.addAction(tr(clickedItem->opened ? "&Close" : "&Open"));
-      connect(action, SIGNAL(triggered()), this, SLOT(openOrCloseObject()));
+      connect(action, &QAction::triggered, this, &SceneGraphDockWidget::openOrCloseObject);
       menu.addSeparator();
     }
     if(clickedItem->childCount() > 0)
     {
-      QAction* action = menu.addAction(tr(clickedItem->isExpanded() ? "Collaps&e" : "&Expand"));
-      connect(action, SIGNAL(triggered()), this, SLOT(expandOrCollapseObject()));
+      QAction* action = menu.addAction(tr(clickedItem->isExpanded() ? "Collaps&e" : "&Expand")); // cspell:disable-line
+      connect(action, &QAction::triggered, this, &SceneGraphDockWidget::expandOrCollapseObject);
       menu.addSeparator();
     }
   }
@@ -311,6 +309,17 @@ void SceneGraphDockWidget::contextMenuEvent(QContextMenuEvent* event)
   event->accept();
   menu.exec(mapToGlobal(QPoint(event->x(), event->y())));
   clickedItem = 0;
+}
+
+void SceneGraphDockWidget::changeEvent(QEvent* event)
+{
+  if(event->type() == QEvent::PaletteChange)
+  {
+    for(QTreeWidgetItem* item : treeWidget->findItems(QString("*"), Qt::MatchWrap | Qt::MatchWildcard | Qt::MatchRecursive))
+      if(!item->icon(0).isNull())
+        item->setIcon(0, Theme::updateIcon(this, item->icon(0)));
+  }
+  QDockWidget::changeEvent(event);
 }
 
 void SceneGraphDockWidget::itemActivated(const QModelIndex& index)
@@ -357,12 +366,4 @@ void SceneGraphDockWidget::expandOrCollapseObject()
     treeWidget->collapseItem(clickedItem);
   else
     treeWidget->expandItem(clickedItem);
-}
-
-void SceneGraphDockWidget::topLevelChanged(bool topLevel)
-{
-  if(topLevel)
-    setFeatures(features() | DockWidgetMovable);
-  else
-    setFeatures(features() & ~DockWidgetMovable);
 }

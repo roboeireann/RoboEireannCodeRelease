@@ -1,0 +1,46 @@
+<Simulation>
+  <Include href="../../Includes/K1/K1_new.rsi3"/>
+  <Include href="setups/5vs5.rsi3"/>
+  <Include href="../../Includes/BallFifa3.rsi3"/>
+  <Include href="../../Includes/Field2026-S.rsi3"/>
+
+  <Scene name="RoboCup" controller="SimulatedNao" stepLength="0.002" color="rgb(65%, 65%, 70%)">
+    <PointLight z="9m" ambientColor="rgb(50%, 50%, 50%)"/>
+
+    <Compound ref="robots"/>
+    
+    <Compound name="extras">
+    </Compound>
+
+    <Compound name="balls">
+      <Body ref="ball">
+        <Translation z="1m"/>
+      </Body>
+    </Compound>
+
+    <Compound ref="field"/>
+
+    <Compound name="teams">
+      <Compound name="RoboEireann">
+        <Compound name="17"/>
+        <Compound name="green"/>
+        <Compound name="white"/>
+      </Compound>
+      <Compound name="B-Team">
+        <Compound name="70"/>
+        <Compound name="red"/>
+        <Compound name="blue"/>
+      </Compound>
+    </Compound>
+
+    <Compound name="scenarios">
+      <Compound name="RC2026-5v5"/>
+    </Compound>
+
+    <Compound ref="robot type"/>
+
+    <Compound name="location">
+      <Compound name="Field2026-S"/>
+    </Compound>
+  </Scene>
+</Simulation>

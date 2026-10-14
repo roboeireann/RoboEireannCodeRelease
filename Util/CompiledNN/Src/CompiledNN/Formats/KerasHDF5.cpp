@@ -8,8 +8,8 @@
 
 #include "KerasHDF5.h"
 #include "Platform/BHAssert.h"
-#include "Tools/Streams/InStreams.h"
-#include "Tools/Streams/SimpleMap.h"
+#include "Streaming/InStreams.h"
+#include "Streaming/SimpleMap.h"
 #include <hdf5.h>
 #include <cmath>
 #include <cstring>
@@ -96,9 +96,10 @@ namespace NeuralNetwork
     return InterpolationMethod::nearest;
   }
 
-  std::unique_ptr<Layer> parseInputLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long)
+  std::unique_ptr<Layer> parseInputLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long kerasVersion)
   {
-    const SimpleMap::Array* batchInputShape = getRecordEntry<SimpleMap::Array>(config, "batch_input_shape");
+    const std::string batchInputShapeName = kerasVersion >= makeVersion(3, 0, 0) ? "batch_shape" : "batch_input_shape";
+    const SimpleMap::Array* batchInputShape = getRecordEntry<SimpleMap::Array>(config, batchInputShapeName);
     const std::string dtype = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "dtype"));
     const bool sparse = getLiteral<bool>(getRecordEntry<SimpleMap::Literal>(config, "sparse"));
 
@@ -212,6 +213,59 @@ namespace NeuralNetwork
 #endif
     }
     ASSERT(outputSize > 0);
+    return layer;
+  }
+
+  std::unique_ptr<Layer> parseConv1DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType& getWeights, unsigned long)
+  {
+#ifndef NDEBUG
+    const unsigned int filters = getLiteral<unsigned int>(getRecordEntry<SimpleMap::Literal>(config, "filters"));
+    const SimpleMap::Array* kernelSize = getRecordEntry<SimpleMap::Array>(config, "kernel_size");
+#endif
+    const SimpleMap::Array* strides = getRecordEntry<SimpleMap::Array>(config, "strides");
+    const std::string padding = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "padding"));
+    const std::string dataFormat = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "data_format"));
+    const SimpleMap::Array* dilationRate = getRecordEntry<SimpleMap::Array>(config, "dilation_rate");
+    const std::string activation = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "activation"));
+    const bool useBias = getLiteral<bool>(getRecordEntry<SimpleMap::Literal>(config, "use_bias"));
+
+    ASSERT(filters > 0);
+    ASSERT(kernelSize->size() == 1);
+    ASSERT(strides->size() == 1);
+    ASSERT(dilationRate->size() == 1);
+    if(dataFormat != "channels_last")
+      FAIL("Data formats other than channels last are not supported.");
+    if(getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(dilationRate, 0)) != 1)
+      FAIL("Conv1D layers with a dilation rate other than (1) are currently not supported.");
+#ifndef NDEBUG
+    const unsigned int kernelHeight = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(kernelSize, 0));
+#endif
+    const unsigned int stride = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(strides, 0));
+    ASSERT(kernelHeight > 0);
+    ASSERT(stride > 0);
+
+    std::unique_ptr<Conv1DLayer> layer = std::make_unique<Conv1DLayer>();
+    layer->stride = stride;
+    layer->activationId = parseActivation(activation);
+    layer->padding = parsePadding(padding);
+    layer->hasBiases = useBias;
+
+    std::vector<float> weights;
+    std::vector<unsigned int> dimensions;
+    getWeights("kernel", weights, dimensions);
+    ASSERT(dimensions.size() == 3);
+    ASSERT(dimensions[0] == kernelHeight);
+    ASSERT(dimensions[1] > 0);
+    ASSERT(dimensions[2] == filters);
+    layer->weights.reshape(dimensions[0], dimensions[1], dimensions[2]);
+    std::copy(weights.begin(), weights.end(), layer->weights.begin());
+    if(useBias)
+    {
+      getWeights("bias", weights, dimensions);
+      ASSERT(dimensions.size() == 1);
+      ASSERT(dimensions[0] == filters);
+      layer->biases = weights;
+    }
     return layer;
   }
 
@@ -455,6 +509,23 @@ namespace NeuralNetwork
     return layer;
   }
 
+  std::unique_ptr<Layer> parseZeroPadding1DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long)
+  {
+    const SimpleMap::Array* padding = getRecordEntry<SimpleMap::Array>(config, "padding");
+    const std::string dataFormat = config->find("data_format") == config->end() ? "channels_last" : getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "data_format"));
+
+    if(dataFormat != "channels_last")
+      FAIL("Data formats other than channels last are not supported.");
+    ASSERT(padding->size() == 2);
+    const unsigned int leftPadding = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(padding, 0));
+    const unsigned int rightPadding = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(padding, 1));
+
+    std::unique_ptr<ZeroPadding1DLayer> layer = std::make_unique<ZeroPadding1DLayer>();
+    layer->padding[ZeroPadding1DLayer::LEFT] = leftPadding;
+    layer->padding[ZeroPadding1DLayer::RIGHT] = rightPadding;
+    return layer;
+  }
+
   std::unique_ptr<Layer> parseZeroPadding2DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long)
   {
     const SimpleMap::Array* padding = getRecordEntry<SimpleMap::Array>(config, "padding");
@@ -477,6 +548,30 @@ namespace NeuralNetwork
     layer->padding[ZeroPadding2DLayer::BOTTOM] = bottomPadding;
     layer->padding[ZeroPadding2DLayer::LEFT] = leftPadding;
     layer->padding[ZeroPadding2DLayer::RIGHT] = rightPadding;
+    return layer;
+  }
+
+  std::unique_ptr<Layer> parsePooling1DLayer(const SimpleMap::Record* config, PoolingMethod method, unsigned long)
+  {
+    const SimpleMap::Array* poolSize = getRecordEntry<SimpleMap::Array>(config, "pool_size");
+    const std::string padding = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "padding"));
+    const SimpleMap::Array* strides = getRecordEntry<SimpleMap::Array>(config, "strides");
+    const std::string dataFormat = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(config, "data_format"));
+
+    ASSERT(poolSize->size() == 1);
+    ASSERT(strides->size() == 1);
+    if(dataFormat != "channels_last")
+      FAIL("Data formats other than channels last are not supported.");
+    const unsigned int poolVertical = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(poolSize, 0));
+    const unsigned int stride = getLiteral<unsigned int>(getArrayEntry<SimpleMap::Literal>(strides, 0));
+    ASSERT(poolVertical > 0);
+    ASSERT(stride > 0);
+
+    std::unique_ptr<Pooling1DLayer> layer = std::make_unique<Pooling1DLayer>(method == PoolingMethod::max ? LayerType::maxPooling1D : LayerType::averagePooling1D, method);
+    layer->method = method;
+    layer->padding = parsePadding(padding);
+    layer->kernelSize = poolVertical;
+    layer->stride = stride;
     return layer;
   }
 
@@ -510,9 +605,19 @@ namespace NeuralNetwork
     return layer;
   }
 
+  std::unique_ptr<Layer> parseMaxPooling1DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long kerasVersion)
+  {
+    return parsePooling1DLayer(config, PoolingMethod::max, kerasVersion);
+  }
+
   std::unique_ptr<Layer> parseMaxPooling2DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long kerasVersion)
   {
     return parsePooling2DLayer(config, PoolingMethod::max, kerasVersion);
+  }
+
+  std::unique_ptr<Layer> parseAveragePooling1DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long kerasVersion)
+  {
+    return parsePooling1DLayer(config, PoolingMethod::average, kerasVersion);
   }
 
   std::unique_ptr<Layer> parseAveragePooling2DLayer(const SimpleMap::Record* config, const KerasHDF5::GetWeights2FuncType&, unsigned long kerasVersion)
@@ -707,15 +812,19 @@ namespace NeuralNetwork
     layerParsers.emplace("Flatten", &parseFlattenLayer);
     layerParsers.emplace("Reshape", &parseReshapeLayer);
     // Convolutional layers
+    layerParsers.emplace("Conv1D", &parseConv1DLayer);
     layerParsers.emplace("Conv2D", &parseConv2DLayer);
     layerParsers.emplace("SeparableConv2D", &parseSeparableConv2DLayer);
     if(kerasVersion >= makeVersion(2, 1, 5))
       layerParsers.emplace("DepthwiseConv2D", &parseDepthwiseConv2DLayer);
     layerParsers.emplace("Cropping2D", &parseCropping2DLayer);
     layerParsers.emplace("UpSampling2D", &parseUpSampling2DLayer);
+    layerParsers.emplace("ZeroPadding1D", &parseZeroPadding1DLayer);
     layerParsers.emplace("ZeroPadding2D", &parseZeroPadding2DLayer);
     // Pooling layers
+    layerParsers.emplace("MaxPooling1D", &parseMaxPooling1DLayer);
     layerParsers.emplace("MaxPooling2D", &parseMaxPooling2DLayer);
+    layerParsers.emplace("AveragePooling1D", &parseAveragePooling1DLayer);
     layerParsers.emplace("AveragePooling2D", &parseAveragePooling2DLayer);
     layerParsers.emplace("GlobalMaxPooling2D", &parseGlobalMaxPooling2DLayer);
     layerParsers.emplace("GlobalAveragePooling2D", &parseGlobalAveragePooling2DLayer);
@@ -779,8 +888,9 @@ namespace NeuralNetwork
         if(layers.empty() && newLayer->type != LayerType::input)
         {
           // Add an implicit input layer before the first layer.
-          // Its dimensions are given by the batch_input_shape attribute of the first actual layer.
-          const SimpleMap::Array* batchInputShape = getRecordEntry<SimpleMap::Array>(layerConfig, "batch_input_shape");
+          // Its dimensions are given by the batch_input_shape / batch_shape attribute of the first actual layer.
+          const std::string batchInputShapeName = kerasVersion >= makeVersion(3, 0, 0) ? "batch_shape" : "batch_input_shape";
+          const SimpleMap::Array* batchInputShape = getRecordEntry<SimpleMap::Array>(layerConfig, batchInputShapeName);
           const std::string dtype = getLiteral<std::string>(getRecordEntry<SimpleMap::Literal>(layerConfig, "dtype"));
 
           if(dtype != "float32")
@@ -847,7 +957,7 @@ namespace NeuralNetwork
     // This code is very much inspired by the original keras `Network.from_config` method:
     // https://github.com/keras-team/keras/blob/d78c982b326adeed6ac25200dc6892ff8f518ca6/keras/engine/network.py#L933
     std::unordered_map<std::string, std::unique_ptr<Layer>> createdLayers;
-    std::unordered_map<std::string, std::vector<const SimpleMap::Array*>> unprocessedNodes;
+    std::unordered_map<std::string, std::vector<const SimpleMap::Value*>> unprocessedNodes;
     // It first instantiates all layers and adds all their nodes (each layer can have multiple nodes) to the unprocessed map.
     for(const SimpleMap::Value* value : *layers)
     {
@@ -876,7 +986,7 @@ namespace NeuralNetwork
 
       // Add all inbound nodes of this layer to its unprocessed nodes array.
       for(const SimpleMap::Value* node : *getRecordEntry<SimpleMap::Array>(layer, "inbound_nodes"))
-        unprocessedNodes[name].push_back(dynamic_cast<const SimpleMap::Array*>(node));
+        unprocessedNodes[name].push_back(node);
     }
 
     // After that, all nodes are processed (i.e. linked with their predecessors).
@@ -897,7 +1007,21 @@ namespace NeuralNetwork
         std::size_t i;
         for(i = 0; i < it->second.size(); ++i)
         {
-          const SimpleMap::Array* node = it->second[i];
+          const SimpleMap::Value* value = it->second[i];
+          const SimpleMap::Array* node;
+          if(kerasVersion >= makeVersion(3, 0, 0))
+          {
+            const SimpleMap::Record* nodeRecord = dynamic_cast<const SimpleMap::Record*>(value);
+            node = getRecordEntry<SimpleMap::Array>(nodeRecord, "args");
+            if(node != nullptr && node->size() >= 1)
+            {
+              const SimpleMap::Array* nodeArray = dynamic_cast<const SimpleMap::Array*>(getArrayEntry<SimpleMap::Value>(node, 0));
+              if(nodeArray != nullptr)
+                node = nodeArray;
+            }
+          }
+          else
+            node = dynamic_cast<const SimpleMap::Array*>(value);
           ASSERT(node);
 
           // A node in this array is represented as an array of its inputs.
@@ -907,7 +1031,17 @@ namespace NeuralNetwork
           std::size_t j;
           for(j = 0; j < node->size(); ++j)
           {
-            const SimpleMap::Array* input = getArrayEntry<SimpleMap::Array>(node, j);
+            const SimpleMap::Value* inputValue = getArrayEntry<SimpleMap::Value>(node, j);
+            const SimpleMap::Array* input;
+            if(kerasVersion >= makeVersion(3, 0, 0))
+            {
+              const SimpleMap::Record* kerasTensor = dynamic_cast<const SimpleMap::Record*>(inputValue);
+              ASSERT(kerasTensor);
+              const SimpleMap::Array* kerasHistory = getRecordEntry<SimpleMap::Array>(getRecordEntry<SimpleMap::Record>(kerasTensor, "config"), "keras_history");
+              input = kerasHistory;
+            }
+            else
+              input = dynamic_cast<const SimpleMap::Array*>(inputValue);
             ASSERT(input);
             ASSERT(input->size() == 3 || input->size() == 4);
             const std::string inboundLayerName = getLiteral<std::string>(getArrayEntry<SimpleMap::Literal>(input, 0));
@@ -1046,9 +1180,9 @@ namespace NeuralNetwork
       VERIFY(H5Aclose(kerasVersionAttribute) >= 0);
     }
 
-    // Keras 1.x was very different. Keras 3.x is not existing yet.
-    if(kerasVersion < makeVersion(2, 0, 0) || kerasVersion >= makeVersion(3, 0, 0))
-      FAIL("Only Keras 2 models are supported.");
+    // Keras 1.x was very different. Keras 4.x does not exist yet.
+    if(kerasVersion < makeVersion(2, 0, 0) || kerasVersion >= makeVersion(4, 0, 0))
+      FAIL("Only Keras 2 and 3 models are supported.");
 
     hid_t modelConfigAttribute = H5Aopen(rootGroup, "model_config", H5P_DEFAULT);
     ASSERT(modelConfigAttribute >= 0);
@@ -1075,38 +1209,79 @@ namespace NeuralNetwork
       hid_t layerGroup = H5Gopen2(modelWeightsGroup, layerName.c_str(), H5P_DEFAULT);
       ASSERT(layerGroup >= 0);
 
-      std::string mangledLayerName = layerName;
+      // std::string mangledLayerName = layerName;
       hid_t weightNamesAttribute = H5Aopen(layerGroup, "weight_names", H5P_DEFAULT);
       ASSERT(weightNamesAttribute >= 0);
+
       hid_t weightNamesAttributeType = H5Aget_type(weightNamesAttribute);
       ASSERT(weightNamesAttributeType >= 0);
-      hsize_t weightNamesAttributeSize = H5Aget_storage_size(weightNamesAttribute);
-      ASSERT(weightNamesAttributeSize > 0);
-      std::vector<char> weightNamesBuf(static_cast<size_t>(weightNamesAttributeSize));
-      VERIFY(H5Aread(weightNamesAttribute, weightNamesAttributeType, weightNamesBuf.data()) >= 0);
-      size_t weightNameLength = H5Tget_size(weightNamesAttributeType);
-      ASSERT(weightNameLength > 0);
-      VERIFY(H5Tclose(weightNamesAttributeType) >= 0);
-      VERIFY(H5Aclose(weightNamesAttribute) >= 0);
-      for(size_t i = 0; i < static_cast<size_t>(weightNamesAttributeSize); i += weightNameLength)
+      ASSERT(H5Tget_class(weightNamesAttributeType) == H5T_STRING);
+      ASSERT(H5Tget_cset(weightNamesAttributeType) == H5T_CSET_ASCII);
+
+      hid_t weightNamesAttributeDataspace = H5Aget_space(weightNamesAttribute);
+      ASSERT(weightNamesAttributeDataspace >= 0);
+      ASSERT(H5Sis_simple(weightNamesAttributeDataspace) > 0);
+      ASSERT(H5Sget_simple_extent_type(weightNamesAttributeDataspace) == H5S_SIMPLE);
+      ASSERT(H5Sget_simple_extent_ndims(weightNamesAttributeDataspace) == 1);
+      hsize_t numOfWeightNames = 0;
+      VERIFY(H5Sget_simple_extent_dims(weightNamesAttributeDataspace, &numOfWeightNames, nullptr) == 1);
+
+      std::string mangledWeightLayerName;
+
+      if(H5Tis_variable_str(weightNamesAttributeType) > 0)
       {
-        // This string might end with multiple \0 due to the zero-padding in HDF5, but it does not matter since
-        // everything coming after the colon is irrelevant
-        const std::string currentWeightLayerName(weightNamesBuf.begin() + i, weightNamesBuf.begin() + i + weightNameLength);
-        auto posSlash = currentWeightLayerName.find('/');
-        auto posColon = currentWeightLayerName.find(':');
-        std::string currentWeightName = currentWeightLayerName.substr(posSlash + 1, posColon - posSlash - 1);
-        if(currentWeightName == weightName)
+        ASSERT(H5Tget_size(weightNamesAttributeType) == sizeof(char*));
+        // I have no idea where the factor 2 comes from, but valgrind doesn't report any invalid reads/writes
+        // although the actual allocated storage (weightNamesData) isn't twice as large.
+        ASSERT(H5Aget_storage_size(weightNamesAttribute) == numOfWeightNames * sizeof(char*) * 2);
+
+        std::vector<const char*> weightNamesData(static_cast<size_t>(numOfWeightNames));
+        VERIFY(H5Aread(weightNamesAttribute, weightNamesAttributeType, weightNamesData.data()) >= 0);
+        for(const char* ptr : weightNamesData)
         {
-          mangledLayerName = currentWeightLayerName.substr(0, posSlash);
-          break;
+          const std::string currentWeightLayerName(ptr);
+          auto posSlash = currentWeightLayerName.rfind('/');
+          auto posColon = currentWeightLayerName.rfind(':');
+          posColon = posColon == std::string::npos ? currentWeightLayerName.size() : posColon;
+          std::string currentWeightName = currentWeightLayerName.substr(posSlash + 1, posColon - posSlash - 1);
+          if(currentWeightName == weightName)
+          {
+            mangledWeightLayerName = currentWeightLayerName;
+            break;
+          }
+        }
+        H5Dvlen_reclaim(weightNamesAttributeType, weightNamesAttributeDataspace, H5P_DEFAULT, weightNamesData.data());
+      }
+      else
+      {
+        hsize_t weightNamesAttributeSize = H5Aget_storage_size(weightNamesAttribute);
+        ASSERT(weightNamesAttributeSize > 0);
+
+        const size_t weightNameLength = H5Tget_size(weightNamesAttributeType);
+        ASSERT(weightNameLength > 0);
+        ASSERT(weightNamesAttributeSize % weightNameLength == 0);
+
+        std::vector<char> weightNamesData(static_cast<size_t>(weightNamesAttributeSize));
+        VERIFY(H5Aread(weightNamesAttribute, weightNamesAttributeType, weightNamesData.data()) >= 0);
+        for(auto it = weightNamesData.begin(); it != weightNamesData.end(); it += weightNameLength)
+        {
+          const std::string currentWeightLayerName(it, it + weightNameLength);
+          auto posSlash = currentWeightLayerName.rfind('/');
+          auto posColon = currentWeightLayerName.rfind(':');
+          posColon = posColon == std::string::npos ? currentWeightLayerName.size() : posColon;
+          std::string currentWeightName = currentWeightLayerName.substr(posSlash + 1, posColon - posSlash - 1);
+          if(currentWeightName == weightName)
+          {
+            mangledWeightLayerName = currentWeightLayerName;
+            break;
+          }
         }
       }
+      VERIFY(H5Sclose(weightNamesAttributeDataspace) >= 0);
+      VERIFY(H5Tclose(weightNamesAttributeType) >= 0);
+      VERIFY(H5Aclose(weightNamesAttribute) >= 0);
 
-      hid_t weightsGroup = H5Gopen2(layerGroup, mangledLayerName.c_str(), H5P_DEFAULT);
-      ASSERT(weightsGroup >= 0);
-      const std::string mangledWeightName = weightName + ":0"; // TODO: Is this always :0? We will see.
-      hid_t weightsDataset = H5Dopen2(weightsGroup, mangledWeightName.c_str(), H5P_DEFAULT);
+      hid_t weightsDataset = H5Dopen2(layerGroup, mangledWeightLayerName.c_str(), H5P_DEFAULT);
       ASSERT(weightsDataset >= 0);
       hid_t weightsDatasetDataspace = H5Dget_space(weightsDataset);
       ASSERT(weightsDatasetDataspace >= 0);
@@ -1129,7 +1304,6 @@ namespace NeuralNetwork
 
       VERIFY(H5Sclose(weightsDatasetDataspace) >= 0);
       VERIFY(H5Dclose(weightsDataset) >= 0);
-      VERIFY(H5Gclose(weightsGroup) >= 0);
       VERIFY(H5Gclose(layerGroup) >= 0);
     };
 

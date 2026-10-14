@@ -9,10 +9,10 @@
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
 #include "Tools/Math/Transformation.h"
-#include "Tools/Module/Blackboard.h"
+#include "Framework/Blackboard.h"
 
 void CirclePercept::draw() const
 {
@@ -58,8 +58,8 @@ void CirclePercept::draw() const
       Vector2f p1;
       if(Transformation::robotToImage(pos, *theCameraMatrix, *theCameraInfo, p1))
       {
-        Vector2f uncor = theImageCoordinateSystem->fromCorrected(p1);
-        CROSS("representation:FieldLines:image", uncor.x(), uncor.y(), 5, 3, Drawings::solidPen, ColorRGBA::red);
+        Vector2f uncorrected = theImageCoordinateSystem->fromCorrected(p1);
+        CROSS("representation:FieldLines:image", uncorrected.x(), uncorrected.y(), 5, 3, Drawings::solidPen, ColorRGBA::red);
       }
       const float stepSize = 0.2f;
       for(float i = 0; i < pi2; i += stepSize)
@@ -69,9 +69,9 @@ void CirclePercept::draw() const
         if(Transformation::robotToImage(Vector2f(pos + Vector2f(theFieldDimensions->centerCircleRadius, 0).rotate(i)), *theCameraMatrix, *theCameraInfo, p1) &&
            Transformation::robotToImage(Vector2f(pos + Vector2f(theFieldDimensions->centerCircleRadius, 0).rotate(i + stepSize)), *theCameraMatrix, *theCameraInfo, p2))
         {
-          Vector2f uncor1 = theImageCoordinateSystem->fromCorrected(p1);
-          Vector2f uncor2 = theImageCoordinateSystem->fromCorrected(p2);
-          LINE("representation:FieldLines:image", uncor1.x(), uncor1.y(), uncor2.x(), uncor2.y(), 3, Drawings::solidPen, ColorRGBA::red);
+          Vector2f uncorrected1 = theImageCoordinateSystem->fromCorrected(p1);
+          Vector2f uncorrected2 = theImageCoordinateSystem->fromCorrected(p2);
+          LINE("representation:FieldLines:image", uncorrected1.x(), uncorrected1.y(), uncorrected2.x(), uncorrected2.y(), 3, Drawings::solidPen, ColorRGBA::red);
         }
       }
     }
@@ -93,5 +93,18 @@ void CirclePercept::draw() const
         v1 = v2;
       }
     }
+  }
+}
+
+void CirclePercept::verify() const
+{
+  if(wasSeen)
+  {
+    ASSERT(std::isfinite(pos.x()));
+    ASSERT(std::isfinite(pos.y()));
+    ASSERT(std::isnormal(cov(0, 0)));
+    ASSERT(std::isnormal(cov(1, 1)));
+    ASSERT(std::isfinite(cov(0, 1)));
+    ASSERT(std::isfinite(cov(1, 0)));
   }
 }

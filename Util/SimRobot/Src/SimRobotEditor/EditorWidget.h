@@ -11,7 +11,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QSignalMapper>
 #include <QSpinBox>
 #include <QTextEdit>
 
@@ -110,17 +109,17 @@ private:
 
   FileEditorObject* editorObject;
 
-  bool canCopy;
-  bool canUndo;
-  bool canRedo;
+  bool shownYet = false;
+  bool canCopy = false;
+  bool canUndo = false;
+  bool canRedo = false;
 
   bool useTabStop;
   int tabStopWidth;
 
-  mutable QSignalMapper openFileMapper, findAndReplaceMapper;
-  SyntaxHighlighter* highlighter;
-  EditorSettingsDialog* editorSettingsDialog;
-  FindAndReplaceDialog* findAndReplaceDialog;
+  SyntaxHighlighter* highlighter = nullptr;
+  EditorSettingsDialog* editorSettingsDialog = nullptr;
+  FindAndReplaceDialog* findAndReplaceDialog = nullptr;
 
   void updateEditMenu(QMenu* menu, bool aboutToShow) const;
 
@@ -133,6 +132,8 @@ private:
   void contextMenuEvent(QContextMenuEvent* event) override;
   void focusInEvent(QFocusEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
+  void showEvent(QShowEvent* event) override;
+  void changeEvent(QEvent* event) override;
 
 signals:
   void pasteAvailable(bool available);

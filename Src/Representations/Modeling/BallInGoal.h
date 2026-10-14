@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 
 STREAMABLE(BallInGoal,
 {,
-  (int)(0) timeSinceLastInGoal,
+  (unsigned)(0) lastTimeInGoal,
   (bool)(false) inOwnGoal,
 });

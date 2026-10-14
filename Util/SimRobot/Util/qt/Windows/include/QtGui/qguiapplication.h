@@ -73,11 +73,14 @@ class Q_GUI_EXPORT QGuiApplication : public QCoreApplication
 {
     Q_OBJECT
     Q_PROPERTY(QIcon windowIcon READ windowIcon WRITE setWindowIcon)
-    Q_PROPERTY(QString applicationDisplayName READ applicationDisplayName WRITE setApplicationDisplayName NOTIFY applicationDisplayNameChanged)
+    Q_PROPERTY(QString applicationDisplayName READ applicationDisplayName
+               WRITE setApplicationDisplayName NOTIFY applicationDisplayNameChanged)
     Q_PROPERTY(QString desktopFileName READ desktopFileName WRITE setDesktopFileName)
-    Q_PROPERTY(Qt::LayoutDirection layoutDirection READ layoutDirection WRITE setLayoutDirection NOTIFY layoutDirectionChanged)
+    Q_PROPERTY(Qt::LayoutDirection layoutDirection READ layoutDirection WRITE setLayoutDirection
+               NOTIFY layoutDirectionChanged)
     Q_PROPERTY(QString platformName READ platformName STORED false)
-    Q_PROPERTY(bool quitOnLastWindowClosed  READ quitOnLastWindowClosed WRITE setQuitOnLastWindowClosed)
+    Q_PROPERTY(bool quitOnLastWindowClosed  READ quitOnLastWindowClosed
+               WRITE setQuitOnLastWindowClosed)
     Q_PROPERTY(QScreen *primaryScreen READ primaryScreen NOTIFY primaryScreenChanged STORED false)
 
 public:
@@ -86,7 +89,7 @@ public:
 #else
     QGuiApplication(int &argc, char **argv, int = ApplicationFlags);
 #endif
-    virtual ~QGuiApplication();
+    ~QGuiApplication();
 
     static void setApplicationDisplayName(const QString &name);
     static QString applicationDisplayName();
@@ -110,6 +113,8 @@ public:
 
     static QScreen *primaryScreen();
     static QList<QScreen *> screens();
+    static QScreen *screenAt(const QPoint &point);
+
     qreal devicePixelRatio() const;
 
 #ifndef QT_NO_CURSOR
@@ -154,8 +159,11 @@ public:
 
     static Qt::ApplicationState applicationState();
 
+    static void setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy policy);
+    static Qt::HighDpiScaleFactorRoundingPolicy highDpiScaleFactorRoundingPolicy();
+
     static int exec();
-    bool notify(QObject *, QEvent *) Q_DECL_OVERRIDE;
+    bool notify(QObject *, QEvent *) override;
 
 #ifndef QT_NO_SESSIONMANAGER
     // session management
@@ -163,10 +171,9 @@ public:
     QString sessionId() const;
     QString sessionKey() const;
     bool isSavingSession() const;
-
-    static bool isFallbackSessionManagementEnabled();
-    static void setFallbackSessionManagementEnabled(bool);
 #endif
+
+    QT_DECLARE_NATIVE_INTERFACE_ACCESSOR(QGuiApplication)
 
     static void sync();
 Q_SIGNALS:
@@ -183,12 +190,14 @@ Q_SIGNALS:
     void commitDataRequest(QSessionManager &sessionManager);
     void saveStateRequest(QSessionManager &sessionManager);
 #endif
-    void paletteChanged(const QPalette &pal);
     void applicationDisplayNameChanged();
-
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Handle QEvent::ApplicationPaletteChange instead") void paletteChanged(const QPalette &pal);
+    QT_DEPRECATED_VERSION_X_6_0("Handle QEvent::ApplicationFontChange instead")  void fontChanged(const QFont &font);
+#endif
 protected:
-    bool event(QEvent *) Q_DECL_OVERRIDE;
-    bool compressEvent(QEvent *, QObject *receiver, QPostEventList *) Q_DECL_OVERRIDE;
+    bool event(QEvent *) override;
+    bool compressEvent(QEvent *, QObject *receiver, QPostEventList *) override;
 
     QGuiApplication(QGuiApplicationPrivate &p);
 
@@ -209,5 +218,7 @@ private:
 };
 
 QT_END_NAMESPACE
+
+#include <QtGui/qguiapplication_platform.h>
 
 #endif // QGUIAPPLICATION_H

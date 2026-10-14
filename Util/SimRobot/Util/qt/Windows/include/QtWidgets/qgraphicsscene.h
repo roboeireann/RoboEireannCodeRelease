@@ -47,15 +47,12 @@
 #include <QtGui/qbrush.h>
 #include <QtGui/qfont.h>
 #include <QtGui/qtransform.h>
-#include <QtGui/qmatrix.h>
 #include <QtGui/qpen.h>
+
+QT_REQUIRE_CONFIG(graphicsview);
 
 QT_BEGIN_NAMESPACE
 
-
-#if !defined(QT_NO_GRAPHICSVIEW)
-
-template<typename T> class QList;
 class QFocusEvent;
 class QFont;
 class QFontMetrics;
@@ -104,16 +101,16 @@ class Q_WIDGETS_EXPORT QGraphicsScene : public QObject
     Q_PROPERTY(int bspTreeDepth READ bspTreeDepth WRITE setBspTreeDepth)
     Q_PROPERTY(QPalette palette READ palette WRITE setPalette)
     Q_PROPERTY(QFont font READ font WRITE setFont)
-    Q_PROPERTY(bool sortCacheEnabled READ isSortCacheEnabled WRITE setSortCacheEnabled)
     Q_PROPERTY(bool stickyFocus READ stickyFocus WRITE setStickyFocus)
     Q_PROPERTY(qreal minimumRenderSize READ minimumRenderSize WRITE setMinimumRenderSize)
+    Q_PROPERTY(bool focusOnTouch READ focusOnTouch WRITE setFocusOnTouch)
 
 public:
     enum ItemIndexMethod {
         BspTreeIndex,
         NoIndex = -1
     };
-
+    Q_ENUM(ItemIndexMethod)
     enum SceneLayer {
         ItemLayer = 0x1,
         BackgroundLayer = 0x2,
@@ -122,9 +119,9 @@ public:
     };
     Q_DECLARE_FLAGS(SceneLayers, SceneLayer)
 
-    QGraphicsScene(QObject *parent = Q_NULLPTR);
-    QGraphicsScene(const QRectF &sceneRect, QObject *parent = Q_NULLPTR);
-    QGraphicsScene(qreal x, qreal y, qreal width, qreal height, QObject *parent = Q_NULLPTR);
+    QGraphicsScene(QObject *parent = nullptr);
+    QGraphicsScene(const QRectF &sceneRect, QObject *parent = nullptr);
+    QGraphicsScene(qreal x, qreal y, qreal width, qreal height, QObject *parent = nullptr);
     virtual ~QGraphicsScene();
 
     QRectF sceneRect() const;
@@ -141,9 +138,6 @@ public:
     ItemIndexMethod itemIndexMethod() const;
     void setItemIndexMethod(ItemIndexMethod method);
 
-    bool isSortCacheEnabled() const;
-    void setSortCacheEnabled(bool enabled);
-
     int bspTreeDepth() const;
     void setBspTreeDepth(int depth);
 
@@ -155,37 +149,19 @@ public:
     QList<QGraphicsItem *> items(const QRectF &rect, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, Qt::SortOrder order = Qt::DescendingOrder, const QTransform &deviceTransform = QTransform()) const;
     QList<QGraphicsItem *> items(const QPolygonF &polygon, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, Qt::SortOrder order = Qt::DescendingOrder, const QTransform &deviceTransform = QTransform()) const;
     QList<QGraphicsItem *> items(const QPainterPath &path, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, Qt::SortOrder order = Qt::DescendingOrder, const QTransform &deviceTransform = QTransform()) const;
-
-    QList<QGraphicsItem *> collidingItems(const QGraphicsItem *item, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape) const;
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline QGraphicsItem *itemAt(const QPointF &position) const {
-        QList<QGraphicsItem *> itemsAtPoint = items(position);
-        return itemsAtPoint.isEmpty() ? Q_NULLPTR : itemsAtPoint.first();
-    }
-#endif
-    QGraphicsItem *itemAt(const QPointF &pos, const QTransform &deviceTransform) const;
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline QList<QGraphicsItem *> items(qreal x, qreal y, qreal w, qreal h, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape) const
-    { return items(QRectF(x, y, w, h), mode); }
-#endif
     inline QList<QGraphicsItem *> items(qreal x, qreal y, qreal w, qreal h, Qt::ItemSelectionMode mode, Qt::SortOrder order,
                                         const QTransform &deviceTransform = QTransform()) const
     { return items(QRectF(x, y, w, h), mode, order, deviceTransform); }
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline QGraphicsItem *itemAt(qreal x, qreal y) const {
-        QList<QGraphicsItem *> itemsAtPoint = items(QPointF(x, y));
-        return itemsAtPoint.isEmpty() ? Q_NULLPTR : itemsAtPoint.first();
-    }
-#endif
+
+    QList<QGraphicsItem *> collidingItems(const QGraphicsItem *item, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape) const;
+    QGraphicsItem *itemAt(const QPointF &pos, const QTransform &deviceTransform) const;
     inline QGraphicsItem *itemAt(qreal x, qreal y, const QTransform &deviceTransform) const
     { return itemAt(QPointF(x, y), deviceTransform); }
 
     QList<QGraphicsItem *> selectedItems() const;
     QPainterPath selectionArea() const;
     void setSelectionArea(const QPainterPath &path, const QTransform &deviceTransform);
-    void setSelectionArea(const QPainterPath &path, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, const QTransform &deviceTransform = QTransform());
-    void setSelectionArea(const QPainterPath &path, Qt::ItemSelectionOperation selectionOperation, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, const QTransform &deviceTransform = QTransform());
-    // ### Qt6 merge the last 2 functions and add a default: Qt::ItemSelectionOperation selectionOperation = Qt::ReplaceSelection
+    void setSelectionArea(const QPainterPath &path, Qt::ItemSelectionOperation selectionOperation = Qt::ReplaceSelection, Qt::ItemSelectionMode mode = Qt::IntersectsItemShape, const QTransform &deviceTransform = QTransform());
 
     QGraphicsItemGroup *createItemGroup(const QList<QGraphicsItem *> &items);
     void destroyItemGroup(QGraphicsItemGroup *group);
@@ -254,6 +230,9 @@ public:
     qreal minimumRenderSize() const;
     void setMinimumRenderSize(qreal minSize);
 
+    bool focusOnTouch() const;
+    void setFocusOnTouch(bool enabled);
+
 public Q_SLOTS:
     void update(const QRectF &rect = QRectF());
     void invalidate(const QRectF &rect = QRectF(), SceneLayers layers = AllLayers);
@@ -262,8 +241,8 @@ public Q_SLOTS:
     void clear();
 
 protected:
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
-    bool eventFilter(QObject *watched, QEvent *event) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
     virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event);
     virtual void dragEnterEvent(QGraphicsSceneDragDropEvent *event);
     virtual void dragMoveEvent(QGraphicsSceneDragDropEvent *event);
@@ -286,14 +265,10 @@ protected:
     virtual void drawItems(QPainter *painter, int numItems,
                            QGraphicsItem *items[],
                            const QStyleOptionGraphicsItem options[],
-                           QWidget *widget = Q_NULLPTR);
+                           QWidget *widget = nullptr);
 
 protected Q_SLOTS:
-    // ### Qt 6: make unconditional
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    virtual
-#endif
-    bool focusNextPrevChild(bool next);
+    virtual bool focusNextPrevChild(bool next);
 
 Q_SIGNALS:
     void changed(const QList<QRectF> &region);
@@ -327,8 +302,6 @@ private:
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QGraphicsScene::SceneLayers)
-
-#endif // QT_NO_GRAPHICSVIEW
 
 QT_END_NAMESPACE
 

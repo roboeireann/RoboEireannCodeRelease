@@ -5,16 +5,16 @@
  */
 
 #include "CameraMatrix.h"
-#include "Tools/Boundary.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Math/Geometry.h"
+#include "Math/Boundary.h"
+#include "Debugging/DebugDrawings.h"
+#include "Math/Geometry.h"
 #include "Tools/Math/Projection.h"
 #include "Tools/Math/Transformation.h"
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Tools/Module/Blackboard.h"
+#include "Framework/Blackboard.h"
 
 CameraMatrix::CameraMatrix(const Pose3f& pose) :
-  Pose3f(pose), invPos(Pose3f::inverse()), isValid(true)
+    SE3WithCov(pose), invPos(Pose3f::inverse()), isValid(true)
 {}
 
 void CameraMatrix::draw() const
@@ -71,7 +71,7 @@ void CameraMatrix::draw() const
     LINE("representation:CameraMatrix:field", boundary.x.max, boundary.y.max, boundary.x.min, boundary.y.max, 30, Drawings::solidPen, ColorRGBA::blue);
     LINE("representation:CameraMatrix:field", boundary.x.min, boundary.y.max, boundary.x.min, boundary.y.min, 30, Drawings::solidPen, ColorRGBA::white);
 
-    // fill the bounding rectangle with coordinate system lines (and reproject it to the image)
+    // fill the bounding rectangle with coordinate system lines (and re-project it to the image)
     const int spacing = 100;
     for(int xx = boundary.x.min - boundary.x.min % spacing + spacing; xx <= boundary.x.max; xx += spacing)
     {
@@ -128,7 +128,7 @@ void CameraMatrix::draw() const
         if(isValid[i])
           boundary.add(pointOnField[i]);
 
-      // fill the bounding rectangle with coordinate system lines (and reproject it to the image)
+      // fill the bounding rectangle with coordinate system lines (and re-project it to the image)
       int spacing = 100;
       for(int xx = boundary.x.min - boundary.x.min % spacing + spacing; xx <= boundary.x.max; xx += spacing)
         if(Transformation::robotToImage(Vector2f(static_cast<float>(xx), static_cast<float>(boundary.y.min)), *this, cameraInfo, beginPoint) &&
@@ -144,16 +144,6 @@ void CameraMatrix::draw() const
                yy == 0 ? 3 : 0, Drawings::solidPen, ColorRGBA::white);
     }
   } // end complex drawing
-
-  if(Blackboard::getInstance().exists("CameraInfo"))
-  {
-    const CameraInfo cameraInfo = static_cast<const CameraInfo&>(Blackboard::getInstance()["CameraInfo"]);
-
-    if(cameraInfo.camera == CameraInfo::upper)
-      PLOT_VEC3("representation:CameraMatrix:upper:", this->translation);
-    else
-      PLOT_VEC3("representation:CameraMatrix:lower:", this->translation);
-  }
 }
 
 void RobotCameraMatrix::draw() const
@@ -208,7 +198,7 @@ void RobotCameraMatrix::draw() const
     LINE("representation:RobotCameraMatrix:field", boundary.x.max, boundary.y.max, boundary.x.min, boundary.y.max, 30, Drawings::solidPen, ColorRGBA::blue);
     LINE("representation:RobotCameraMatrix:field", boundary.x.min, boundary.y.max, boundary.x.min, boundary.y.min, 30, Drawings::solidPen, ColorRGBA::white);
 
-    // fill the bounding rectangle with coordinate system lines (and reproject it to the image)
+    // fill the bounding rectangle with coordinate system lines (and re-project it to the image)
     const int spacing = 100;
     for(int xx = boundary.x.min - boundary.x.min % spacing + spacing; xx <= boundary.x.max; xx += spacing)
     {
@@ -266,7 +256,7 @@ void RobotCameraMatrix::draw() const
         if(isValid[i])
           boundary.add(pointOnField[i]);
 
-      // fill the bounding rectangle with coordinate system lines (and reproject it to the image)
+      // fill the bounding rectangle with coordinate system lines (and re-project it to the image)
       const int spacing = 100;
       for(int xx = boundary.x.min - boundary.x.min % spacing + spacing; xx <= boundary.x.max; xx += spacing)
         if(Transformation::robotToImage(Vector2f(static_cast<float>(xx), static_cast<float>(boundary.y.min)), *this, CameraInfo(), beginPoint) &&
@@ -284,40 +274,52 @@ void RobotCameraMatrix::draw() const
   } // end complex drawing
 }
 
-RobotCameraMatrix::RobotCameraMatrix(const RobotDimensions& robotDimensions, float headYaw, float headPitch, const CameraCalibration& cameraCalibration, CameraInfo::Camera camera)
+RobotCameraMatrix::RobotCameraMatrix(const RobotDimensions& robotDimensions, const SE3WithCov& head, const CameraCalibration& cameraCalibration,
+                                     CameraInfo::Camera camera)
 {
-  computeRobotCameraMatrix(robotDimensions, headYaw, headPitch, cameraCalibration, camera);
+  computeRobotCameraMatrix(robotDimensions, head, cameraCalibration, camera);
 }
 
-void RobotCameraMatrix::computeRobotCameraMatrix(const RobotDimensions& robotDimensions, float headYaw, float headPitch, const CameraCalibration& cameraCalibration, CameraInfo::Camera camera)
+RobotCameraMatrix::RobotCameraMatrix(const RobotDimensions& robotDimensions, float headYaw, float headPitch, const CameraCalibration& cameraCalibration,
+                                     CameraInfo::Camera camera)
+{
+  Pose3f head {};
+  head.translate(robotDimensions.hipToNeckOffset);
+  head.rotateZ(headYaw);
+  head.rotateY(headPitch);
+
+  computeRobotCameraMatrix(robotDimensions, head, cameraCalibration, camera);
+}
+
+void
+RobotCameraMatrix::computeRobotCameraMatrix(const RobotDimensions& robotDimensions, const SE3WithCov& head, const CameraCalibration& cameraCalibration,
+                                            CameraInfo::Camera camera)
 {
   *this = RobotCameraMatrix();
+  *this *= head;
 
-  translate(0., 0., robotDimensions.hipToNeckLength);
-  rotateZ(headYaw);
-  rotateY(headPitch);
   if(camera == CameraInfo::upper)
   {
-    translate(robotDimensions.xOffsetNeckToUpperCamera, 0.f, robotDimensions.zOffsetNeckToUpperCamera);
+    translate(robotDimensions.offsetNeckToUpperCamera);
     rotateY(robotDimensions.tiltNeckToUpperCamera + cameraCalibration.cameraRotationCorrections[camera].y());
   }
   else
   {
-    translate(robotDimensions.xOffsetNeckToLowerCamera, 0.f, robotDimensions.zOffsetNeckToLowerCamera);
+    translate(robotDimensions.offsetNeckToLowerCamera);
     rotateY(robotDimensions.tiltNeckToLowerCamera + cameraCalibration.cameraRotationCorrections[camera].y());
   }
   rotateX(cameraCalibration.cameraRotationCorrections[camera].x());
   rotateZ(cameraCalibration.cameraRotationCorrections[camera].z());
 }
 
-CameraMatrix::CameraMatrix(const Pose3f& torsoMatrix, const Pose3f& robotCameraMatrix, const CameraCalibration& cameraCalibration)
+CameraMatrix::CameraMatrix(const SE3WithCov& torsoMatrix, const SE3WithCov& robotCameraMatrix, const CameraCalibration& cameraCalibration)
 {
   computeCameraMatrix(torsoMatrix, robotCameraMatrix, cameraCalibration);
 }
 
-void CameraMatrix::computeCameraMatrix(const Pose3f& torsoMatrix, const Pose3f& robotCameraMatrix, const CameraCalibration& cameraCalibration)
+void CameraMatrix::computeCameraMatrix(const SE3WithCov& torsoMatrix, const SE3WithCov& robotCameraMatrix, const CameraCalibration& cameraCalibration)
 {
-  static_cast<Pose3f&>(*this) = torsoMatrix;
+  static_cast<SE3WithCov&>(*this) = torsoMatrix;
   rotateY(cameraCalibration.bodyRotationCorrection.y());
   rotateX(cameraCalibration.bodyRotationCorrection.x());
   conc(robotCameraMatrix);

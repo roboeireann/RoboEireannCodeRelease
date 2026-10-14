@@ -73,13 +73,11 @@ public:
     explicit QTextCursor(QTextFrame *frame);
     explicit QTextCursor(const QTextBlock &block);
     QTextCursor(const QTextCursor &cursor);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QTextCursor &operator=(QTextCursor &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QTextCursor)
     QTextCursor &operator=(const QTextCursor &other);
     ~QTextCursor();
 
-    void swap(QTextCursor &other) Q_DECL_NOTHROW { qSwap(d, other.d); }
+    void swap(QTextCursor &other) noexcept { d.swap(other.d); }
 
     bool isNull() const;
 

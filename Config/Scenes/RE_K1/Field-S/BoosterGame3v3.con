@@ -1,0 +1,7 @@
+call ../../Includes/BoosterNormal
+call ../../Includes/3vs3
+
+# explicit even though it matches the GameController default - avoids silently breaking if that default changes
+gc competitionTypeMiddleFoundation
+
+dr representation:SetupPoses:place

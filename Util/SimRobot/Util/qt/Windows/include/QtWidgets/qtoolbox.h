@@ -44,10 +44,9 @@
 #include <QtWidgets/qframe.h>
 #include <QtGui/qicon.h>
 
+QT_REQUIRE_CONFIG(toolbox);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_TOOLBOX
 
 class QToolBoxPrivate;
 
@@ -58,7 +57,7 @@ class Q_WIDGETS_EXPORT QToolBox : public QFrame
     Q_PROPERTY(int count READ count)
 
 public:
-    explicit QToolBox(QWidget *parent = Q_NULLPTR, Qt::WindowFlags f = Qt::WindowFlags());
+    explicit QToolBox(QWidget *parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
     ~QToolBox();
 
     int addItem(QWidget *widget, const QString &text);
@@ -77,7 +76,7 @@ public:
     void setItemIcon(int index, const QIcon &icon);
     QIcon itemIcon(int index) const;
 
-#ifndef QT_NO_TOOLTIP
+#if QT_CONFIG(tooltip)
     void setItemToolTip(int index, const QString &toolTip);
     QString itemToolTip(int index) const;
 #endif
@@ -85,7 +84,7 @@ public:
     int currentIndex() const;
     QWidget *currentWidget() const;
     QWidget *widget(int index) const;
-    int indexOf(QWidget *widget) const;
+    int indexOf(const QWidget *widget) const;
     int count() const;
 
 public Q_SLOTS:
@@ -96,11 +95,11 @@ Q_SIGNALS:
     void currentChanged(int index);
 
 protected:
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
+    bool event(QEvent *e) override;
     virtual void itemInserted(int index);
     virtual void itemRemoved(int index);
-    void showEvent(QShowEvent *e) Q_DECL_OVERRIDE;
-    void changeEvent(QEvent *) Q_DECL_OVERRIDE;
+    void showEvent(QShowEvent *e) override;
+    void changeEvent(QEvent *) override;
 
 
 private:
@@ -118,8 +117,6 @@ inline int QToolBox::addItem(QWidget *item, const QIcon &iconSet,
 { return insertItem(-1, item, iconSet, text); }
 inline int QToolBox::insertItem(int index, QWidget *item, const QString &text)
 { return insertItem(index, item, QIcon(), text); }
-
-#endif // QT_NO_TOOLBOX
 
 QT_END_NAMESPACE
 

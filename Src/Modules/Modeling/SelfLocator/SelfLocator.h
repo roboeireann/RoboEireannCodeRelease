@@ -9,62 +9,54 @@
 #pragma once
 
 #include "UKFRobotPoseHypothesis.h"
-#include "Representations/Communication/GameInfo.h"
-
+#include "Representations/BehaviorControl/Libraries/LibDemo.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Representations/Infrastructure/ExtendedGameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Communication/GameControllerData.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Modeling/AlternativeRobotPoseHypothesis.h"
-#include "Representations/Modeling/BallModel.h"
 #include "Representations/Modeling/Odometer.h"
 #include "Representations/Modeling/PerceptRegistration.h"
 #include "Representations/Modeling/RobotPose.h"
+#include "Representations/Configuration/RobotDimensions.h"
 #include "Representations/Modeling/SelfLocalizationHypotheses.h"
 #include "Representations/Modeling/SideInformation.h"
 #include "Representations/Modeling/WorldModelPrediction.h"
 #include "Representations/MotionControl/MotionInfo.h"
-#include "Representations/MotionControl/MotionRequest.h"
 #include "Representations/MotionControl/OdometryData.h"
-#include "Representations/Perception/FieldFeatures/FieldFeatureOverview.h"
-#include "Representations/Perception/FieldPercepts/CirclePercept.h"
-#include "Representations/Perception/FieldPercepts/PenaltyMarkPercept.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
-#include "Representations/Perception/ImagePreprocessing/FieldBoundary.h"
 #include "Representations/Sensing/FallDownState.h"
-#include "Representations/Sensing/GyroState.h"
+#include "Representations/Sensing/IMUValueState.h"
 #include "Representations/Configuration/SetupPoses.h"
 #include "Representations/Configuration/StaticInitialPose.h"
 #include "Tools/Modeling/SampleSet.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 MODULE(SelfLocator,
 {,
   REQUIRES(AlternativeRobotPoseHypothesis),
-  REQUIRES(ExtendedGameInfo),
+  REQUIRES(ExtendedGameState),
   REQUIRES(Odometer),
   REQUIRES(OdometryData),
   REQUIRES(FallDownState),
-  REQUIRES(GameInfo),
-  REQUIRES(GyroState),
-  REQUIRES(CirclePercept),
+  REQUIRES(GameControllerData),
+  REQUIRES(GameState),
+  REQUIRES(IMUValueState),
   REQUIRES(FieldDimensions),
-  REQUIRES(FieldFeatureOverview),
   REQUIRES(FrameInfo),
+  REQUIRES(LibDemo),
   REQUIRES(MotionInfo),
-  REQUIRES(CameraMatrix),
   REQUIRES(CameraInfo),
-  REQUIRES(BallModel),
-  REQUIRES(FieldBoundary),
-  REQUIRES(RobotPose),
+  REQUIRES(RobotDimensions),
   REQUIRES(SideInformation),
-  REQUIRES(PenaltyMarkPercept),
   REQUIRES(PerceptRegistration),
   REQUIRES(WorldModelPrediction),
   REQUIRES(SetupPoses),
   REQUIRES(StaticInitialPose),
   REQUIRES(GroundTruthRobotPose),
-  USES(MotionRequest),
+
+  REQUIRES(RobotPose),
   PROVIDES(RobotPose),
   PROVIDES(SelfLocalizationHypotheses),
   LOADS_PARAMETERS(
@@ -78,8 +70,6 @@ MODULE(SelfLocator,
     (Pose2f)   filterProcessDeviation,               /**< The process noise for estimating the robot pose. */
     (Pose2f)   odometryDeviation,                    /**< The percentage inaccuracy of the odometry. */
     (Vector2f) odometryRotationDeviation,            /**< A rotation deviation of each walked mm. */
-    (Vector2f) robotRotationDeviation,               /**< Deviation of the rotation of the robot's torso */
-    (Vector2f) robotRotationDeviationInStand,        /**< Deviation of the rotation of the robot's torso when it is standing. */
     (float)  movedDistWeightRotationNoise,           /**< Weighting for considering walked distance when computing a sample's rotational error */
     (float)  movedAngleWeightRotationNoise,          /**< Weighting for considering rotation when computing a sample's rotational error */
     (float)  movedAngleWeightRotationNoiseNotWalking,/**< Weighting for considering rotation when computing a sample's rotational error, special handling for situations in which the robot is not walking and odometry might not be continuous */
@@ -94,19 +84,18 @@ MODULE(SelfLocator,
     (float)  validityFactorPoseMeasurement,          /**< Indicates how strongly a perceived pose influences a sample's validity. Higher value means stronger influence */
     (float)  validityFactorLandmarkMeasurement,      /**< Indicates how strongly a perceived landmark influences a sample's validity. Higher value means stronger influence */
     (float)  validityFactorLineMeasurement,          /**< Indicates how strongly a perceived line influences a sample's validity. Higher value means stronger influence */
-    (float)  goalieFieldBorderDistanceThreshold,     /**< Workaround for 180 degree turned goalie: Definition of distance for a "far" field border */
-    (float)  goalieNoPerceptsThreshold,              /**< Workaround for 180 degree turned goalie: Timeout for not having seen major percepts (ball, field features) */
-    (float)  goalieNoFarFieldBorderThreshold,        /**< Workaround for 180 degree turned goalie: Timeout for not having seen the "far" field border */
-    (float)  goalieTwistNoStandWalkKickTimeout,      /**< Workaround for 180 degree turned goalie: Do not execute the handling of this situation, if robot has not been standing, walking, kicking recently */
-    (bool)   goalieActivateTwistHandling,            /**< Flag to turn the 180 degree goalie handling on and off */
     (float)  positionJumpNotificationDistance,       /**< Threshold, min position change (distance) to give a notification. */
     (int)    minNumberOfObservationsForResetting,    /**< To accept an alternative robot pose, it must be based on at least this many observations of field features. */
     (float)  translationalDeviationForResetting,     /**< To insert a new particle, the current alternative pose must be farther away from the current robot pose than this threshold. */
     (float)  rotationalDeviationForResetting,        /**< To insert a new particle, the current alternative pose rotation must be more different from the current robot pose rotation than this threshold. */
     (float)  returnFromPenaltyMaxXOffset,            /**< When poses are generated after returning from a penalty, a random x offset is added to each pose. The absolute value of this offset is defined by this parameter. */
-    (bool)   demoUseCustomReturnFromPenaltyPoses,       /**< Flag to use the two following poses when localization is restarted after a penalty. This is only useful for certain demos on special fields. */
-    (Pose2f) demoCustomReturnFromPenaltyPoseGoalie,     /**< Goalie pose is set to this pose after a penalty. */
-    (Pose2f) demoCustomReturnFromPenaltyPoseFieldPlayer,/**< Field player pose is set to this pose after a penalty. */
+    (bool)   demoUseCustomReturnFromPenaltyPoses,             /**< Flag to use the two following poses when localization is restarted after a penalty. This is only useful for certain demos on special fields. */
+    (Pose2f) demoCustomReturnFromPenaltyPoseGoalie,           /**< Goalie pose is set to this pose after a penalty. */
+    (Pose2f) demoCustomReturnFromPenaltyPoseFieldPlayer,      /**< Field player pose is set to this pose after a penalty. */
+    (int)    timeoutForResamplingAfterReturnFromPenalty,      /**< Do not perform any resampling step after returning from a penalty for this time (in milliseconds).*/
+    (int)    timeoutForSensorResettingAfterReturnFromPenalty, /**< Do not perform sensor resetting after returning from a penalty for this time (in milliseconds).*/
+    (int)    timeoutBetweenTwoJumpSounds,                     /**< Make a pause between playing two "Jump!" sounds for this time (in milliseconds).*/
+    (int)    timeoutForJumpAnnotationAfterReturnFromPenalty,  /**< If the robot pose jumps within this time (in milliseconds) after returning from a penalty, a different annotation will be written.*/
   }),
 });
 
@@ -120,31 +109,22 @@ class SelfLocator : public SelfLocatorBase
 {
 private:
   SampleSet<UKFRobotPoseHypothesis>* samples;   /**< Container for all samples. */
-  unsigned lastTimeFarFieldBorderSeen;          /**< Timestamp for checking goalie localization */
   unsigned lastTimeJumpSound;                   /**< When has the last sound been played? Avoid to flood the sound player in some situations */
   unsigned timeOfLastReturnFromPenalty;         /**< Point of time when the last penalty of this robot was over */
-  unsigned lastTimeNotInStandWalkKick;          /**< Timestamp to keep track of the time during which the robot was either standing, walking, or kicking */
   bool sampleSetHasBeenReset;                   /**< Flag indicating that all samples have been replaced in the current frame */
   int nextSampleNumber;                         /**< Unique sample identifiers */
   int idOfLastBestSample;                       /**< Identifier of the best sample of the last frame */
   float averageWeighting;                       /**< The average of the weightings of all samples in the sample set */
   unsigned lastAlternativePoseTimestamp;        /**< Last time an alternative pose was valid */
-  unsigned int nextManualPlacementPoseNumber;   /**< Counter for uniform manual placement pose selection */
-  Vector2f currentRotationDeviation;            /**< Set to either robotRotationDeviation or robotRotationDeviationInStand */
-  Pose3f inverseCameraMatrix;                   /**< Precomputed matrix that is needed multiple times */
-  unsigned lastTimePenaltyMarkSeen;             /**< Last time a penalty mark was seen */
-  unsigned lastTimeCirclePerceptSeen;           /**< Last time a circle percept was seen */
   bool validitiesHaveBeenUpdated;               /**< Flag that indicates that the validities of the samples have been changed this frame */
+  Pose2f lastGroundTruthRobotPose;              /**< Remember ground truth of last frame */
 
-  // allow setting a custom pose from SimRobot
-  ENUM(DefendingHalf, {, left, right, none, }); // half as seen from the GC desk
+  int sumOfPerceivedLandmarks;                  /**< Statistics: Sum up number of all perceived landmarks */
+  int sumOfPerceivedLines;                      /**< Statistics: Sum up number of all perceived lines */
+  float sumOfUsedLandmarks;                     /**< Statistics: Sum up number of all integrated landmarks (average over samples) */
+  float sumOfUsedLines;                         /**< Statistics: Sum up number of all integrated lines (average over samples) */
 
-  STREAMABLE(OverridePose,
-  {,
-    (DefendingHalf)(none) defendingHalf,
-    (Pose2f)(Pose2f()) pose,
-  });
-  OverridePose overridePose;
+  bool forceInitialPoseAllowed = true; ///< whether the initial pose may be forced
 
   /**
    * The method provides the robot pose
@@ -175,6 +155,13 @@ private:
    */
   bool sensorResetting(const RobotPose& robotPose);
 
+  /** Special function for testing (currently only working in simulation).
+   *  Whenever the ground truth robot pose has changed to a certain extent, the samples are
+   *  reinitializes at the new pose. This allows easier testing by moving the robot around without waiting
+   *  for it to re-localize at the new pose.
+   */
+  void resetSamplesToGroundTruth(bool updateImmediately=false);
+
   /** Some motions lead to low-quality percepts, as the camera pose cannot be computed precisely enough.
    *  This functions performs the necessary checks.
    * @return true, if the current motion is not safe.
@@ -188,18 +175,9 @@ private:
    */
   bool alternativeRobotPoseIsCompatibleToPose(const Pose2f& robotPose);
 
-  /** reset the samples to match theGroundTruthPose */
-  void updateSamplesFromGroundTruth(const RobotPose& robotPose, bool immediateUpdate);
-
-  /** reset the samples to match theGroundTruthPose */
-  void updateSamplesFromOverridePoseIfNeeded();
-
   /** Special handling for initializing samples at some game state transitions and in penalty shootout
    */
   void handleGameStateChanges();
-
-  /** Handle information about a possibly flipped pose */
-  void handleSideInformation();
 
   /** Computes (almost) all elements needed to fill RobotPose
    * @param robotPose The pose (updated by this method)
@@ -212,9 +190,6 @@ private:
    * @param robotPose The pose (updated by this method)
    */
   void setLocalizationQuality(RobotPose& robotPose, float validityOfBestHypothesis);
-
-  /** Method for hacks. Currently: The 180 degree goalie turn problem */
-  void domainSpecificSituationHandling();
 
   /** Returns a reference to the sample that has the highest validity
    * @return A reference sample
@@ -238,12 +213,12 @@ private:
    */
   Pose2f getNewPoseReturnFromPenaltyPosition(bool leftSideOfGoal);
 
-  /** Returns the preconfigured pose for a robot to enter the field
+  /** Returns the pre-configured pose for a robot to enter the field
    * @return A robot pose
    */
   Pose2f getNewPoseAtWalkInPosition();
 
-  /** Returns a pose on the manual placement line or inside the own penalty area (if the robot is the goalie)
+  /** Returns a pose on the manual placement positions for the 1v1 demo
    * @return A robot pose
    */
   Pose2f getNewPoseAtManualPlacementPosition();

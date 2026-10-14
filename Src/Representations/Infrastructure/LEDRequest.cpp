@@ -3,8 +3,8 @@
  *
  * Mainly needed to support static members of representation
  * 
- * [RV] Added new convenience interface to provide greater control over LEDs
- * while providing a simpler interface
+ * Also contains a convenience interface to provide greater control over LEDs
+ * while providing a simpler interface than calling setLed repeatedly
  *
  * @author Rudi Villing
  */
@@ -62,7 +62,7 @@ void LEDRequest::setLed(LED led, float value, LEDState state)
 }
 
 /**
- * set one eye LED or all LEDs in that eye to a specific colour
+ * set one eye LED or multiple LEDs in an eye to a specific colour
  */
 void LEDRequest::setEyeLeds(Side side, unsigned indexOrMask, const LEDColor &color, LEDState state)
 {

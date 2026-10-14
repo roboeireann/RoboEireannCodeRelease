@@ -11,6 +11,7 @@
 #include "Simulation/SimObject.h"
 #include "Simulation/Scene.h"
 #include <QApplication>
+#include <QActionGroup>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QResizeEvent>
@@ -23,7 +24,6 @@ SimObjectWidget::SimObjectWidget(SimObject& simObject) :
 {
   setFocusPolicy(Qt::StrongFocus);
   grabGesture(Qt::PinchGesture);
-  setAttribute(Qt::WA_AcceptTouchEvents);
 
   QSettings& settings = CoreModule::application->getLayoutSettings();
   settings.beginGroup(object.getFullName());
@@ -63,12 +63,14 @@ void SimObjectWidget::update()
 
 QMenu* SimObjectWidget::createUserMenu() const
 {
-  auto* const menu = new QMenu(tr(&object == Simulation::simulation->scene ? "S&cene" : "&Object"));
+  auto* const menu = new QMenu(tr(&object == Simulation::simulation->scene ? "S&cene" : "&Object")); // cspell:disable-line
 
   {
     QMenu* const subMenu = menu->addMenu(tr("&Drag and Drop"));
     QAction* const action = subMenu->menuAction();
-    action->setIcon(QIcon(":/Icons/dragPlane.png"));
+    QIcon icon(":/Icons/icons8-coordinate-system-50.png");
+    icon.setIsMask(true);
+    action->setIcon(icon);
     action->setStatusTip(tr("Select the drag and drop dynamics mode"));
 
     auto* const actionGroup = new QActionGroup(subMenu);
@@ -92,7 +94,9 @@ QMenu* SimObjectWidget::createUserMenu() const
   menu->addSeparator();
 
   QAction* const action = menu->addAction(tr("&Reset Camera"));
-  action->setIcon(QIcon(":/Icons/camera.png"));
+  QIcon icon(":/Icons/icons8-camera-50.png");
+  icon.setIsMask(true);
+  action->setIcon(icon);
   action->setShortcut(QKeySequence(Qt::Key_R));
   connect(action, &QAction::triggered, [this]{ const_cast<SimObjectPainter&>(objectPainter).resetView(); const_cast<SimObjectWidget&>(*this).update(); });
 
@@ -122,7 +126,8 @@ void SimObjectWidget::mouseMoveEvent(QMouseEvent* event)
   QWidget::mouseMoveEvent(event);
 
   const Qt::KeyboardModifiers m = QApplication::keyboardModifiers();
-  if(objectPainter.moveDrag(event->x(), event->y(), m & Qt::ShiftModifier ? SimObjectPainter::dragRotate : SimObjectPainter::dragNormal))
+  const QPointF position = event->position();
+  if(objectPainter.moveDrag(static_cast<int>(position.x()), static_cast<int>(position.y()), m & Qt::ShiftModifier ? SimObjectPainter::dragRotate : SimObjectPainter::dragNormal))
   {
     event->accept();
     update();
@@ -133,10 +138,11 @@ void SimObjectWidget::mousePressEvent(QMouseEvent* event)
 {
   QWidget::mousePressEvent(event);
 
-  if(event->button() == Qt::LeftButton || event->button() == Qt::MidButton)
+  if(event->button() == Qt::LeftButton || event->button() == Qt::MiddleButton)
   {
     const Qt::KeyboardModifiers m = QApplication::keyboardModifiers();
-    objectPainter.startDrag(event->x(), event->y(), m & Qt::ShiftModifier ? SimObjectPainter::dragRotate : SimObjectPainter::dragNormal);
+    const QPointF position = event->position();
+    objectPainter.startDrag(static_cast<int>(position.x()), static_cast<int>(position.y()), m & Qt::ShiftModifier ? SimObjectPainter::dragRotate : SimObjectPainter::dragNormal);
     event->accept();
     update();
   }
@@ -146,7 +152,8 @@ void SimObjectWidget::mouseReleaseEvent(QMouseEvent* event)
 {
   QWidget::mouseReleaseEvent(event);
 
-  if(objectPainter.releaseDrag(event->x(), event->y()))
+  const QPointF position = event->position();
+  if(objectPainter.releaseDrag(static_cast<int>(position.x()), static_cast<int>(position.y())))
   {
     event->accept();
     update();
@@ -166,7 +173,9 @@ void SimObjectWidget::wheelEvent(QWheelEvent* event)
 {
   QWidget::wheelEvent(event);
 
-  objectPainter.zoom(static_cast<float>(event->delta()), event->x(), event->y());
+  const QPointF position = event->position();
+  objectPainter.zoom(event->angleDelta().y(), static_cast<int>(position.x()),
+                     static_cast<int>(position.y()));
   event->accept();
   update();
 }

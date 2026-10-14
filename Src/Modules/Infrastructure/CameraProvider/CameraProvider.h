@@ -11,7 +11,6 @@
 
 #pragma once
 
-#include "Platform/Camera.h"
 #include "Platform/Semaphore.h"
 #include "Platform/Thread.h"
 #include "Representations/Configuration/AutoExposureWeightTable.h"
@@ -23,11 +22,10 @@
 #include "Representations/Infrastructure/CameraStatus.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/JPEGImage.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
-#include "Tools/Math/Random.h"
-#include "Tools/Md5.h"
-#include "Tools/RingBuffer.h"
+#include "Math/Random.h"
+#include "Math/RingBuffer.h"
 
 class NaoCamera;
 
@@ -43,10 +41,13 @@ MODULE(CameraProvider,
   PROVIDES(CameraIntrinsics),
   PROVIDES(CameraStatus),
   PROVIDES_WITHOUT_MODIFY(JPEGImage),
-  DEFINES_PARAMETERS(
+  LOADS_PARAMETERS(
   {,
-    (unsigned)(1000) maxWaitForImage, /** Timeout in ms for waiting for new images. */
-    (int)(2000) resetDelay, /** Timeout in ms for resetting camera without image. */
+    (unsigned) maxWaitForImage, /**< Timeout in ms for waiting for new images after the camera was just set up. */
+    (unsigned) minWaitForImage, /**< Timeout in ms for waiting for new images when the camera was previously working. */
+    (int) resetDelay, /**< Timeout in ms for resetting camera without image after the camera was previously working. */
+    (int) timeBetweenResets, /**< Timeout in ms between camera resets. */
+    (int) jpegQuality, /**< The quality of the JPEG compressing (0 = bad ... 100 = very good). */
   }),
 });
 
@@ -61,7 +62,7 @@ class CameraProvider : public CameraProviderBase
   CameraResolutionRequest cameraResolutionRequest;
   CameraResolutionRequest::Resolutions lastResolutionRequest = CameraResolutionRequest::defaultRes;
   volatile bool cameraOk = true;
-#ifdef CAMERA_INCLUDED
+#ifdef TARGET_ROBOT
   static Semaphore performingReset;
   static bool resetPending;
   RingBuffer<std::string, 120> rowBuffer;
@@ -93,6 +94,8 @@ class CameraProvider : public CameraProviderBase
   bool processResolutionRequest();
 
   void setupCamera();
+
+  void createCamera();
 
   void takeImages();
 

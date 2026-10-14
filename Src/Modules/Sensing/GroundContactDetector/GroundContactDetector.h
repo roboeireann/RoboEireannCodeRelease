@@ -7,34 +7,31 @@
 #pragma once
 
 #include "Representations/Infrastructure/FrameInfo.h"
-#include "Representations/Infrastructure/SensorData/FsrSensorData.h"
-#include "Representations/Infrastructure/SensorData/InertialSensorData.h"
 #include "Representations/Sensing/GroundContactState.h"
-#include "Tools/Module/Module.h"
+#include "Representations/Sensing/SolePressureState.h"
+#include "Framework/Module.h"
 
 MODULE(GroundContactDetector,
 {,
   REQUIRES(FrameInfo),
-  REQUIRES(FsrSensorData),
-  REQUIRES(InertialSensorData),
+  USES(SolePressureState),
   PROVIDES(GroundContactState),
   LOADS_PARAMETERS(
   {,
-    (float) minPressureToKeepContact, /**< Minimum pressure on both feet for ground contact in kg. */
-    (float) minPressureToRegainContact, /**< Minimum pressure on both feet to regain ground contact in kg. */
-    (float) minPressurePerFootToRegainContact, /**< Minimum pressure on both feet to regain ground contact in kg. */
-    (Angle) maxGyroYToRegainContact, /**< Maximum y gyro value considered as "not moving". */
-    (int) maxTimeWithoutPressure, /**< Maxmimum time allowed without minimum pressure before losing contact in ms. */
+    (int) maxTimeWithoutPressure, /**< Maximum time allowed without minimum pressure before losing contact in ms. */
     (int) minTimeWithPressure, /**< Minimum time required with minimum pressure to regain contact in ms. */
+    (int) minTimeSay, /**< Minimum interval in milliseconds to say something.. */
   }),
 });
 
 class GroundContactDetector : public GroundContactDetectorBase
 {
 private:
-  unsigned startupTime = 0; ///< the frame info time when ground contact was first checked
   unsigned lastTimeWithPressure = 0; /**< Last time when there was enough pressure while ground contact is still assumed (in ms). */
   unsigned lastTimeWithoutPressure = 0; /**< Last time when there wasn't enough pressure while ground contact is not yet assumed (in ms). */
+  unsigned lastTimeSay = 0; /**< Last time when something was queued to say. */
+  unsigned lastTimeGround = 0; /**< Last time when we wanted to say 'Ground'. */
+  unsigned lastTimeHigh = 0; /**< Last time when we wanted to say 'High'. */
 
   void update(GroundContactState& groundContactState) override;
 };

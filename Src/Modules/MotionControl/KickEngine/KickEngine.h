@@ -15,16 +15,18 @@
 #include "Representations/MotionControl/KickGenerator.h"
 #include "Representations/Sensing/FootSupport.h"
 #include "Representations/Sensing/InertialData.h"
-#include "Representations/Sensing/TorsoMatrix.h"
-#include "Tools/Module/Module.h"
+#include "Representations/Sensing/RobotStableState.h"
+#include "Representations/Sensing/SolePressureState.h"
+#include "Framework/Module.h"
 #include "Tools/Motion/MotionUtilities.h"
-#include "Tools/Streams/InStreams.h"
+#include "Streaming/InStreams.h"
 
 MODULE(KickEngine,
 {,
   USES(JointRequest),
   REQUIRES(DamageConfigurationBody),
   REQUIRES(FootSupport),
+  REQUIRES(SolePressureState),
   REQUIRES(FrameInfo),
   REQUIRES(InertialData),
   REQUIRES(JointAngles),
@@ -32,7 +34,7 @@ MODULE(KickEngine,
   REQUIRES(MassCalibration),
   REQUIRES(RobotDimensions),
   REQUIRES(RobotModel),
-  REQUIRES(TorsoMatrix),
+  REQUIRES(RobotStableState),
   PROVIDES(KickGenerator),
   DEFINES_PARAMETERS(
   {,
@@ -55,19 +57,20 @@ struct KickPhase : MotionPhase
 {
   explicit KickPhase(KickEngine& engine, const KickRequest& kickRequest, const MotionPhase& lastPhase, const JointRequest& jointRequest);
 
+  KickRequest currentKickRequest;
 private:
 
+  Pose3f leftStartSole;
+  Pose3f rightStartSole;
+  KickEngineData data;
   KickEngine& engine;
 
-  KickEngineData data;
   bool compensate = false;
   bool compensated = false;
   bool isInterpolating = true;
   bool adjustStartArmPosition = true; // if the arms are on the back, move them to the side
-  int boostState = 0;
   unsigned startTime = 0;
   unsigned bothFeetGroundContactTimestamp = 0;
-  KickRequest currentKickRequest;
   bool leftArmInterpolation = false;
   bool rightArmInterpolation = false;
 

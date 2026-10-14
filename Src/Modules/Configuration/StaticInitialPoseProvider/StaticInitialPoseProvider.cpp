@@ -1,7 +1,7 @@
 /**
  * @file StaticInitialPoseProvider.cpp
  *
- * Sets the positions from the config-file into the representation StaticInitialPose
+ * Sets the positions from the configuration file into the representation StaticInitialPose
  *
  * @author Tim Haß
  * @author Nicole Schrader
@@ -9,7 +9,7 @@
 
 #include "StaticInitialPoseProvider.h"
 
-MAKE_MODULE(StaticInitialPoseProvider, infrastructure);
+MAKE_MODULE(StaticInitialPoseProvider);
 
 void StaticInitialPoseProvider::update(StaticInitialPose& staticInitialPose)
 {
@@ -18,22 +18,21 @@ void StaticInitialPoseProvider::update(StaticInitialPose& staticInitialPose)
   staticInitialPose.isActive = isActive;
   if(isActive && static_cast<size_t>(loadVariation) < poseVariations.size())
   {
+    ASSERT(poseVariations.size() > 0);
     const PoseVariation& poses = poseVariations[loadVariation];
-    staticInitialPose.staticPoseOnField = poses.poseVaria[theGameInfo.playerNumber - 1];
+    staticInitialPose.staticPoseOnField = poses.poseVaria[theGameState.playerNumber - Settings::lowestValidPlayerNumber];
     staticInitialPose.jump = false;
     DEBUG_RESPONSE_ONCE("module:StaticInitialPoseProvider")
     {
-      setRobotsInSimulator(poses.poseVaria[theGameInfo.playerNumber - 1]);
+      setRobotsInSimulator(poses.poseVaria[theGameState.playerNumber - Settings::lowestValidPlayerNumber]);
       staticInitialPose.jump = true;
-      ++loadVariation;
+      loadVariation = (loadVariation + 1) % poseVariations.size();
     }
   }
 }
 
-void StaticInitialPoseProvider::setRobotsInSimulator(const Pose2f& staticInitialPose)
+void StaticInitialPoseProvider::setRobotsInSimulator([[maybe_unused]] const Pose2f& staticInitialPose)
 {
-  const Angle rotation = staticInitialPose.rotation >= 0
-                    ? staticInitialPose.rotation - pi
-                    : staticInitialPose.rotation + pi;
-  OUTPUT(idConsole, text, "mv " << -staticInitialPose.translation.x() << " " << -staticInitialPose.translation.y() << " 300 0 0 " << rotation);
+  OUTPUT(idConsole, text, "mv " << staticInitialPose.translation.x() << " " << staticInitialPose.translation.y() << " "
+         << theRobotDimensions.simOriginHeight << " 0 0 " << staticInitialPose.rotation);
 }

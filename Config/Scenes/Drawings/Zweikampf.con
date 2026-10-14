@@ -1,0 +1,7 @@
+vfd worldState cognition:Reset
+echo vfd worldState cognition:Reset
+echo vfd worldState option:Zweikampf:wheel
+echo vfd worldState option:Zweikampf:kicks
+echo vfd worldState option:Zweikampf:sideSteal
+echo vfd worldState option:Zweikampf:sidewardRange
+echo vfd worldState option:Zweikampf:wheelSteal

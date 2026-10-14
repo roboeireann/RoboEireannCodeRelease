@@ -6,7 +6,7 @@
  */
 
 #include "BodyContourProvider.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Debugging/DebugDrawings3D.h"
 
 void BodyContourProvider::update(BodyContour& bodyContour)
 {
@@ -79,4 +79,4 @@ bool BodyContourProvider::calculatePointInImage(const Vector3f& pointInWorld, Ve
     return false;
 }
 
-MAKE_MODULE(BodyContourProvider, perception);
+MAKE_MODULE(BodyContourProvider);

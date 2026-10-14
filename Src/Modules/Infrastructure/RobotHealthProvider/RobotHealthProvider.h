@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include "Tools/Module/Module.h"
-#include "Tools/RingBufferWithSum.h"
+#include "Framework/Module.h"
+#include "Math/RingBufferWithSum.h"
+#include "Representations/BehaviorControl/Libraries/LibDemo.h"
 #include "Representations/Infrastructure/RobotHealth.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/SensorData/JointSensorData.h"
@@ -17,6 +18,7 @@ MODULE(RobotHealthProvider,
 {,
   REQUIRES(FrameInfo),
   REQUIRES(JointSensorData),
+  REQUIRES(LibDemo),
   REQUIRES(MotionRobotHealth),
   REQUIRES(SystemSensorData),
   PROVIDES(RobotHealth),

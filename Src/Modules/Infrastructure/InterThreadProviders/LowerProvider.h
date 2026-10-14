@@ -9,24 +9,23 @@
 
 #pragma once
 
-#include "Representations/Perception/GoalPercepts/GoalPostsPercept.h"
+#include "Representations/MotionControl/OdometryData.h"
 #include "Representations/Perception/ImagePreprocessing/FieldBoundary.h"
-#include "Representations/Perception/ObstaclesPercepts/ObstaclesFieldPercept.h"
 #include "Representations/Perception/ObstaclesPercepts/ObstaclesPerceptorData.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 STREAMABLE_WITH_BASE(LowerFieldBoundary, FieldBoundary, {,});
 STREAMABLE_WITH_BASE(LowerObstaclesPerceptorData, ObstaclesPerceptorData, {,});
-STREAMABLE_WITH_BASE(LowerGoalPostsPercept, GoalPostsPercept, {,});
+STREAMABLE_WITH_BASE(LowerOdometryData, OdometryData, {,});
 
 MODULE(LowerProvider,
 {,
   REQUIRES(LowerFieldBoundary),
   PROVIDES(OtherFieldBoundary),
-  REQUIRES(LowerGoalPostsPercept),
-  PROVIDES(OtherGoalPostsPercept),
   REQUIRES(LowerObstaclesPerceptorData),
   PROVIDES(OtherObstaclesPerceptorData),
+  REQUIRES(LowerOdometryData),
+  PROVIDES(OtherOdometryData),
 });
 
 class LowerProvider : public LowerProviderBase
@@ -39,15 +38,15 @@ class LowerProvider : public LowerProviderBase
 
   /**
    * This method is called when the representation provided needs to be updated.
-   * @param theOtherGoalPostPercept The representation updated.
-   */
-  void update(OtherGoalPostsPercept& theOtherGoalPostsPercept) override;
-
-  /**
-   * This method is called when the representation provided needs to be updated.
    * @param theOtherObstaclesPerceptorData Since no data is sent from the lower
    *                                      to the upper image, nothing happens
    *                                      here.
    */
   void update(OtherObstaclesPerceptorData& theOtherObstaclesPerceptorData) override;
+
+  /**
+   * This method is called when the representation provided needs to be updated.
+   * @param theOtherOdometryData The representation updated.
+   */
+  void update(OtherOdometryData& theOtherOdometryData) override;
 };

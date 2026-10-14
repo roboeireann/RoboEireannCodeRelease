@@ -6,9 +6,8 @@
 
 #pragma once
 
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include <vector>
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
 
 /**
  * @struct CirclePercept
@@ -16,11 +15,13 @@
  */
 STREAMABLE(CirclePercept,
 {
-  /**
-   * The method draws the percepts to image/field/3D scene.
-   */
-  void draw() const,
+  /** The method draws the percepts to image/field/3D scene. */
+  void draw() const;
+
+  /** Verifies that this percept contains valid values. */
+  void verify() const,
 
   (Vector2f)(Vector2f::Zero()) pos, /**< The position of the center of the center circle in field coordinates */
-  (bool)(false) wasSeen, /**< Has the percept been seen in the last frame? */
+  (Matrix2f)((Matrix2f() << 1.f, 0.f, 0.f, 1.f).finished()) cov,  /**< The covariance of the center circle "measurement" */
+  (bool)(false) wasSeen,            /**< Has the percept been seen in the last frame? */
 });

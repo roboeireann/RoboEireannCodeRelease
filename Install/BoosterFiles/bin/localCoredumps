@@ -1,0 +1,33 @@
+#!/bin/bash
+# cores.sh - enable or restore core dump handling
+# Usage: ./cores.sh enable | restore
+
+CORE_PATTERN_FILE="/proc/sys/kernel/core_pattern"
+SAVED_PATTERN_FILE="/home/booster/cores_saved_pattern"
+
+case "${1}" in
+  enable)
+    cat "$CORE_PATTERN_FILE" > "$SAVED_PATTERN_FILE"
+    echo "Saved pattern: $(cat $SAVED_PATTERN_FILE)"
+
+    echo "core.%e.%p.%t" | sudo tee "$CORE_PATTERN_FILE" > /dev/null
+    sudo systemctl stop apport
+    echo "Core pattern now: $(cat $CORE_PATTERN_FILE)"
+    echo "Cores will land in: $(pwd)"
+    echo "Remember to: ulimit -c unlimited  in your launch shell"
+    ;;
+  restore)
+    if [ ! -f "$SAVED_PATTERN_FILE" ]; then
+      echo "No saved pattern found at $SAVED_PATTERN_FILE - did you run enable first?"
+      exit 1
+    fi
+    cat "$SAVED_PATTERN_FILE" | sudo tee "$CORE_PATTERN_FILE" > /dev/null
+    sudo systemctl start apport
+    echo "Pattern restored: $(cat $CORE_PATTERN_FILE)"
+    rm "$SAVED_PATTERN_FILE"
+    ;;
+  *)
+    echo "Usage: $0 enable | restore"
+    exit 1
+    ;;
+esac

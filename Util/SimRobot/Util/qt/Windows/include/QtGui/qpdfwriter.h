@@ -61,6 +61,9 @@ public:
     explicit QPdfWriter(QIODevice *device);
     ~QPdfWriter();
 
+    void setPdfVersion(PdfVersion version);
+    PdfVersion pdfVersion() const;
+
     QString title() const;
     void setTitle(const QString &title);
 
@@ -72,21 +75,10 @@ public:
     void setResolution(int resolution);
     int resolution() const;
 
-#ifdef Q_QDOC
-    bool setPageLayout(const QPageLayout &pageLayout);
-    bool setPageSize(const QPageSize &pageSize);
-    bool setPageOrientation(QPageLayout::Orientation orientation);
-    bool setPageMargins(const QMarginsF &margins);
-    bool setPageMargins(const QMarginsF &margins, QPageLayout::Unit units);
-    QPageLayout pageLayout() const;
-#else
-    using QPagedPaintDevice::setPageSize;
-#endif
+    void setDocumentXmpMetadata(const QByteArray &xmpMetadata);
+    QByteArray documentXmpMetadata() const;
 
-    void setPageSize(PageSize size) override;
-    void setPageSizeMM(const QSizeF &size) override;
-
-    void setMargins(const Margins &m) override;
+    void addFileAttachment(const QString &fileName, const QByteArray &data, const QString &mimeType = QString());
 
 protected:
     QPaintEngine *paintEngine() const override;

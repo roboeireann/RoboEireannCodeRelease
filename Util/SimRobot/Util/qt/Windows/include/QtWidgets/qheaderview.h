@@ -43,10 +43,9 @@
 #include <QtWidgets/qtwidgetsglobal.h>
 #include <QtWidgets/qabstractitemview.h>
 
+QT_REQUIRE_CONFIG(itemviews);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_ITEMVIEWS
 
 class QHeaderViewPrivate;
 class QStyleOptionHeader;
@@ -54,14 +53,19 @@ class QStyleOptionHeader;
 class Q_WIDGETS_EXPORT QHeaderView : public QAbstractItemView
 {
     Q_OBJECT
+    Q_PROPERTY(bool firstSectionMovable READ isFirstSectionMovable WRITE setFirstSectionMovable)
     Q_PROPERTY(bool showSortIndicator READ isSortIndicatorShown WRITE setSortIndicatorShown)
     Q_PROPERTY(bool highlightSections READ highlightSections WRITE setHighlightSections)
     Q_PROPERTY(bool stretchLastSection READ stretchLastSection WRITE setStretchLastSection)
-    Q_PROPERTY(bool cascadingSectionResizes READ cascadingSectionResizes WRITE setCascadingSectionResizes)
-    Q_PROPERTY(int defaultSectionSize READ defaultSectionSize WRITE setDefaultSectionSize RESET resetDefaultSectionSize)
+    Q_PROPERTY(bool cascadingSectionResizes READ cascadingSectionResizes
+               WRITE setCascadingSectionResizes)
+    Q_PROPERTY(int defaultSectionSize READ defaultSectionSize WRITE setDefaultSectionSize
+               RESET resetDefaultSectionSize)
     Q_PROPERTY(int minimumSectionSize READ minimumSectionSize WRITE setMinimumSectionSize)
     Q_PROPERTY(int maximumSectionSize READ maximumSectionSize WRITE setMaximumSectionSize)
     Q_PROPERTY(Qt::Alignment defaultAlignment READ defaultAlignment WRITE setDefaultAlignment)
+    Q_PROPERTY(bool sortIndicatorClearable READ isSortIndicatorClearable
+               WRITE setSortIndicatorClearable NOTIFY sortIndicatorClearableChanged)
 
 public:
 
@@ -75,16 +79,16 @@ public:
     };
     Q_ENUM(ResizeMode)
 
-    explicit QHeaderView(Qt::Orientation orientation, QWidget *parent = Q_NULLPTR);
+    explicit QHeaderView(Qt::Orientation orientation, QWidget *parent = nullptr);
     virtual ~QHeaderView();
 
-    void setModel(QAbstractItemModel *model) Q_DECL_OVERRIDE;
+    void setModel(QAbstractItemModel *model) override;
 
     Qt::Orientation orientation() const;
     int offset() const;
     int length() const;
-    QSize sizeHint() const Q_DECL_OVERRIDE;
-    void setVisible(bool v) Q_DECL_OVERRIDE;
+    QSize sizeHint() const override;
+    void setVisible(bool v) override;
     int sectionSizeHint(int logicalIndex) const;
 
     int visualIndexAt(int position) const;
@@ -115,17 +119,11 @@ public:
 
     void setSectionsMovable(bool movable);
     bool sectionsMovable() const;
-#if QT_DEPRECATED_SINCE(5, 0)
-    inline QT_DEPRECATED void setMovable(bool movable) { setSectionsMovable(movable); }
-    inline QT_DEPRECATED bool isMovable() const { return sectionsMovable(); }
-#endif
+    void setFirstSectionMovable(bool movable);
+    bool isFirstSectionMovable() const;
 
     void setSectionsClickable(bool clickable);
     bool sectionsClickable() const;
-#if QT_DEPRECATED_SINCE(5, 0)
-    inline QT_DEPRECATED void setClickable(bool clickable) { setSectionsClickable(clickable); }
-    inline QT_DEPRECATED bool isClickable() const { return sectionsClickable(); }
-#endif
 
     void setHighlightSections(bool highlight);
     bool highlightSections() const;
@@ -137,15 +135,6 @@ public:
     void setResizeContentsPrecision(int precision);
     int  resizeContentsPrecision() const;
 
-#if QT_DEPRECATED_SINCE(5, 0)
-    inline QT_DEPRECATED void setResizeMode(ResizeMode mode)
-        { setSectionResizeMode(mode); }
-    inline QT_DEPRECATED void setResizeMode(int logicalindex, ResizeMode mode)
-        { setSectionResizeMode(logicalindex, mode); }
-    inline QT_DEPRECATED ResizeMode resizeMode(int logicalindex) const
-        { return sectionResizeMode(logicalindex); }
-#endif
-
     int stretchSectionCount() const;
 
     void setSortIndicatorShown(bool show);
@@ -154,6 +143,9 @@ public:
     void setSortIndicator(int logicalIndex, Qt::SortOrder order);
     int sortIndicatorSection() const;
     Qt::SortOrder sortIndicatorOrder() const;
+
+    void setSortIndicatorClearable(bool clearable);
+    bool isSortIndicatorClearable() const;
 
     bool stretchLastSection() const;
     void setStretchLastSection(bool stretch);
@@ -173,7 +165,7 @@ public:
     Qt::Alignment defaultAlignment() const;
     void setDefaultAlignment(Qt::Alignment alignment);
 
-    void doItemsLayout() Q_DECL_OVERRIDE;
+    void doItemsLayout() override;
     bool sectionsMoved() const;
     bool sectionsHidden() const;
 
@@ -182,7 +174,7 @@ public:
     bool restoreState(const QByteArray &state);
 #endif
 
-    void reset() Q_DECL_OVERRIDE;
+    void reset() override;
 
 public Q_SLOTS:
     void setOffset(int offset);
@@ -201,6 +193,7 @@ Q_SIGNALS:
     void sectionHandleDoubleClicked(int logicalIndex);
     void geometriesChanged();
     void sortIndicatorChanged(int logicalIndex, Qt::SortOrder order);
+    void sortIndicatorClearableChanged(bool clearable);
 
 protected Q_SLOTS:
     void updateSection(int logicalIndex);
@@ -209,49 +202,59 @@ protected Q_SLOTS:
     void sectionsAboutToBeRemoved(const QModelIndex &parent, int logicalFirst, int logicalLast);
 
 protected:
-    QHeaderView(QHeaderViewPrivate &dd, Qt::Orientation orientation, QWidget *parent = Q_NULLPTR);
+    QHeaderView(QHeaderViewPrivate &dd, Qt::Orientation orientation, QWidget *parent = nullptr);
     void initialize();
 
     void initializeSections();
     void initializeSections(int start, int end);
-    void currentChanged(const QModelIndex &current, const QModelIndex &old) Q_DECL_OVERRIDE;
+    void currentChanged(const QModelIndex &current, const QModelIndex &old) override;
 
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
-    void paintEvent(QPaintEvent *e) Q_DECL_OVERRIDE;
-    void mousePressEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    void mouseMoveEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    void mouseReleaseEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    void mouseDoubleClickEvent(QMouseEvent *e) Q_DECL_OVERRIDE;
-    bool viewportEvent(QEvent *e) Q_DECL_OVERRIDE;
+    bool event(QEvent *e) override;
+    void paintEvent(QPaintEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
+    void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
+    bool viewportEvent(QEvent *e) override;
 
     virtual void paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const;
     virtual QSize sectionSizeFromContents(int logicalIndex) const;
 
-    int horizontalOffset() const Q_DECL_OVERRIDE;
-    int verticalOffset() const Q_DECL_OVERRIDE;
-    void updateGeometries() Q_DECL_OVERRIDE;
-    void scrollContentsBy(int dx, int dy) Q_DECL_OVERRIDE;
+    int horizontalOffset() const override;
+    int verticalOffset() const override;
+    void updateGeometries() override;
+    void scrollContentsBy(int dx, int dy) override;
 
-    void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles = QVector<int>()) Q_DECL_OVERRIDE;
-    void rowsInserted(const QModelIndex &parent, int start, int end) Q_DECL_OVERRIDE;
+    void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight,
+                     const QList<int> &roles = QList<int>()) override;
+    void rowsInserted(const QModelIndex &parent, int start, int end) override;
 
-    QRect visualRect(const QModelIndex &index) const Q_DECL_OVERRIDE;
-    void scrollTo(const QModelIndex &index, ScrollHint hint) Q_DECL_OVERRIDE;
+    QRect visualRect(const QModelIndex &index) const override;
+    void scrollTo(const QModelIndex &index, ScrollHint hint) override;
 
-    QModelIndex indexAt(const QPoint &p) const Q_DECL_OVERRIDE;
-    bool isIndexHidden(const QModelIndex &index) const Q_DECL_OVERRIDE;
+    QModelIndex indexAt(const QPoint &p) const override;
+    bool isIndexHidden(const QModelIndex &index) const override;
 
-    QModelIndex moveCursor(CursorAction, Qt::KeyboardModifiers) Q_DECL_OVERRIDE;
-    void setSelection(const QRect& rect, QItemSelectionModel::SelectionFlags flags) Q_DECL_OVERRIDE;
-    QRegion visualRegionForSelection(const QItemSelection &selection) const Q_DECL_OVERRIDE;
-    void initStyleOption(QStyleOptionHeader *option) const;
+    QModelIndex moveCursor(CursorAction, Qt::KeyboardModifiers) override;
+    void setSelection(const QRect& rect, QItemSelectionModel::SelectionFlags flags) override;
+    QRegion visualRegionForSelection(const QItemSelection &selection) const override;
+    virtual void initStyleOptionForIndex(QStyleOptionHeader *option, int logicalIndex) const;
+    virtual void initStyleOption(QStyleOptionHeader *option) const;
 
     friend class QTableView;
     friend class QTreeView;
 
 private:
+    void initStyleOption(QStyleOptionFrame *option) const override;
+
+    // ### Qt6: make them protected slots in QHeaderViewPrivate
     Q_PRIVATE_SLOT(d_func(), void _q_sectionsRemoved(const QModelIndex &parent, int logicalFirst, int logicalLast))
-    Q_PRIVATE_SLOT(d_func(), void _q_layoutAboutToBeChanged())
+    Q_PRIVATE_SLOT(d_func(), void _q_sectionsAboutToBeMoved(const QModelIndex &sourceParent, int logicalStart, int logicalEnd, const QModelIndex &destinationParent, int logicalDestination))
+    Q_PRIVATE_SLOT(d_func(), void _q_sectionsMoved(const QModelIndex &sourceParent, int logicalStart, int logicalEnd, const QModelIndex &destinationParent, int logicalDestination))
+    Q_PRIVATE_SLOT(d_func(), void _q_sectionsAboutToBeChanged(const QList<QPersistentModelIndex> &parents = QList<QPersistentModelIndex>(),
+                                                              QAbstractItemModel::LayoutChangeHint hint = QAbstractItemModel::NoLayoutChangeHint))
+    Q_PRIVATE_SLOT(d_func(), void _q_sectionsChanged(const QList<QPersistentModelIndex> &parents = QList<QPersistentModelIndex>(),
+                                                     QAbstractItemModel::LayoutChangeHint hint = QAbstractItemModel::NoLayoutChangeHint))
     Q_DECLARE_PRIVATE(QHeaderView)
     Q_DISABLE_COPY(QHeaderView)
 };
@@ -264,8 +267,6 @@ inline void QHeaderView::hideSection(int alogicalIndex)
 { setSectionHidden(alogicalIndex, true); }
 inline void QHeaderView::showSection(int alogicalIndex)
 { setSectionHidden(alogicalIndex, false); }
-
-#endif // QT_NO_ITEMVIEWS
 
 QT_END_NAMESPACE
 

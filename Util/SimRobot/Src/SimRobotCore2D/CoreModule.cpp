@@ -23,9 +23,11 @@ SimRobot::Application* CoreModule::application = nullptr;
 CoreModule* CoreModule::module = nullptr;
 
 CoreModule::CoreModule(SimRobot::Application& application) :
-  sceneIcon(":/Icons/bricks.png"),
-  objectIcon(":/Icons/brick.png")
+  sceneIcon(":/Icons/icons8-3d-model-50.png"),
+  objectIcon(":/Icons/icons8-orthogonal-view-50.png")
 {
+  sceneIcon.setIsMask(true);
+  objectIcon.setIsMask(true);
   CoreModule::application = &application;
   CoreModule::module = this;
 }
@@ -122,7 +124,7 @@ bool CoreModule::compile()
   application->addStatusLabel(*this, new CollisionsLabel);
 
   // Suggest further modules.
-  application->registerModule(*this, "File Editor", "SimRobotEditor", SimRobot::Flag::ignoreReset);
+  application->registerModule(*this, "File Editor", "SimRobotEditor");
 
   // Load the controller.
   if(!scene->controller.empty())

@@ -17,15 +17,11 @@
  */
 
 #include "PerceptRegistrationProvider.h"
-#include "Tools/Modeling/Measurements.h"
 
-MAKE_MODULE(PerceptRegistrationProvider, modeling);
+MAKE_MODULE(PerceptRegistrationProvider);
 
 PerceptRegistrationProvider::PerceptRegistrationProvider()
 {
-  // Initialize time stamps
-  timeOfLastPenaltyMarkCovarianceUpdate = 0;
-
   // Initialize penalty marks
   ownPenaltyMarkWorldModel =      Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0.f);
   opponentPenaltyMarkWorldModel = Vector2f(theFieldDimensions.xPosOpponentPenaltyMark, 0.f);
@@ -54,10 +50,48 @@ PerceptRegistrationProvider::PerceptRegistrationProvider()
     }
   }
 
+  // Initialize lists for intersections in the world model
+  // X
+  xIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosHalfwayLine, theFieldDimensions.centerCircleRadius));
+  xIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosHalfwayLine, -theFieldDimensions.centerCircleRadius));
+  // T
+  tIntersectionsWorld = xIntersectionsWorld;
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosHalfwayLine, theFieldDimensions.yPosRightTouchline));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosHalfwayLine, theFieldDimensions.yPosLeftTouchline));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftPenaltyArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightPenaltyArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftGoalArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightGoalArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftPenaltyArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightPenaltyArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftGoalArea));
+  tIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightGoalArea));
+  // L
+  lIntersectionsWorld = tIntersectionsWorld;
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightTouchline));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftTouchline));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightTouchline));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftTouchline));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosRightPenaltyArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosLeftPenaltyArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosRightGoalArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosLeftGoalArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentPenaltyArea, theFieldDimensions.yPosRightPenaltyArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentPenaltyArea, theFieldDimensions.yPosLeftPenaltyArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalArea, theFieldDimensions.yPosRightGoalArea));
+  lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoalArea, theFieldDimensions.yPosLeftGoalArea));
+  if(goalFrameIsPerceivedAsLines)
+  {
+    lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoal, theFieldDimensions.yPosLeftGoal));
+    lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOwnGoal, theFieldDimensions.yPosRightGoal));
+    lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoal, theFieldDimensions.yPosLeftGoal));
+    lIntersectionsWorld.push_back(Vector2f(theFieldDimensions.xPosOpponentGoal, theFieldDimensions.yPosRightGoal));
+  }
+
   // Compute deviations
   // If we see false positive center circles, they are sometimes seen in large corners.
-  // The closest constellation is near the crossing of the centerline and the side line:
-  Vector2f posOfClosestPotentialFalsePositiveCenterCircle(theFieldDimensions.centerCircleRadius, theFieldDimensions.yPosLeftSideline - theFieldDimensions.centerCircleRadius);
+  // The closest constellation is near the crossing of the halfway line and the touchline:
+  Vector2f posOfClosestPotentialFalsePositiveCenterCircle(theFieldDimensions.centerCircleRadius, theFieldDimensions.yPosLeftTouchline - theFieldDimensions.centerCircleRadius);
   maxCenterCircleDeviation = posOfClosestPotentialFalsePositiveCenterCircle.norm();
   maxCenterCircleDeviation *= 0.8f; // Some additional tolerance
   maxGoalPostDeviation = 2.f * theFieldDimensions.yPosLeftGoal / 3.f; // One third of the total goal width
@@ -97,40 +131,21 @@ void PerceptRegistrationProvider::preprocessMeasurements(PerceptRegistration& pe
   perceptRegistration.totalNumberOfAvailableLandmarks = 0;
   perceptRegistration.totalNumberOfAvailableLines = 0;
 
-  // Precompute and initialize stuff:
-  inverseCameraMatrix = theCameraMatrix.inverse();
-  currentRotationDeviation = theMotionInfo.executedPhase == MotionPhase::stand ? robotRotationDeviationInStand : robotRotationDeviation;
-  if(theFieldLineIntersections.intersections.size() > timesOfLastIntersectionCovarianceUpdates.size())
-  {
-    intersectionCovariances.resize(theFieldLineIntersections.intersections.size());
-    timesOfLastIntersectionCovarianceUpdates.resize(theFieldLineIntersections.intersections.size(), 0);
-  }
-  if(theGoalPostsPercept.goalPosts.size() > timesOfLastGoalPostCovarianceUpdates.size())
-  {
-    goalPostsCovariances.resize(theGoalPostsPercept.goalPosts.size());
-    timesOfLastGoalPostCovarianceUpdates.resize(theGoalPostsPercept.goalPosts.size(), 0);
-  }
-  if(theFieldLines.lines.size() > timesOfLastLineCovarianceUpdates.size())
-  {
-    lineCovariances.resize(theFieldLines.lines.size());
-    timesOfLastLineCovarianceUpdates.resize(theFieldLines.lines.size(), 0);
-  }
-
   // Count the number of perceived field elements (needed for computing the validity):
   // --- Field Features:
   if(thePenaltyMarkWithPenaltyAreaLine.isValid)
     perceptRegistration.totalNumberOfAvailableAbsolutePoseMeasurements++;
-  if(theMidCircle.isValid)
+  if(theCenterCircleWithLine.isValid)
+    perceptRegistration.totalNumberOfAvailableAbsolutePoseMeasurements++;
+  if(thePenaltyAreaAndGoalArea.isValid)
     perceptRegistration.totalNumberOfAvailableAbsolutePoseMeasurements++;
   // --- Landmarks:
   if(thePenaltyMarkPercept.wasSeen)
     perceptRegistration.totalNumberOfAvailableLandmarks++;
   if(theCirclePercept.wasSeen)
     perceptRegistration.totalNumberOfAvailableLandmarks++;
-  for(auto const& goalPost : theGoalPostsPercept.goalPosts)
-    if(goalPost.baseInImage)
-      perceptRegistration.totalNumberOfAvailableLandmarks++;
   perceptRegistration.totalNumberOfAvailableLandmarks += static_cast<int>(theFieldLineIntersections.intersections.size());
+  perceptRegistration.totalNumberOfAvailableLandmarks += static_cast<int>(theMLIntersectionsPercept.intersections.size());
   // --- Lines:
   perceptRegistration.totalNumberOfAvailableLines = static_cast<int>(theFieldLines.lines.size());
 }
@@ -138,7 +153,8 @@ void PerceptRegistrationProvider::preprocessMeasurements(PerceptRegistration& pe
 void PerceptRegistrationProvider::registerAbsolutePoseMeasurements(const Pose2f& pose, std::vector<RegisteredAbsolutePoseMeasurement>& absolutePoseMeasurements)
 {
   registerSingleAbsolutePoseMeasurement(pose, thePenaltyMarkWithPenaltyAreaLine, absolutePoseMeasurements);
-  registerSingleAbsolutePoseMeasurement(pose, theMidCircle, absolutePoseMeasurements);
+  registerSingleAbsolutePoseMeasurement(pose, theCenterCircleWithLine, absolutePoseMeasurements);
+  registerSingleAbsolutePoseMeasurement(pose, thePenaltyAreaAndGoalArea, absolutePoseMeasurements);
 }
 
 void PerceptRegistrationProvider::registerSingleAbsolutePoseMeasurement(const Pose2f& pose, const FieldFeature& measurement, std::vector<RegisteredAbsolutePoseMeasurement>& absolutePoseMeasurements)
@@ -155,6 +171,7 @@ void PerceptRegistrationProvider::registerSingleAbsolutePoseMeasurement(const Po
         if(std::abs(angularDifference) < globalPoseAssociationMaxAngularDeviation)
         {
           newPose.perceivedRelativePose = measurement;
+          newPose.covariance = measurement.covOfAbsoluteRobotPose;
           absolutePoseMeasurements.push_back(newPose);
         }
       }
@@ -196,12 +213,7 @@ void PerceptRegistrationProvider::registerLandmarks(const Pose2f& pose, std::vec
       RegisteredLandmark newLandmark;
       newLandmark.model = penaltyMarkWorldModel;
       newLandmark.percept = thePenaltyMarkPercept.positionOnField;
-      if(timeOfLastPenaltyMarkCovarianceUpdate != theFrameInfo.time)
-      {
-        penaltyMarkCovariance = Measurements::positionToCovarianceMatrixInRobotCoordinates(newLandmark.percept, 0.f, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation);
-        timeOfLastPenaltyMarkCovarianceUpdate = theFrameInfo.time;
-      }
-      newLandmark.covPercept = penaltyMarkCovariance;
+      newLandmark.covPercept = thePenaltyMarkPercept.covarianceOnField;
       landmarks.push_back(newLandmark);
     }
   }
@@ -214,25 +226,7 @@ void PerceptRegistrationProvider::registerLandmarks(const Pose2f& pose, std::vec
       RegisteredLandmark newLandmark;
       newLandmark.model = Vector2f(0.f, 0.f);
       newLandmark.percept = theCirclePercept.pos;
-      if(timeOfLastCenterCircleCovarianceUpdate != theFrameInfo.time)
-      {
-        // The distance to a perceived center circle center
-        // might be extremely small (which results in an extremely small covariance) as
-        // the center is not perceived directly but is computed based on lines on the circle.
-        // An extreme case would be a robot standing in the center of the center circle.
-        // However, the measurement of the circle is definitely not as precise as
-        // the small covariance might indicate. This could lead to significant localization
-        // errors that rotate the robot in the wrong direction. B-Human will das nicht.
-        // Thus, a minimum is required for the covariance. This is realized by assuming a minimum
-        // distance to the center circle (the covariance computation is based on this distance).
-        const float circleDistance = theCirclePercept.pos.norm();
-        const float minimumCircleDistance = theFieldDimensions.centerCircleRadius * 0.7834f; // Based on optimization.                        Not.
-        centerCircleCovariance = Measurements::positionToCovarianceMatrixInRobotCoordinates(
-          circleDistance < minimumCircleDistance ? Vector2f(minimumCircleDistance, 0.f) : theCirclePercept.pos,
-          0.f, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation);
-        timeOfLastCenterCircleCovarianceUpdate = theFrameInfo.time;
-      }
-      newLandmark.covPercept = centerCircleCovariance;
+      newLandmark.covPercept = theCirclePercept.cov;
       landmarks.push_back(newLandmark);
     }
   }
@@ -241,38 +235,27 @@ void PerceptRegistrationProvider::registerLandmarks(const Pose2f& pose, std::vec
   {
     const auto& intersection = theFieldLineIntersections.intersections[i];
     Vector2f intersectionInWorldModel;
-    if(getCorrespondingIntersection(pose, intersection, intersectionInWorldModel))
+    bool intersectionFound = useIntersectionDirections ? getCorrespondingIntersection(pose, intersection, intersectionInWorldModel)
+                             : getCorrespondingIntersectionNoDirections(pose, intersection, intersectionInWorldModel);
+    if(intersectionFound)
     {
       RegisteredLandmark newLandmark;
       newLandmark.model = intersectionInWorldModel;
       newLandmark.percept = intersection.pos;
-      if(timesOfLastIntersectionCovarianceUpdates[i] < theFrameInfo.time)
-      {
-        intersectionCovariances[i] = Measurements::positionToCovarianceMatrixInRobotCoordinates(newLandmark.percept, 0.f, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation);
-        timesOfLastIntersectionCovarianceUpdates[i] = theFrameInfo.time;
-      }
-      newLandmark.covPercept = intersectionCovariances[i];
+      newLandmark.covPercept = intersection.cov;
       landmarks.push_back(newLandmark);
     }
   }
-  // Register goal posts: I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I I
-  for(unsigned int i = 0; i < theGoalPostsPercept.goalPosts.size(); ++i)
+  // Register ML-detected intersections (no direction checking — ML detections carry no line directions):
+  for(const auto& intersection : theMLIntersectionsPercept.intersections)
   {
-    const auto& goalPost = theGoalPostsPercept.goalPosts[i];
-    if(!goalPost.baseInImage)
-      continue;
-    Vector2f goalPostInWorldModel;
-    if(getCorrespondingGoalPost(pose, goalPost.relativePosition, goalPostInWorldModel))
+    Vector2f intersectionInWorldModel;
+    if(getCorrespondingMLIntersection(pose, intersection, intersectionInWorldModel))
     {
       RegisteredLandmark newLandmark;
-      newLandmark.model = goalPostInWorldModel;
-      newLandmark.percept = goalPost.relativePosition;
-      if(timesOfLastGoalPostCovarianceUpdates[i] < theFrameInfo.time)
-      {
-        goalPostsCovariances[i] = Measurements::positionToCovarianceMatrixInRobotCoordinates(newLandmark.percept, 0.f, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation);
-        timesOfLastGoalPostCovarianceUpdates[i] = theFrameInfo.time;
-      }
-      newLandmark.covPercept = goalPostsCovariances[i];
+      newLandmark.model = intersectionInWorldModel;
+      newLandmark.percept = intersection.pos;
+      newLandmark.covPercept = intersection.cov;
       landmarks.push_back(newLandmark);
     }
   }
@@ -289,19 +272,10 @@ void PerceptRegistrationProvider::registerLines(const Pose2f& pose, std::vector<
     const WorldModelFieldLine* fieldLineWorld = getPointerToCorrespondingLineInWorldModel(pose, line.first, line.last, line.length, lineIsOnCenterCircle);
     if(fieldLineWorld != nullptr || lineIsOnCenterCircle)
     {
-      // Compute covariance of point on center of line percept (if not already in buffer)
-      if(timesOfLastLineCovarianceUpdates[i] < theFrameInfo.time)
-      {
-        // TODO: Consider kind of covariance scaling similar to center circle percept.
-        const Vector2f linePerceptCenter = (line.first + line.last) * 0.5f;
-        lineCovariances[i] = Measurements::positionToCovarianceMatrixInRobotCoordinates(linePerceptCenter, 0.f, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation);
-        timesOfLastLineCovarianceUpdates[i] = theFrameInfo.time;
-      }
       // Normal case: Line in the world model was found and pointer references it:
       if(fieldLineWorld != nullptr)
       {
-        RegisteredLine newLine(line.first, line.last, fieldLineWorld->start, fieldLineWorld->end,
-                               lineCovariances[i]);
+        RegisteredLine newLine(line.first, line.last, fieldLineWorld->start, fieldLineWorld->end, line.cov);
         lines.push_back(newLine);
       }
       // Alternative case: Line appears to be a part of the center circle:
@@ -310,9 +284,8 @@ void PerceptRegistrationProvider::registerLines(const Pose2f& pose, std::vector<
         // The world model is just used for drawing, create a fake line from the center
         // of the perceived line to the center circle.
         const Vector2f fakeLineStartInWorld(pose * ((line.first + line.last) * 0.5f));
-        const Vector2f fakeLineEndInWorld(0.f,0.f);
-        RegisteredLine newLine(line.first, line.last, fakeLineStartInWorld, fakeLineEndInWorld,
-                               lineCovariances[i], true);
+        const Vector2f fakeLineEndInWorld(0.f, 0.f);
+        RegisteredLine newLine(line.first, line.last, fakeLineStartInWorld, fakeLineEndInWorld, line.cov, true);
         lines.push_back(newLine);
       }
       // Remaining case: line appears to be on the center circle but should be ignored
@@ -336,7 +309,7 @@ bool PerceptRegistrationProvider::getCorrespondingGoalPost(const Pose2f& pose, c
 {
   const Vector2f goalPostInWorld = pose * goalPostPercept;
   const Vector2f* listOfGoalPosts = goalPostInWorld.x() > 0.f ? &opponentGoalPostsWorldModel[0] : &ownGoalPostsWorldModel[0];
-  for(int i=0; i<2; i++)
+  for(int i = 0; i < 2; i++)
   {
     if((listOfGoalPosts[i] - goalPostInWorld).norm() <= maxGoalPostDeviation)
     {
@@ -359,10 +332,18 @@ bool PerceptRegistrationProvider::getCorrespondingIntersection(const Pose2f& pos
     int section = intersectionDirectionTo90DegreeSection(pose, intersectionPercept.dir1);
     switch(section)
     {
-      case 0:   intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner0];   break;
-      case 90:  intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner90];  break;
-      case 180: intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner180]; break;
-      default:  intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner270]; break;
+      case 0:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner0];
+        break;
+      case 90:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner90];
+        break;
+      case 180:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner180];
+        break;
+      default:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::tCorner270];
+        break;
     }
   }
   else if(intersectionPercept.type == FieldLineIntersections::Intersection::L)
@@ -370,10 +351,18 @@ bool PerceptRegistrationProvider::getCorrespondingIntersection(const Pose2f& pos
     int section = intersectionDirectionTo90DegreeSection(pose, intersectionPercept.dir1);
     switch(section)
     {
-      case 0:   intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner0];   break;
-      case 90:  intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner90];  break;
-      case 180: intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner180]; break;
-      default:  intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner270]; break;
+      case 0:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner0];
+        break;
+      case 90:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner90];
+        break;
+      case 180:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner180];
+        break;
+      default:
+        intersectionList = &theFieldDimensions.corners[FieldDimensions::lCorner270];
+        break;
     }
   }
   if(intersectionList != 0)
@@ -406,19 +395,92 @@ bool PerceptRegistrationProvider::getCorrespondingIntersection(const Pose2f& pos
   return false;
 }
 
+bool PerceptRegistrationProvider::getCorrespondingIntersectionNoDirections(const Pose2f& pose, const FieldLineIntersections::Intersection& intersectionPercept, Vector2f& intersectionWorldModel) const
+{
+  const std::vector< Vector2f >* intersectionList = 0;
+  if(intersectionPercept.type == FieldLineIntersections::Intersection::L)
+    intersectionList = &lIntersectionsWorld;
+  else if(intersectionPercept.type == FieldLineIntersections::Intersection::T)
+    intersectionList = &tIntersectionsWorld;
+  else if(intersectionPercept.type == FieldLineIntersections::Intersection::X)
+    intersectionList = &xIntersectionsWorld;
+
+  if(intersectionList != 0)
+  {
+    // Check for empty list. This might happen for special configurations of demo fields.
+    if(intersectionList->size() == 0)
+      return false;
+    // Initialize variables to store the real world intersection that is closest to the percept:
+    const Vector2f perceptWorld = pose * intersectionPercept.pos;
+    Vector2f closestIntersectionWorld = intersectionList->at(0);
+    float sqrDistanceToClosestIntersectionWorld = (perceptWorld - closestIntersectionWorld).squaredNorm();
+    // Iterate over list to find the closest intersection:
+    for(unsigned int i = 1; i < intersectionList->size(); ++i)
+    {
+      const Vector2f& intersection = intersectionList->at(i);
+      const float sqrDistance = (perceptWorld - intersection).squaredNorm();
+      if(sqrDistance < sqrDistanceToClosestIntersectionWorld)
+      {
+        sqrDistanceToClosestIntersectionWorld = sqrDistance;
+        closestIntersectionWorld = intersection;
+      }
+    }
+    // Check, if closest intersection is close enough:
+    if(sqrDistanceToClosestIntersectionWorld < maxIntersectionDeviation * maxIntersectionDeviation)
+    {
+      intersectionWorldModel = closestIntersectionWorld;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PerceptRegistrationProvider::getCorrespondingMLIntersection(const Pose2f& pose, const MLIntersectionsPercept::Intersection& intersection, Vector2f& intersectionWorldModel) const
+{
+  const std::vector<Vector2f>* intersectionList = nullptr;
+  if(intersection.type == MLIntersectionsPercept::Intersection::L)
+    intersectionList = &lIntersectionsWorld;
+  else if(intersection.type == MLIntersectionsPercept::Intersection::T)
+    intersectionList = &tIntersectionsWorld;
+  else if(intersection.type == MLIntersectionsPercept::Intersection::X)
+    intersectionList = &xIntersectionsWorld;
+
+  if(intersectionList == nullptr || intersectionList->empty())
+    return false;
+
+  const Vector2f perceptWorld = pose * intersection.pos;
+  Vector2f closestIntersectionWorld = intersectionList->at(0);
+  float sqrDistanceToClosest = (perceptWorld - closestIntersectionWorld).squaredNorm();
+  for(unsigned int i = 1; i < intersectionList->size(); ++i)
+  {
+    const float sqrDistance = (perceptWorld - intersectionList->at(i)).squaredNorm();
+    if(sqrDistance < sqrDistanceToClosest)
+    {
+      sqrDistanceToClosest = sqrDistance;
+      closestIntersectionWorld = intersectionList->at(i);
+    }
+  }
+  if(sqrDistanceToClosest < maxIntersectionDeviation * maxIntersectionDeviation)
+  {
+    intersectionWorldModel = closestIntersectionWorld;
+    return true;
+  }
+  return false;
+}
+
 int PerceptRegistrationProvider::intersectionDirectionTo90DegreeSection(const Pose2f& pose, const Vector2f& dir) const
 {
   Vector2f directionInFieldCoordinates = dir;
-  directionInFieldCoordinates.rotate(-pose.rotation);
+  directionInFieldCoordinates.rotate(pose.rotation);
   const float degrees = toDegrees(directionInFieldCoordinates.angle()) + 180.f;
   if(degrees < 45 || degrees >= 315)
-    return 0;
-  else if(degrees >= 45 && degrees < 135)
-    return 90;
-  else if(degrees >= 135 && degrees < 225)
     return 180;
-  else // if(degrees >= 225 && degrees < 315)
+  else if(degrees >= 45 && degrees < 135)
     return 270;
+  else if(degrees >= 135 && degrees < 225)
+    return 0;
+  else // if(degrees >= 225 && degrees < 315)
+    return 90;
 }
 
 const PerceptRegistrationProvider::WorldModelFieldLine*
@@ -454,14 +516,14 @@ PerceptRegistrationProvider::getPointerToCorrespondingLineInWorldModel(const Pos
       continue;
     // Not other conditions implemented yet. Some more might be added later (see old implementation).
     // ...
-    // Check association of perceived line to center line. Often, short schniptzels of the center circle
-    // become falsely associated to the center line, causing a translational error in the self-localization.
-    // Thus, any perceived center line must be longer than the center circle diameter, if it was perceived
+    // Check association of perceived line to halfway line. Often, short segments of the center circle
+    // become falsely associated to the halfway line, causing a translational error in the self-localization.
+    // Thus, any perceived halfway line must be longer than the center circle diameter, if it was perceived
     // from a distance that is larger than the diameter.
-    // Please note that these are just frickelparameters, but I do not think that we should
+    // Please note that these are just fiddle parameters, but I do not think that we should
     // add some separate parameters to the module.
     const float diameter = 2.f * theFieldDimensions.centerCircleRadius;
-    if(worldModelLine.isCenterLine && lineLength < diameter &&
+    if(worldModelLine.isHalfwayLine && lineLength < diameter &&
        start.norm() > diameter && end.norm() > diameter)
     {
       return nullptr;
@@ -476,7 +538,7 @@ bool PerceptRegistrationProvider::lineShouldBeMatchedWithCenterCircle(const Vect
 {
   // A line on the center circle
   // - is short,
-  if(lineLength > 2000.f)
+  if(lineLength > theFieldDimensions.centerCircleRadius)
     return false;
   // - has start and end points that are about one center circle radius away from the field center,
   const float distToStart = start.norm();
@@ -490,7 +552,7 @@ bool PerceptRegistrationProvider::lineShouldBeMatchedWithCenterCircle(const Vect
   Geometry::Line line;
   line.base = start;
   line.direction = dir;
-  const float distToCenter = std::abs(Geometry::getDistanceToLine(line, Vector2f::Zero()));
+  const float distToCenter = Geometry::getDistanceToLine(line, Vector2f::Zero());
   return distToCenter > centerCircleCorridorInner && distToCenter < centerCircleCorridorOuter;
 }
 

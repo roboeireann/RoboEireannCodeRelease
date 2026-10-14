@@ -7,22 +7,16 @@
 
 #pragma once
 
-#include "Tools/RobotParts/FsrSensors.h"
-#include "Tools/RobotParts/Joints.h"
-#include "Tools/RobotParts/Legs.h"
-#include "Tools/Streams/EnumIndexedArray.h"
-#include <cstring>
-#include "Tools/Math/Pose2f.h"
-#include "Tools/Streams/Enum.h"
+#include "RobotParts/FsrSensors.h"
+#include "RobotParts/Joints.h"
+#include "RobotParts/Legs.h"
+#include "Streaming/EnumIndexedArray.h"
+#include "Streaming/Enum.h"
+#include <array>
 
 STREAMABLE(DamageConfigurationHead,
-{
-  DamageConfigurationHead()
-  {
-    std::memset(audioChannelsDefect, 0, sizeof(audioChannelsDefect));
-  },
-
-  (bool[4]) audioChannelsDefect,
+{,
+  (std::array<bool,4>)({}) audioChannelsDefect,
 });
 
 STREAMABLE(DamageConfigurationBody,
@@ -41,11 +35,13 @@ STREAMABLE(DamageConfigurationBody,
     (bool)(false) footBumperDefect,
     (bool)(false) armContactDefect,
   }),
+  (bool)(false) disableAllMotion, // every MotionRequest is converted to playDead
   (bool)(false) noFieldGenuflect,
   (BrokenStandUp)(allFine) brokenStandUp,
+  (ENUM_INDEXED_ARRAY(std::vector<FsrSensors::FsrSensor>, Legs::Leg)) brokenFsrSensors,
   (Joints::stdVectorJoint)(Joints::stdVectorJoint()) jointsToEraseStiffness,
+  (Joints::stdVectorJoint)(Joints::stdVectorJoint()) jointsToMuteSirens,
   (Vector2f) startTiltLeft,
   (Vector2f) startTiltRight,
-  (bool) doNotBoost,
   (ENUM_INDEXED_ARRAY(Side, Legs::Leg)) sides,
 });

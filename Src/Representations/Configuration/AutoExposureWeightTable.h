@@ -1,7 +1,7 @@
 /**
  * @file AutoExposureWeightTable.h
  *
- * This file implements a representation to describe how the camera is using the image reagions to calculate the auto exposure.
+ * This file implements a representation to describe how the camera is using the image regions to calculate the auto exposure.
  *
  * @author <a href="mailto:jesse@tzi.de">Jesse Richter-Klug</a>
  */
@@ -9,8 +9,8 @@
 #pragma once
 
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Math/Eigen.h"
+#include "Streaming/EnumIndexedArray.h"
 
 STREAMABLE(AutoExposureWeightTable,
 {

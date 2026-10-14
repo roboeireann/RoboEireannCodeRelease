@@ -9,13 +9,15 @@
 
 #pragma once
 
-#include "Tools/Module/Module.h"
-#include "Tools/Debugging/DebugDrawings.h"
+#include "Framework/Module.h"
+#include "Debugging/DebugDrawings.h"
+#include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/MotionControl/OdometryData.h"
 #include "Representations/Modeling/Odometer.h"
 
 MODULE(OdometerProvider,
 {,
+  REQUIRES(FrameInfo),
   REQUIRES(OdometryData),
   PROVIDES(Odometer),
   LOADS_PARAMETERS(
@@ -34,7 +36,7 @@ class OdometerProvider : public OdometerProviderBase
 {
 private:
   Pose2f lastOdometryData; /**< Odometry data in last frame */
-  Matrix3f covariance;
+  unsigned lastFrameInfoTime = 0; /**< Last timestamp when an update occurred. */
 
   /**
    * The method that computes the odometry information
@@ -42,6 +44,4 @@ private:
    * @param odometer The odometry information that is updated by this module.
    */
   void update(Odometer& odometer) override;
-
-  void draw();
 };

@@ -8,18 +8,18 @@
 #pragma once
 
 #include "Representations/MotionControl/KickRequest.h"
-#include "Tools/Math/Angle.h"
+#include "Math/Angle.h"
 #include "Tools/Motion/MotionPhase.h"
 #include "Tools/Motion/WalkKickType.h"
-#include "Tools/Range.h"
-#include "Tools/RobotParts/Legs.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Streams/Enum.h"
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Math/Range.h"
+#include "RobotParts/Legs.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/Enum.h"
+#include "Streaming/EnumIndexedArray.h"
 
 /**
  * @struct KickInfo
- * A representation that contains the nearest pose for shooting a goal
+ * A representation that contains information about the available kicks
  */
 STREAMABLE(KickInfo,
 {
@@ -27,6 +27,8 @@ STREAMABLE(KickInfo,
   {,
     forwardFastRight,
     forwardFastLeft,
+    forwardFastRightPass,
+    forwardFastLeftPass,
     forwardFastRightLong,
     forwardFastLeftLong,
     walkForwardsRight,
@@ -37,31 +39,88 @@ STREAMABLE(KickInfo,
     walkSidewardsLeftFootToLeft,
     walkTurnRightFootToLeft,
     walkTurnLeftFootToRight,
+    walkTurnRightFootToLeftShifted,
+    walkTurnLeftFootToRightShifted,
     walkForwardStealBallLeft,
     walkForwardStealBallRight,
     walkForwardsRightAlternative,
     walkForwardsLeftAlternative,
 
-    // kicks up to here are used by the KickView
-    newKick,
+    standRLK1KickLongRight,
+    standRLK1KickLongLeft,
   });
 
   STREAMABLE(Kick,
   {,
-    (KickInfo::KickType) kickType,
-    (Angle) rotationOffset,
-    (Vector2f) ballOffset,
-    (Rangef) range,
-    (Rangef) ballVelocity,
-    (Rangef) exclusionRange,
+    (KickInfo::KickType) kickType, /**< The name of the kick. */
+    (Angle) rotationOffset, /**< The offset of the kick pose, e.g. how much does the robot need to be rotated away additionally from the kick angle. */
+    (Vector2f) ballOffset, /**< The offset of the kick pose, e.g. the robot pose relative to the ball. */
+    (Rangef) range, /**< The kick range (in mm). Note: all kicks deviate, this is just an approximation. */
+    (Rangef) ballVelocity, /**< The velocity of the ball after the kick (in mm/s). Note with this value the range value is determined at the start of the software. */
     (unsigned) executionTime, /**< Time needed to perform the kick or extra penalty for deficient kicks (in ms) */
     (Angle) postRotationOffset, /**< The angle at which the ball should be after the kick has been performed (relative to the pose of the robot after the kick, because some kicks change the rotation of the robot) */
-    (MotionPhase::Type) motion,
-    (KickRequest::KickMotionID) kickMotionType,
-    (WalkKicks::Type) walkKickType,
-    (Legs::Leg) kickLeg,
-    (bool) mirror,
+    (MotionPhase::Type) motion, /**< Is the kick a walk kick or a KickEngine kick? */
+    (KickRequest::KickMotionID) kickMotionType, /**< Kick name for the KickEngine. TODO should be removed ... */
+    (WalkKicks::Type) walkKickType, /**< The name of the walk kick. */
+    (Legs::Leg) kickLeg, /**< Which leg is the kicking one? TODO should be removed ... */
+    (bool) mirror, /**< Mirror the kick? TODO should be removed ... */
   });
+
+  inline KickInfo::KickType mirror(const KickInfo::KickType kick) const
+  {
+    switch(kick)
+    {
+      case KickInfo::forwardFastRight:
+        return KickInfo::forwardFastLeft;
+      case KickInfo::forwardFastLeft:
+        return KickInfo::forwardFastRight;
+      case KickInfo::forwardFastRightPass:
+        return KickInfo::forwardFastLeftPass;
+      case KickInfo::forwardFastLeftPass:
+        return KickInfo::forwardFastRightPass;
+      case KickInfo::forwardFastRightLong:
+        return KickInfo::forwardFastLeftLong;
+      case KickInfo::forwardFastLeftLong:
+        return KickInfo::forwardFastRightLong;
+      case KickInfo::walkForwardsRight:
+        return KickInfo::walkForwardsLeft;
+      case KickInfo::walkForwardsLeft:
+        return KickInfo::walkForwardsRight;
+      case KickInfo::walkForwardsRightLong:
+        return KickInfo::walkForwardsLeftLong;
+      case KickInfo::walkForwardsLeftLong:
+        return KickInfo::walkForwardsRightLong;
+      case KickInfo::walkSidewardsRightFootToRight:
+        return KickInfo::walkSidewardsLeftFootToLeft;
+      case KickInfo::walkSidewardsLeftFootToLeft:
+        return KickInfo::walkSidewardsRightFootToRight;
+      case KickInfo::walkTurnRightFootToLeft:
+        return KickInfo::walkTurnLeftFootToRight;
+      case KickInfo::walkTurnLeftFootToRight:
+        return KickInfo::walkTurnRightFootToLeft;
+      case KickInfo::walkTurnRightFootToLeftShifted:
+        return KickInfo::walkTurnLeftFootToRightShifted;
+      case KickInfo::walkTurnLeftFootToRightShifted:
+        return KickInfo::walkTurnRightFootToLeftShifted;
+      case KickInfo::walkForwardStealBallLeft:
+        return KickInfo::walkForwardStealBallRight;
+      case KickInfo::walkForwardStealBallRight:
+        return KickInfo::walkForwardStealBallLeft;
+      case KickInfo::walkForwardsRightAlternative:
+        return KickInfo::walkForwardsLeftAlternative;
+      case KickInfo::walkForwardsLeftAlternative:
+        return KickInfo::walkForwardsRightAlternative;
+      case KickInfo::standRLK1KickLongRight:
+        return KickInfo::standRLK1KickLongLeft;
+      case KickInfo::standRLK1KickLongLeft:
+        return KickInfo::standRLK1KickLongRight;
+      default:
+      {
+        FAIL("Unknown kick type.");
+        return KickInfo::walkForwardsLeft;
+      }
+    }
+  };
 
   const KickInfo::Kick& operator[](const KickInfo::KickType kickType) const { return kicks[kickType]; },
 

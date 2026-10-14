@@ -8,10 +8,10 @@
 #include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
 #include "Tools/Math/Transformation.h"
-#include "Tools/Module/Blackboard.h"
+#include "Framework/Blackboard.h"
 
 void FieldLineIntersections::draw() const
 {
@@ -97,21 +97,20 @@ void FieldLineIntersections::draw() const
       }
       if(transformationSuccessful)
       {
-        const Vector2f uncor1 = theImageCoordinateSystem->fromCorrected(p1);
-        const Vector2f uncor2 = theImageCoordinateSystem->fromCorrected(p2);
-        const Vector2f uncor3 = theImageCoordinateSystem->fromCorrected(p3);
-        const Vector2f uncor4 = theImageCoordinateSystem->fromCorrected(p4);
-        ARROW("representation:FieldLines:image", uncor1.x(), uncor1.y(), uncor2.x(), uncor2.y(),
+        const Vector2f uncorrected1 = theImageCoordinateSystem->fromCorrected(p1);
+        const Vector2f uncorrected2 = theImageCoordinateSystem->fromCorrected(p2);
+        const Vector2f uncorrected3 = theImageCoordinateSystem->fromCorrected(p3);
+        const Vector2f uncorrected4 = theImageCoordinateSystem->fromCorrected(p4);
+        ARROW("representation:FieldLines:image", uncorrected1.x(), uncorrected1.y(), uncorrected2.x(), uncorrected2.y(),
               3, Drawings::solidPen, ColorRGBA::red);
-        ARROW("representation:FieldLines:image", uncor3.x(), uncor3.y(), uncor4.x(), uncor4.y(),
+        ARROW("representation:FieldLines:image", uncorrected3.x(), uncorrected3.y(), uncorrected4.x(), uncorrected4.y(),
               3, Drawings::solidPen, ColorRGBA::green);
         Vector2f intersectionInImage;
         if(Transformation::robotToImage(inter->pos, *theCameraMatrix, *theCameraInfo, intersectionInImage))
         {
-          const Vector2f uncorIntersection = theImageCoordinateSystem->fromCorrected(intersectionInImage);
-          DRAW_TEXT("representation:FieldLines:image", uncorIntersection.x(), uncorIntersection.y(), 25, ColorRGBA(255, 180, 180),
-                   (inter->type == Intersection::L ? "L" : inter->type == Intersection::T ? "T" : "X") <<
-                   (inter->additionalType == Intersection::none ? "" : inter->additionalType == Intersection::mid ? "m" : "b"));
+          const Vector2f uncorrectedIntersection = theImageCoordinateSystem->fromCorrected(intersectionInImage);
+          DRAW_TEXT("representation:FieldLines:image", uncorrectedIntersection.x(), uncorrectedIntersection.y(), 25, ColorRGBA(255, 180, 180),
+                   (inter->type == Intersection::L ? "L" : inter->type == Intersection::T ? "T" : "X"));
         }
       }
     }
@@ -151,5 +150,22 @@ void FieldLineIntersections::draw() const
           break;
       }
     }
+  }
+}
+
+void FieldLineIntersections::verify() const
+{
+  for([[maybe_unused]] const Intersection& i : intersections)
+  {
+    ASSERT(std::isfinite(i.pos.x()));
+    ASSERT(std::isfinite(i.pos.y()));
+    ASSERT(std::isnormal(i.cov(0, 0)));
+    ASSERT(std::isnormal(i.cov(1, 1)));
+    ASSERT(std::isfinite(i.cov(0, 1)));
+    ASSERT(std::isfinite(i.cov(1, 0)));
+    ASSERT(std::isfinite(i.dir1.x()));
+    ASSERT(std::isfinite(i.dir1.y()));
+    ASSERT(std::isfinite(i.dir2.x()));
+    ASSERT(std::isfinite(i.dir2.y()));
   }
 }

@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -41,10 +41,9 @@
 #define QFUTUREWATCHER_H
 
 #include <QtCore/qfuture.h>
-
-#ifndef QT_NO_QFUTURE
-
 #include <QtCore/qobject.h>
+
+QT_REQUIRE_CONFIG(future);
 
 QT_BEGIN_NAMESPACE
 
@@ -58,7 +57,7 @@ class Q_CORE_EXPORT QFutureWatcherBase : public QObject
     Q_DECLARE_PRIVATE(QFutureWatcherBase)
 
 public:
-    explicit QFutureWatcherBase(QObject *parent = Q_NULLPTR);
+    explicit QFutureWatcherBase(QObject *parent = nullptr);
     // de-inline dtor
 
     int progressValue() const;
@@ -70,19 +69,29 @@ public:
     bool isFinished() const;
     bool isRunning() const;
     bool isCanceled() const;
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use isSuspending() or isSuspended() instead.")
     bool isPaused() const;
+#endif
+    bool isSuspending() const;
+    bool isSuspended() const;
 
     void waitForFinished();
 
     void setPendingResultsLimit(int limit);
 
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
 
 Q_SIGNALS:
     void started();
     void finished();
     void canceled();
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use suspending() instead.")
     void paused();
+#endif
+    void suspending();
+    void suspended();
     void resumed();
     void resultReadyAt(int resultIndex);
     void resultsReadyAt(int beginIndex, int endIndex);
@@ -92,14 +101,25 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void cancel();
-    void setPaused(bool paused);
-    void pause();
+    void setSuspended(bool suspend);
+    void suspend();
     void resume();
+    void toggleSuspended();
+
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use setSuspended() instead.")
+    void setPaused(bool paused);
+
+    QT_DEPRECATED_VERSION_X_6_0("Use suspended() instead.")
+    void pause();
+
+    QT_DEPRECATED_VERSION_X_6_0("Use toggleSuspended() instead.")
     void togglePaused();
+#endif
 
 protected:
-    void connectNotify (const QMetaMethod &signal) Q_DECL_OVERRIDE;
-    void disconnectNotify (const QMetaMethod &signal) Q_DECL_OVERRIDE;
+    void connectNotify (const QMetaMethod &signal) override;
+    void disconnectNotify (const QMetaMethod &signal) override;
 
     // called from setFuture() implemented in template sub-classes
     void connectOutputInterface();
@@ -115,7 +135,7 @@ template <typename T>
 class QFutureWatcher : public QFutureWatcherBase
 {
 public:
-    explicit QFutureWatcher(QObject *_parent = 0)
+    explicit QFutureWatcher(QObject *_parent = nullptr)
         : QFutureWatcherBase(_parent)
     { }
     ~QFutureWatcher()
@@ -125,7 +145,10 @@ public:
     QFuture<T> future() const
     { return m_future; }
 
+    template<typename U = T, typename = QtPrivate::EnableForNonVoid<U>>
     T result() const { return m_future.result(); }
+
+    template<typename U = T, typename = QtPrivate::EnableForNonVoid<U>>
     T resultAt(int index) const { return m_future.resultAt(index); }
 
 #ifdef Q_QDOC
@@ -138,7 +161,11 @@ public:
     bool isFinished() const;
     bool isRunning() const;
     bool isCanceled() const;
+#if QT_DEPRECATED_SINCE(6, 0)
     bool isPaused() const;
+#endif
+    bool isSuspending() const;
+    bool isSuspended() const;
 
     void waitForFinished();
 
@@ -148,7 +175,11 @@ Q_SIGNALS:
     void started();
     void finished();
     void canceled();
+#if QT_DEPRECATED_SINCE(6, 0)
     void paused();
+#endif
+    void suspending();
+    void suspended();
     void resumed();
     void resultReadyAt(int resultIndex);
     void resultsReadyAt(int beginIndex, int endIndex);
@@ -158,52 +189,28 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void cancel();
+    void setSuspended(bool suspend);
+    void suspend();
+    void resume();
+    void toggleSuspended();
+#if QT_DEPRECATED_SINCE(6, 0)
     void setPaused(bool paused);
     void pause();
-    void resume();
     void togglePaused();
-#endif
+#endif // QT_DEPRECATED_SINCE(6, 0)
+
+#endif // Q_QDOC
 
 private:
     QFuture<T> m_future;
-    const QFutureInterfaceBase &futureInterface() const Q_DECL_OVERRIDE { return m_future.d; }
-    QFutureInterfaceBase &futureInterface() Q_DECL_OVERRIDE { return m_future.d; }
+    const QFutureInterfaceBase &futureInterface() const override { return m_future.d; }
+    QFutureInterfaceBase &futureInterface() override { return m_future.d; }
 };
 
 template <typename T>
 Q_INLINE_TEMPLATE void QFutureWatcher<T>::setFuture(const QFuture<T> &_future)
 {
-    if (_future == m_future)
-        return;
-
-    disconnectOutputInterface(true);
-    m_future = _future;
-    connectOutputInterface();
-}
-
-template <>
-class QFutureWatcher<void> : public QFutureWatcherBase
-{
-public:
-    explicit QFutureWatcher(QObject *_parent = Q_NULLPTR)
-        : QFutureWatcherBase(_parent)
-    { }
-    ~QFutureWatcher()
-    { disconnectOutputInterface(); }
-
-    void setFuture(const QFuture<void> &future);
-    QFuture<void> future() const
-    { return m_future; }
-
-private:
-    QFuture<void> m_future;
-    const QFutureInterfaceBase &futureInterface() const Q_DECL_OVERRIDE { return m_future.d; }
-    QFutureInterfaceBase &futureInterface() Q_DECL_OVERRIDE { return m_future.d; }
-};
-
-Q_INLINE_TEMPLATE void QFutureWatcher<void>::setFuture(const QFuture<void> &_future)
-{
-    if (_future == m_future)
+    if (_future.d == m_future.d)
         return;
 
     disconnectOutputInterface(true);
@@ -212,6 +219,5 @@ Q_INLINE_TEMPLATE void QFutureWatcher<void>::setFuture(const QFuture<void> &_fut
 }
 
 QT_END_NAMESPACE
-#endif // QT_NO_QFUTURE
 
 #endif // QFUTUREWATCHER_H

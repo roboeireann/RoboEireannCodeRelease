@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2021 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtGui module of the Qt Toolkit.
@@ -40,15 +40,16 @@
 #ifndef QTEXTFORMAT_H
 #define QTEXTFORMAT_H
 
-#include <QtGui/qtguiglobal.h>
+#include <QtGui/qbrush.h>
 #include <QtGui/qcolor.h>
 #include <QtGui/qfont.h>
-#include <QtCore/qshareddata.h>
-#include <QtCore/qvector.h>
-#include <QtCore/qvariant.h>
 #include <QtGui/qpen.h>
-#include <QtGui/qbrush.h>
 #include <QtGui/qtextoption.h>
+#include <QtGui/qtguiglobal.h>
+
+#include <QtCore/qlist.h>
+#include <QtCore/qshareddata.h>
+#include <QtCore/qvariant.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -71,11 +72,6 @@ class QTextObject;
 class QTextCursor;
 class QTextDocument;
 class QTextLength;
-
-#ifndef QT_NO_DATASTREAM
-Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextLength &);
-Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextLength &);
-#endif
 
 #ifndef QT_NO_DEBUG_STREAM
 Q_GUI_EXPORT QDebug operator<<(QDebug, const QTextLength &);
@@ -117,15 +113,10 @@ private:
     friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextLength &);
     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextLength &);
 };
-Q_DECLARE_TYPEINFO(QTextLength, QT_VERSION >= QT_VERSION_CHECK(6,0,0) ? Q_PRIMITIVE_TYPE : Q_RELOCATABLE_TYPE);
+Q_DECLARE_TYPEINFO(QTextLength, Q_PRIMITIVE_TYPE);
 
 inline QTextLength::QTextLength(Type atype, qreal avalue)
     : lengthType(atype), fixedValueOrPercentage(avalue) {}
-
-#ifndef QT_NO_DATASTREAM
-Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextFormat &);
-Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextFormat &);
-#endif
 
 #ifndef QT_NO_DEBUG_STREAM
 Q_GUI_EXPORT QDebug operator<<(QDebug, const QTextFormat &);
@@ -140,9 +131,6 @@ public:
         BlockFormat = 1,
         CharFormat = 2,
         ListFormat = 3,
-#if QT_DEPRECATED_SINCE(5, 3)
-        TableFormat = 4,
-#endif
         FrameFormat = 5,
 
         UserFormat = 100
@@ -175,19 +163,28 @@ public:
         LineHeightType = 0x1049,
         BlockNonBreakableLines = 0x1050,
         BlockTrailingHorizontalRulerWidth = 0x1060,
+        HeadingLevel = 0x1070,
+        BlockQuoteLevel = 0x1080,
+        BlockCodeLanguage = 0x1090,
+        BlockCodeFence = 0x1091,
+        BlockMarker = 0x10A0,
 
         // character properties
         FirstFontProperty = 0x1FE0,
         FontCapitalization = FirstFontProperty,
-        FontLetterSpacingType = 0x2033,
         FontLetterSpacing = 0x1FE1,
         FontWordSpacing = 0x1FE2,
-        FontStretch = 0x2034,
         FontStyleHint = 0x1FE3,
         FontStyleStrategy = 0x1FE4,
         FontKerning = 0x1FE5,
         FontHintingPreference = 0x1FE6,
+        FontFamilies = 0x1FE7,
+        FontStyleName = 0x1FE8,
+        FontLetterSpacingType = 0x1FE9,
+        FontStretch = 0x1FEA,
+#if QT_DEPRECATED_SINCE(6, 0)
         FontFamily = 0x2000,
+#endif
         FontPointSize = 0x2001,
         FontSizeAdjustment = 0x2002,
         FontSizeIncrement = FontSizeAdjustment, // old name, compat
@@ -200,15 +197,25 @@ public:
         FontPixelSize = 0x2009,
         LastFontProperty = FontPixelSize,
 
-        TextUnderlineColor = 0x2010,
+        TextUnderlineColor = 0x2020,
         TextVerticalAlignment = 0x2021,
         TextOutline = 0x2022,
         TextUnderlineStyle = 0x2023,
         TextToolTip = 0x2024,
+        TextSuperScriptBaseline = 0x2025,
+        TextSubScriptBaseline = 0x2026,
+        TextBaselineOffset = 0x2027,
 
         IsAnchor = 0x2030,
         AnchorHref = 0x2031,
         AnchorName = 0x2032,
+
+        // Included for backwards compatibility with old QDataStreams.
+        // Should not be referenced in user code.
+        OldFontLetterSpacingType = 0x2033,
+        OldFontStretch = 0x2034,
+        OldTextUnderlineColor = 0x2010,
+
         ObjectType = 0x2f00,
 
         // list properties
@@ -235,6 +242,7 @@ public:
         TableCellSpacing = 0x4102,
         TableCellPadding = 0x4103,
         TableHeaderRowCount = 0x4104,
+        TableBorderCollapse = 0x4105,
 
         // table cell properties
         TableCellRowSpan = 0x4810,
@@ -245,10 +253,28 @@ public:
         TableCellLeftPadding = 0x4814,
         TableCellRightPadding = 0x4815,
 
+        TableCellTopBorder = 0x4816,
+        TableCellBottomBorder = 0x4817,
+        TableCellLeftBorder = 0x4818,
+        TableCellRightBorder = 0x4819,
+
+        TableCellTopBorderStyle = 0x481a,
+        TableCellBottomBorderStyle = 0x481b,
+        TableCellLeftBorderStyle = 0x481c,
+        TableCellRightBorderStyle = 0x481d,
+
+        TableCellTopBorderBrush = 0x481e,
+        TableCellBottomBorderBrush = 0x481f,
+        TableCellLeftBorderBrush = 0x4820,
+        TableCellRightBorderBrush = 0x4821,
+
         // image properties
         ImageName = 0x5000,
+        ImageTitle = 0x5001,
+        ImageAltText = 0x5002,
         ImageWidth = 0x5010,
         ImageHeight = 0x5011,
+        ImageQuality = 0x5014,
 
         // internal
         /*
@@ -294,7 +320,7 @@ public:
     ~QTextFormat();
 
     void swap(QTextFormat &other)
-    { qSwap(d, other.d); qSwap(format_type, other.format_type); }
+    { d.swap(other.d); std::swap(format_type, other.format_type); }
 
     void merge(const QTextFormat &other);
 
@@ -319,9 +345,9 @@ public:
     QPen penProperty(int propertyId) const;
     QBrush brushProperty(int propertyId) const;
     QTextLength lengthProperty(int propertyId) const;
-    QVector<QTextLength> lengthVectorProperty(int propertyId) const;
+    QList<QTextLength> lengthVectorProperty(int propertyId) const;
 
-    void setProperty(int propertyId, const QVector<QTextLength> &lengths);
+    void setProperty(int propertyId, const QList<QTextLength> &lengths);
 
     QMap<int, QVariant> properties() const;
     int propertyCount() const;
@@ -417,14 +443,35 @@ public:
         FontPropertiesSpecifiedOnly,
         FontPropertiesAll
     };
-    void setFont(const QFont &font, FontPropertiesInheritanceBehavior behavior);
-    void setFont(const QFont &font); // ### Qt6: Merge with above
+    void setFont(const QFont &font, FontPropertiesInheritanceBehavior behavior = FontPropertiesAll);
     QFont font() const;
 
-    inline void setFontFamily(const QString &family)
-    { setProperty(FontFamily, family); }
-    inline QString fontFamily() const
-    { return stringProperty(FontFamily); }
+#if QT_DEPRECATED_SINCE(6, 1)
+    QT_DEPRECATED_VERSION_X_6_1("Use setFontFamilies instead") inline void setFontFamily(const QString &family)
+    { setProperty(FontFamilies, QVariant(QStringList(family))); }
+    QT_DEPRECATED_VERSION_X_6_1("Use fontFamilies instead") inline QString fontFamily() const
+    { return property(FontFamilies).toStringList().first(); }
+#endif
+
+    inline void setFontFamilies(const QStringList &families)
+    { setProperty(FontFamilies, QVariant(families)); }
+#if QT_VERSION < QT_VERSION_CHECK(7, 0, 0)
+    inline QVariant fontFamilies() const
+    { return property(FontFamilies); }
+#else
+    inline QStringList fontFamilies() const
+    { return property(FontFamilies).toStringList(); }
+#endif
+
+    inline void setFontStyleName(const QString &styleName)
+    { setProperty(FontStyleName, styleName); }
+#if QT_VERSION < QT_VERSION_CHECK(7, 0, 0)
+    inline QVariant fontStyleName() const
+    { return property(FontStyleName); }
+#else
+    inline QStringList fontStyleName() const
+    { return property(FontStyleName).toStringList(); }
+#endif
 
     inline void setFontPointSize(qreal size)
     { setProperty(FontPointSize, size); }
@@ -528,6 +575,21 @@ public:
     inline QString toolTip() const
     { return stringProperty(TextToolTip); }
 
+    inline void setSuperScriptBaseline(qreal baseline)
+    { setProperty(TextSuperScriptBaseline, baseline); }
+    inline qreal superScriptBaseline() const
+    { return hasProperty(TextSuperScriptBaseline) ? doubleProperty(TextSuperScriptBaseline) : 50.0; }
+
+    inline void setSubScriptBaseline(qreal baseline)
+    { setProperty(TextSubScriptBaseline, baseline); }
+    inline qreal subScriptBaseline() const
+    { return hasProperty(TextSubScriptBaseline) ? doubleProperty(TextSubScriptBaseline) : 100.0 / 6.0; }
+
+    inline void setBaselineOffset(qreal baseline)
+    { setProperty(TextBaselineOffset, baseline); }
+    inline qreal baselineOffset() const
+    { return hasProperty(TextBaselineOffset) ? doubleProperty(TextBaselineOffset) : 0.0; }
+
     inline void setAnchor(bool anchor)
     { setProperty(IsAnchor, anchor); }
     inline bool isAnchor() const
@@ -537,10 +599,6 @@ public:
     { setProperty(AnchorHref, value); }
     inline QString anchorHref() const
     { return stringProperty(AnchorHref); }
-
-    inline void setAnchorName(const QString &name)
-    { setAnchorNames(QStringList(name)); }
-    QString anchorName() const;
 
     inline void setAnchorNames(const QStringList &names)
     { setProperty(AnchorName, names); }
@@ -556,6 +614,8 @@ public:
 protected:
     explicit QTextCharFormat(const QTextFormat &fmt);
     friend class QTextFormat;
+    friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextCharFormat &);
+    friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextCharFormat &);
 };
 
 Q_DECLARE_SHARED(QTextCharFormat)
@@ -585,6 +645,12 @@ public:
         FixedHeight = 2,
         MinimumHeight = 3,
         LineDistanceHeight = 4
+    };
+
+    enum class MarkerType {
+        NoMarker = 0,
+        Unchecked = 1,
+        Checked = 2
     };
 
     QTextBlockFormat();
@@ -624,6 +690,11 @@ public:
     inline int indent() const
     { return intProperty(BlockIndent); }
 
+    inline void setHeadingLevel(int alevel)
+    { setProperty(HeadingLevel, alevel); }
+    inline int headingLevel() const
+    { return intProperty(HeadingLevel); }
+
     inline void setLineHeight(qreal height, int heightType)
     { setProperty(LineHeight, height); setProperty(LineHeightType, heightType); }
     inline qreal lineHeight(qreal scriptLineHeight, qreal scaling) const;
@@ -645,9 +716,16 @@ public:
     void setTabPositions(const QList<QTextOption::Tab> &tabs);
     QList<QTextOption::Tab> tabPositions() const;
 
+    inline void setMarker(MarkerType marker)
+    { setProperty(BlockMarker, int(marker)); }
+    inline MarkerType marker() const
+    { return MarkerType(intProperty(BlockMarker)); }
+
 protected:
     explicit QTextBlockFormat(const QTextFormat &fmt);
     friend class QTextFormat;
+    friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextBlockFormat &);
+    friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextBlockFormat &);
 };
 
 Q_DECLARE_SHARED(QTextBlockFormat)
@@ -748,9 +826,19 @@ public:
     inline qreal height() const
     { return doubleProperty(ImageHeight); }
 
+    inline void setQuality(int quality);
+#if QT_DEPRECATED_SINCE(6, 3)
+    QT_DEPRECATED_VERSION_X_6_3("Pass a quality value, the default is 100") inline void setQuality()
+    { setQuality(100); }
+#endif
+    inline int quality() const
+    { return intProperty(ImageQuality); }
+
 protected:
     explicit QTextImageFormat(const QTextFormat &format);
     friend class QTextFormat;
+    friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextListFormat &);
+    friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextListFormat &);
 };
 
 Q_DECLARE_SHARED(QTextImageFormat)
@@ -763,6 +851,9 @@ inline void QTextImageFormat::setWidth(qreal awidth)
 
 inline void QTextImageFormat::setHeight(qreal aheight)
 { setProperty(ImageHeight, aheight); }
+
+inline void QTextImageFormat::setQuality(int aquality)
+{ setProperty(ImageQuality, aquality); }
 
 class Q_GUI_EXPORT QTextFrameFormat : public QTextFormat
 {
@@ -851,6 +942,8 @@ public:
 protected:
     explicit QTextFrameFormat(const QTextFormat &fmt);
     friend class QTextFormat;
+    friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextFrameFormat &);
+    friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextFrameFormat &);
 };
 
 Q_DECLARE_SHARED(QTextFrameFormat)
@@ -892,10 +985,10 @@ public:
     { int cols = intProperty(TableColumns); if (cols == 0) cols = 1; return cols; }
     inline void setColumns(int columns);
 
-    inline void setColumnWidthConstraints(const QVector<QTextLength> &constraints)
+    inline void setColumnWidthConstraints(const QList<QTextLength> &constraints)
     { setProperty(TableColumnWidthConstraints, constraints); }
 
-    inline QVector<QTextLength> columnWidthConstraints() const
+    inline QList<QTextLength> columnWidthConstraints() const
     { return lengthVectorProperty(TableColumnWidthConstraints); }
 
     inline void clearColumnWidthConstraints()
@@ -918,6 +1011,11 @@ public:
     { setProperty(TableHeaderRowCount, count); }
     inline int headerRowCount() const
     { return intProperty(TableHeaderRowCount); }
+
+    inline void setBorderCollapse(bool borderCollapse)
+    { setProperty(TableBorderCollapse, borderCollapse); }
+    inline bool borderCollapse() const
+    { return boolProperty(TableBorderCollapse); }
 
 protected:
     explicit QTextTableFormat(const QTextFormat &fmt);
@@ -960,8 +1058,76 @@ public:
 
     inline void setPadding(qreal padding);
 
+    inline void setTopBorder(qreal width)
+    { setProperty(TableCellTopBorder, width); }
+    inline qreal topBorder() const
+    { return doubleProperty(TableCellTopBorder); }
+
+    inline void setBottomBorder(qreal width)
+    { setProperty(TableCellBottomBorder, width); }
+    inline qreal bottomBorder() const
+    { return doubleProperty(TableCellBottomBorder); }
+
+    inline void setLeftBorder(qreal width)
+    { setProperty(TableCellLeftBorder, width); }
+    inline qreal leftBorder() const
+    { return doubleProperty(TableCellLeftBorder); }
+
+    inline void setRightBorder(qreal width)
+    { setProperty(TableCellRightBorder, width); }
+    inline qreal rightBorder() const
+    { return doubleProperty(TableCellRightBorder); }
+
+    inline void setBorder(qreal width);
+
+    inline void setTopBorderStyle(QTextFrameFormat::BorderStyle style)
+    { setProperty(TableCellTopBorderStyle, style); }
+    inline QTextFrameFormat::BorderStyle topBorderStyle() const
+    { return static_cast<QTextFrameFormat::BorderStyle>(intProperty(TableCellTopBorderStyle)); }
+
+    inline void setBottomBorderStyle(QTextFrameFormat::BorderStyle style)
+    { setProperty(TableCellBottomBorderStyle, style); }
+    inline QTextFrameFormat::BorderStyle bottomBorderStyle() const
+    { return static_cast<QTextFrameFormat::BorderStyle>(intProperty(TableCellBottomBorderStyle)); }
+
+    inline void setLeftBorderStyle(QTextFrameFormat::BorderStyle style)
+    { setProperty(TableCellLeftBorderStyle, style); }
+    inline QTextFrameFormat::BorderStyle leftBorderStyle() const
+    { return static_cast<QTextFrameFormat::BorderStyle>(intProperty(TableCellLeftBorderStyle)); }
+
+    inline void setRightBorderStyle(QTextFrameFormat::BorderStyle style)
+    { setProperty(TableCellRightBorderStyle, style); }
+    inline QTextFrameFormat::BorderStyle rightBorderStyle() const
+    { return static_cast<QTextFrameFormat::BorderStyle>(intProperty(TableCellRightBorderStyle)); }
+
+    inline void setBorderStyle(QTextFrameFormat::BorderStyle style);
+
+    inline void setTopBorderBrush(const QBrush &brush)
+    { setProperty(TableCellTopBorderBrush, brush); }
+    inline QBrush topBorderBrush() const
+    { return brushProperty(TableCellTopBorderBrush); }
+
+    inline void setBottomBorderBrush(const QBrush &brush)
+    { setProperty(TableCellBottomBorderBrush, brush); }
+    inline QBrush bottomBorderBrush() const
+    { return brushProperty(TableCellBottomBorderBrush); }
+
+    inline void setLeftBorderBrush(const QBrush &brush)
+    { setProperty(TableCellLeftBorderBrush, brush); }
+    inline QBrush leftBorderBrush() const
+    { return brushProperty(TableCellLeftBorderBrush); }
+
+    inline void setRightBorderBrush(const QBrush &brush)
+    { setProperty(TableCellRightBorderBrush, brush); }
+    inline QBrush rightBorderBrush() const
+    { return brushProperty(TableCellRightBorderBrush); }
+
+    inline void setBorderBrush(const QBrush &brush);
+
 protected:
     explicit QTextTableCellFormat(const QTextFormat &fmt);
+    friend Q_GUI_EXPORT QDataStream &operator<<(QDataStream &, const QTextTableCellFormat &);
+    friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTextTableCellFormat &);
     friend class QTextFormat;
 };
 
@@ -1015,6 +1181,29 @@ inline void QTextTableCellFormat::setPadding(qreal padding)
     setRightPadding(padding);
 }
 
+inline void QTextTableCellFormat::setBorder(qreal width)
+{
+    setTopBorder(width);
+    setBottomBorder(width);
+    setLeftBorder(width);
+    setRightBorder(width);
+}
+
+inline void QTextTableCellFormat::setBorderStyle(QTextFrameFormat::BorderStyle style)
+{
+    setTopBorderStyle(style);
+    setBottomBorderStyle(style);
+    setLeftBorderStyle(style);
+    setRightBorderStyle(style);
+}
+
+inline void QTextTableCellFormat::setBorderBrush(const QBrush &brush)
+{
+    setTopBorderBrush(brush);
+    setBottomBorderBrush(brush);
+    setLeftBorderBrush(brush);
+    setRightBorderBrush(brush);
+}
 
 QT_END_NAMESPACE
 

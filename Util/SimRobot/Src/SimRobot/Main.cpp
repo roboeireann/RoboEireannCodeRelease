@@ -5,6 +5,12 @@
  */
 
 #include <QApplication>
+#include <QLocale>
+#include <QSurfaceFormat>
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 4, 0)
+extern void qt_registerDefaultPlatformBackingStoreOpenGLSupport();
+#endif
 
 #ifdef WINDOWS
 #include <crtdbg.h>
@@ -18,10 +24,11 @@
 #include <QFileOpenEvent>
 
 /** The address of the main window object used by the following class. */
-MainWindow* mainWindow;
+static MainWindow* mainWindow = nullptr;
 
 /**
- * A helper for opening files when they were launched from the Finder.
+ * A helper for opening files when they were launched from the Finder and closing windows
+ * in the correct order.
  * macOS triggers an event for them rather than passing them as a command line
  * parameter. This class handles that event.
  */
@@ -39,28 +46,12 @@ protected:
       mainWindow->openFile(static_cast<QFileOpenEvent*>(ev)->file());
       return true;
     }
-    else
-      return QApplication::event(ev);
+    return QApplication::event(ev);
   }
 };
 
 /** Use the new class rather than the default one. */
 #define QApplication SimRobotApp
-
-/**
- * A helper for diplaying QStrings in Xcode that converts UTF16 strings to UTF8
- * character arrays that Xcode can display.
- * @param string The string to convert.
- * @return The address of the converted string. Note that it points to a static
- *         buffer that will be reused in the next call.
- */
-const char* _fromQString(const QString& string)
-{
-  static char buffer[1000];
-  strncpy(buffer, string.toUtf8().constData(), sizeof(buffer));
-  buffer[sizeof(buffer) - 1] = 0;
-  return buffer;
-}
 #endif // MACOS
 
 int main(int argc, char* argv[])
@@ -69,10 +60,30 @@ int main(int argc, char* argv[])
   _CrtSetDbgFlag(_CRTDBG_LEAK_CHECK_DF | _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG));
   //_CrtSetBreakAlloc(18969); // Use to track down memory leaks
 #endif
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+
+  // Handle floating point values as programming languages would.
+  QLocale::setDefault(QLocale::C);
+
+  QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+#ifdef MACOS
+  QApplication::setAttribute(Qt::AA_DontShowIconsInMenus);
 #endif
+  QSurfaceFormat format;
+  format.setVersion(3, 3);
+  format.setProfile(QSurfaceFormat::CoreProfile);
+  format.setSamples(1);
+  format.setStencilBufferSize(0);
+  QSurfaceFormat::setDefaultFormat(format);
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 4, 0)
+  // Workaround: For OpenGL to be used in windows, support must be registered before the window is created.
+  // The following function is declared as a constructor in QtOpenGL (i.e. executed at library loading time),
+  // but since the SimRobot application doesn't reference QtOpenGL it isn't sufficient to link QtOpenGL
+  // due to lazy loading. Therefore, we call this function here (probably resulting in the function being
+  // called twice, but this is handled by the function).
+  qt_registerDefaultPlatformBackingStoreOpenGLSupport();
+#endif
+
   QApplication app(argc, argv);
 #ifndef WINDOWS
   setlocale(LC_NUMERIC, "C");
@@ -87,8 +98,13 @@ int main(int argc, char* argv[])
 
   app.setApplicationName("SimRobot");
 
+  bool noWindow = false;
+  for(int i = 1; i < argc; i++)
+    noWindow |= strcmp(argv[i], "-noWindow") == 0;
+
 #ifdef MACOS
-  mainWindow.show();
+  if(!noWindow)
+    mainWindow.show();
 #endif
 
   // open file from commandline
@@ -100,7 +116,8 @@ int main(int argc, char* argv[])
     }
 
 #ifndef MACOS
-  mainWindow.show();
+  if(!noWindow)
+    mainWindow.show();
 #endif
 
   return app.exec();

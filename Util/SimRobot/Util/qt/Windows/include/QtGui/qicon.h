@@ -50,6 +50,7 @@ QT_BEGIN_NAMESPACE
 
 class QIconPrivate;
 class QIconEngine;
+class QPainter;
 
 class Q_GUI_EXPORT QIcon
 {
@@ -57,24 +58,21 @@ public:
     enum Mode { Normal, Disabled, Active, Selected };
     enum State { On, Off };
 
-    QIcon() Q_DECL_NOEXCEPT;
+    QIcon() noexcept;
     QIcon(const QPixmap &pixmap);
     QIcon(const QIcon &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QIcon(QIcon &&other) Q_DECL_NOEXCEPT
-        : d(other.d)
-    { other.d = Q_NULLPTR; }
-#endif
+    QIcon(QIcon &&other) noexcept
+        : d(qExchange(other.d, nullptr))
+    {}
     explicit QIcon(const QString &fileName); // file or resource name
     explicit QIcon(QIconEngine *engine);
     ~QIcon();
     QIcon &operator=(const QIcon &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QIcon &operator=(QIcon &&other) Q_DECL_NOEXCEPT
-    { swap(other); return *this; }
-#endif
-    inline void swap(QIcon &other) Q_DECL_NOEXCEPT
-    { qSwap(d, other.d); }
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_MOVE_AND_SWAP(QIcon)
+    inline void swap(QIcon &other) noexcept
+    { qt_ptr_swap(d, other.d); }
+    bool operator==(const QIcon &) const = delete;
+    bool operator!=(const QIcon &) const = delete;
 
     operator QVariant() const;
 
@@ -83,10 +81,17 @@ public:
         { return pixmap(QSize(w, h), mode, state); }
     inline QPixmap pixmap(int extent, Mode mode = Normal, State state = Off) const
         { return pixmap(QSize(extent, extent), mode, state); }
+    QPixmap pixmap(const QSize &size, qreal devicePixelRatio, Mode mode = Normal, State state = Off) const;
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use pixmap(size, devicePixelRatio) instead")
     QPixmap pixmap(QWindow *window, const QSize &size, Mode mode = Normal, State state = Off) const;
+#endif
 
     QSize actualSize(const QSize &size, Mode mode = Normal, State state = Off) const;
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use actualSize(size) instead")
     QSize actualSize(QWindow *window, const QSize &size, Mode mode = Normal, State state = Off) const;
+#endif
 
     QString name() const;
 
@@ -98,9 +103,6 @@ public:
     bool isDetached() const;
     void detach();
 
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline int serialNumber() const { return cacheKey() >> 32; }
-#endif
     qint64 cacheKey() const;
 
     void addPixmap(const QPixmap &pixmap, Mode mode = Normal, State state = Off);
@@ -118,8 +120,14 @@ public:
     static QStringList themeSearchPaths();
     static void setThemeSearchPaths(const QStringList &searchpath);
 
+    static QStringList fallbackSearchPaths();
+    static void setFallbackSearchPaths(const QStringList &paths);
+
     static QString themeName();
     static void setThemeName(const QString &path);
+
+    static QString fallbackThemeName();
+    static void setFallbackThemeName(const QString &name);
 
     Q_DUMMY_COMPARISON_OPERATOR(QIcon)
 
@@ -147,7 +155,7 @@ Q_GUI_EXPORT QDebug operator<<(QDebug dbg, const QIcon &);
 #endif
 
 Q_GUI_EXPORT QString qt_findAtNxFile(const QString &baseFileName, qreal targetDevicePixelRatio,
-                                     qreal *sourceDevicePixelRatio = Q_NULLPTR);
+                                     qreal *sourceDevicePixelRatio = nullptr);
 
 QT_END_NAMESPACE
 

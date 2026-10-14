@@ -3,7 +3,7 @@
 ** Copyright (C) 2016 Intel Corporation.
 ** Contact: https://www.qt.io/licensing/
 **
-** This file is part of the QtCore module of the Qt Toolkit.
+** This file is part of the QtOpenGL module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -41,19 +41,7 @@
 #define QTOPENGLGLOBAL_H
 
 #include <QtCore/qglobal.h>
-
-QT_BEGIN_NAMESPACE
-
-#ifndef QT_STATIC
-#  if defined(QT_BUILD_OPENGL_LIB)
-#    define Q_OPENGL_EXPORT Q_DECL_EXPORT
-#  else
-#    define Q_OPENGL_EXPORT Q_DECL_IMPORT
-#  endif
-#else
-#  define Q_OPENGL_EXPORT
-#endif
-
-QT_END_NAMESPACE
+#include <QtGui/qtguiglobal.h>
+#include <QtOpenGL/qtopenglexports.h>
 
 #endif // QTOPENGLGLOBAL_H

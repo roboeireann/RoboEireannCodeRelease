@@ -8,19 +8,84 @@
 
 #pragma once
 
+#include "Platform/BHAssert.h"
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Streaming/EnumIndexedArray.h"
 
 STREAMABLE(CameraResolutionRequest,
 {
   ENUM(Resolutions,
   {,
-    defaultRes, /**< Use resolutions as specified in the config file. */
-    w320h240,   /**< 160x120 in YCbCr222 */
-    w640h480,   /**< 320x240 in YCbCr222 */
-    w1280h960,  /**< 640x480 in YCbCr222 */
-    noRequest,  /**< Keep the resolution as it is. */
-  }),
+    defaultRes,    /**< Use resolutions as specified in the config file. */
+
+    // NAO
+    w320h240f5,    /**< 160x240 in YUV422 at  5 Hz */
+    w320h240f15,   /**< 160x240 in YUV422 at 15 Hz */
+    w320h240f30,   /**< 160x240 in YUV422 at 30 Hz */
+
+    // RealSense, Orbbec
+    w424h240f5,    /**< 212x240 in YUV422 at  5 Hz */
+    w424h240f15,   /**< 212x240 in YUV422 at 15 Hz */
+    w424h240f30,   /**< 212x240 in YUV422 at 30 Hz */
+    w424h240f60,   /**< 212x240 in YUV422 at 60 Hz */
+    w424h240f90,   /**< 212x240 in YUV422 at 90 Hz */
+
+    w480h270f5,    /**< 240x270 in YUV422 at  5 Hz */
+    w480h270f15,   /**< 240x270 in YUV422 at 15 Hz */
+    w480h270f30,   /**< 240x270 in YUV422 at 30 Hz */
+    w480h270f60,   /**< 240x270 in YUV422 at 60 Hz */
+    w480h270f90,   /**< 240x270 in YUV422 at 90 Hz */
+
+    // MIPI
+    w544h448f30,   /**< 272x224 in YUV422 at 30 Hz */
+
+    // RealSense, Orbbec
+    w640h360f5,    /**< 320x360 in YUV422 at  5 Hz */
+    w640h360f15,   /**< 320x360 in YUV422 at 15 Hz */
+    w640h360f30,   /**< 320x360 in YUV422 at 30 Hz */
+    w640h360f60,   /**< 320x360 in YUV422 at 60 Hz */
+    w640h360f90,   /**< 320x360 in YUV422 at 90 Hz */
+
+    // NAO, RealSense, Orbbec
+    w640h480f5,    /**< 320x480 in YUV422 at  5 Hz */
+    w640h480f15,   /**< 320x480 in YUV422 at 15 Hz */
+    w640h480f30,   /**< 320x480 in YUV422 at 30 Hz */
+
+    // RealSense, Orbec
+    w640h480f60,   /**< 320x480 in YUV422 at 60 Hz */
+
+    w848h480f5,    /**< 424x480 in YUV422 at  5 Hz */
+    w848h480f15,   /**< 424x480 in YUV422 at 15 Hz */
+    w848h480f30,   /**< 424x480 in YUV422 at 30 Hz */
+    w848h480f60,   /**< 424x480 in YUV422 at 60 Hz */
+
+    w1280h720f5,   /**< 640x720 in YUV422 at  5 Hz */
+    w1280h720f15,  /**< 640x720 in YUV422 at 15 Hz */
+    w1280h720f30,  /**< 640x720 in YUV422 at 30 Hz */
+
+    // RealSense
+    w1280h800f5,   /**< 640x800 in YUV422 at 5 Hz  */
+    w1280h800f15,  /**< 640x800 in YUV422 at 15 Hz */
+    w1280h800f30,  /**< 640x800 in YUV422 at 30 Hz */
+
+    // NAO
+    w1280h960f5,   /**< 640x960 in YUV422 at 30 Hz */
+    w1280h960f15,  /**< 640x960 in YUV422 at 15 Hz */
+    w1280h960f30,  /**< 640x960 in YUV422 at 30 Hz */
+
+    noRequest,     /**< Keep the resolution as it is. */
+  });
+
+  /**
+   * Set resolution based on setting for a certain camera.
+   * @param camera The resolution for which camera?
+   * @param cameraInfo The width, height, and frameRate are written here.
+   */
+  void apply(const CameraInfo::Camera camera, CameraInfo& cameraInfo) const
+  {
+    VERIFY(sscanf(TypeRegistry::getEnumName(typeid(Resolutions).name(), resolutions[camera]), "w%dh%df%d",
+                  &cameraInfo.width, &cameraInfo.height, &cameraInfo.frameRate) == 3);
+  },
 
   (ENUM_INDEXED_ARRAY(Resolutions, CameraInfo::Camera))({defaultRes, defaultRes}) resolutions, /**< The desired resolutions */
 });

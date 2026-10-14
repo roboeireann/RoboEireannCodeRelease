@@ -9,35 +9,33 @@
 
 #pragma once
 
-#include "Representations/Communication/GameInfo.h"
-
 #include "Representations/Configuration/FieldDimensions.h"
-#include "Representations/Infrastructure/ExtendedGameInfo.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Modeling/AlternativeRobotPoseHypothesis.h"
 #include "Representations/Modeling/Odometer.h"
 #include "Representations/Modeling/SideInformation.h"
 #include "Representations/MotionControl/MotionInfo.h"
-#include "Representations/Perception/FieldFeatures/MidCircle.h"
-#include "Representations/Perception/FieldFeatures/PenaltyArea.h"
+#include "Representations/Perception/FieldFeatures/CenterCircleWithLine.h"
 #include "Representations/Perception/FieldFeatures/PenaltyMarkWithPenaltyAreaLine.h"
+#include "Representations/Perception/FieldFeatures/PenaltyAreaAndGoalArea.h"
 #include "Representations/Sensing/GroundContactState.h"
-#include "Representations/Sensing/GyroState.h"
-#include "Tools/Module/Module.h"
-#include "Tools/RingBuffer.h"
+#include "Representations/Sensing/IMUValueState.h"
+#include "Framework/Module.h"
+#include "Math/RingBuffer.h"
 
 MODULE(AlternativeRobotPoseProvider,
 {,
-  REQUIRES(ExtendedGameInfo),
+  REQUIRES(CenterCircleWithLine),
+  REQUIRES(ExtendedGameState),
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
-  REQUIRES(GameInfo),
+  REQUIRES(GameState),
   REQUIRES(GroundContactState),
-  REQUIRES(GyroState),
-  REQUIRES(MidCircle),
+  REQUIRES(IMUValueState),
   REQUIRES(MotionInfo),
   REQUIRES(Odometer),
-  REQUIRES(PenaltyArea),
+  REQUIRES(PenaltyAreaAndGoalArea),
   REQUIRES(PenaltyMarkWithPenaltyAreaLine),
   REQUIRES(SideInformation),
   PROVIDES(AlternativeRobotPoseHypothesis),
@@ -47,6 +45,7 @@ MODULE(AlternativeRobotPoseProvider,
     (float)(800.f) translationDifference,      /**< Maximum translational difference for assigning a pose to a cluster */
     (float)(0.5f) rotationDifference,          /**< Maximum rotational difference for assigning a pose to a cluster */
     (unsigned)(6) maxClusters,                 /**< Do not try to find more than this number of clusters */
+    (Angle)(50_deg) gyroZThreshold,            /**< If the robot is turning too fast, do not accept new features. */
   }),
 });
 
@@ -93,7 +92,7 @@ class AlternativeRobotPoseProvider : public AlternativeRobotPoseProviderBase
   void update(AlternativeRobotPoseHypothesis& alternativeRobotPoseHypothesis) override;
 
   /** Converts and adds a feature to the ring buffer.
-   * @param ff A pointer to a field feature, e.g. PenaltyArea, MidCircle, ...
+   * @param ff A pointer to a field feature, such as  CenterCircleWithLine or PenaltyMarkWithPenaltyAreaLine
    */
   void addFieldFeatureToBuffer(const FieldFeature* ff);
 

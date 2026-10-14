@@ -12,10 +12,11 @@
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Infrastructure/GameState.h"
 #include "Representations/Modeling/BallModel.h"
 #include "Representations/Modeling/RobotPose.h"
 #include "Representations/Modeling/TeamBallModel.h"
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 
 MODULE(FieldBallProvider,
 {,
@@ -23,15 +24,16 @@ MODULE(FieldBallProvider,
   REQUIRES(BallSpecification),
   REQUIRES(FieldDimensions),
   REQUIRES(FrameInfo),
+  REQUIRES(GameState),
   REQUIRES(RobotPose),
   REQUIRES(TeamBallModel),
   PROVIDES(FieldBall),
-  DEFINES_PARAMETERS(
+  LOADS_PARAMETERS(
   {,
-    (float)(300.f) opponentGoalpostYOffset,     /**< Assume that the opponent goal is a bit wider */
-    (float)(300.f) ownGoalpostYOffset,          /**< Assume that the own goal is a bit wider */
-    (float)(500.f) aggressiveEndPositionDistance, ///< end position is near enough to consider intercept in aggressive mode
-    (float)(100.f) aggressiveMinVelocityX, ///< min velocity ball can have to predict an intercept in aggressive mode
+    (float) opponentGoalpostYOffset,     /**< Assume that the opponent goal is a bit wider */
+    (float) ownGoalpostYOffset,          /**< Assume that the own goal is a bit wider */
+    (float) consistencyDistanceToDropInPosition,  /**< If the ball is within this distance to a possible ball drop in position for the current game state
+                                                             * it is considered to be consistent with the current game state. */
   }),
 });
 
@@ -43,25 +45,23 @@ class FieldBallProvider : public FieldBallProviderBase
   void update(FieldBall& fieldBall) override;
 
   /** Predicts ball motion and checks for intersection with own and opponent goal line
-   * @param fieldBall The additional ball information for the behavior
+   * @param isRollingTowardsOpponentGoal Is the ball rolling towards the opponent goal?
+   * @param isRollingTowardsOwnGoal Is the ball rolling towards the own goal?
+   * @param positionOnField Ball position in field coordinates
+   * @param velocity Ball velocity (relative)
    */
-  void checkIfBallIsRollingTowardsAGoal(FieldBall& fieldBall);
-
-  /** Predicts ball motion and checks for intersection with the own local y axis
-   * @param fieldBall The additional ball information for the behavior
-   */
-  void checkIfBallIsPassingOwnYAxis(FieldBall& fieldBall);
-
-  /** Predicts ball motion and checks for intersection with line through the robot x-axis
-   * (which happens when the robot adopts an open pose towards the next position the robot
-   * will kick/walk)
-   * @param fieldBall The additional ball information for the behavior
-   */
-  void checkIfBallIsPassingOwnXAxis(FieldBall& fieldBall);
-
+  void checkIfBallIsRollingTowardsAGoal(bool& isRollingTowardsOpponentGoal, bool& isRollingTowardsOwnGoal,
+                                        const Vector2f& positionOnField, const Vector2f& velocity);
 
   /** Checks, if ball position is inside own penalty area
    * @param fieldBall The additional ball information for the behavior
    */
   void checkIfBallIsInsideOwnPenaltyArea(FieldBall& fieldBall);
+
+  /**
+   * Checks, if the ball position is consistent with the game state.
+   * @param fieldBall The additional ball information for the behavior
+   * @param theGameState The game state
+   */
+  void checkBallPositionIsConsistentWithGameState(FieldBall& fieldBall, const GameState& theGameState);
 };

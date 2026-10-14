@@ -5,37 +5,40 @@
  */
 
 #include "FallDownStateProvider.h"
+#include "Debugging/Annotation.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Framework/Settings.h"
+#include "Math/Constants.h"
+#include "Math/Pose3f.h"
+#include "Math/Rotation.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Debugging/Annotation.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/Math/Constants.h"
-#include "Tools/Math/Pose3f.h"
-#include "Tools/Math/Rotation.h"
-#include "Tools/RobotParts/FsrSensors.h"
+#include "RobotParts/FsrSensors.h"
+#include "Streaming/Global.h"
 
-MAKE_MODULE(FallDownStateProvider, sensing);
+MAKE_MODULE(FallDownStateProvider);
 
 FallDownStateProvider::FallDownStateProvider() : lastTimeSoundPlayed(theFrameInfo.time)
 {
-  footShapeToeX = 0.f;
-  for(size_t i = 0; i < FootShape::polygon.size(); ++i)
-    footShapeToeX = std::max(FootShape::polygon[i].x(), footShapeToeX);
   theSensorData = useInertiaData ? &theInertialData : &theInertialSensorData;
   getSupportPolygon();
   lastTiltingEdge = tiltingEdge = getTiltingEdge();
   initUKF(measure());
+  disablePickUp = SystemCall::getMode() == SystemCall::simulatedRobot;
 }
 
 void FallDownStateProvider::update(FallDownState& fallDownState)
 {
   DECLARE_DEBUG_DRAWING3D("module:FallDownStateProvider:fall", "field");
-  dynamicNoise = (Vector5f() << positionProcessDeviation.cwiseAbs2(), velocityProcessDeviation.cwiseAbs2().cast<float>()).finished() * Constants::motionCycleTime;
+  dynamicNoise = (Vector5f() << positionProcessDeviation.cwiseAbs2(), velocityProcessDeviation.cwiseAbs2().cast<float>()).finished() * Global::getSettings().motionCycleTime;
   measurementNoise = (Vector5f() << positionMeasurementDeviation.cwiseAbs2(), velocityMeasurementDeviation.cwiseAbs2().cast<float>()).finished();
   theSensorData = useInertiaData ? &theInertialData : &theInertialSensorData;
   theFallDownState = &fallDownState;
 
   getSupportPolygon();
   tiltingEdge = getTiltingEdge();
+
+  if(std::isnan(tiltingEdge.translation.x()) || std::isnan(tiltingEdge.translation.y()) || std::isnan(tiltingEdge.translation.z()))
+    tiltingEdge = supportFoot == Legs::left ? theRobotModel.soleLeft : theRobotModel.soleRight;
 
   // transform support foot and centroid to the tilting edge coordinate system
   const Pose3f torsoToOrigin = tiltingEdge.inverse();
@@ -44,7 +47,7 @@ void FallDownStateProvider::update(FallDownState& fallDownState)
   supportFootCenter = torsoToOrigin * supportFootCenter;
 
   // predict and measure the next state
-  if(fallDownState.state == FallDownState::upright || fallDownState.state == FallDownState::staggering)
+  if((fallDownState.state == FallDownState::upright || fallDownState.state == FallDownState::staggering) && !resetFilter)
   {
     convertToNewOrigin(lastTiltingEdge, tiltingEdge, ukf.mean);
     updateUKF();
@@ -53,6 +56,7 @@ void FallDownStateProvider::update(FallDownState& fallDownState)
   {
     const Vector5f measurement = measure();
     initUKF(measurement);
+    resetFilter = false;
   }
   const Vector3f& comInOrigin = ukf.mean.head<3>();
   torsoUpright = (comInOrigin.head<2>() - supportFootCenter.head<2>()).norm() <= 0.7f * (-supportFootCenter.head<2>()).norm();
@@ -63,6 +67,7 @@ void FallDownStateProvider::update(FallDownState& fallDownState)
            && std::abs(theSensorData->gyro.y()) <= maxGyroToRegainStableState;
   toUpright = torsoUpright && torsoAboveGround >= maxTorsoHeightToKeepSquatting && theGroundContactState.contact;
   toSquatting = torsoUpright && torsoAboveGround < minTorsoHeightToKeepUpright && theGroundContactState.contact;
+  isPickedUp = torsoUpright && torsoAboveGround >= maxTorsoHeightToKeepSquatting && !theGroundContactState.contact;
   useTorsoOrientation = std::abs(theSensorData->angle.x()) >= minTorsoOrientationToDetermineDirection.x()
                         || std::abs(theSensorData->angle.y()) >= minTorsoOrientationToDetermineDirection.y();
   direction = getFallDirection();
@@ -70,7 +75,7 @@ void FallDownStateProvider::update(FallDownState& fallDownState)
 
   // Execute behavior
   beginFrame(theFrameInfo.time);
-  execute(OptionInfos::getOption("Root"));
+  execute("Root");
   endFrame();
 
   // debug stuff
@@ -93,7 +98,7 @@ bool FallDownStateProvider::isFalling() const
   // robot is falling, if the com is not in the support polygon
   if(!isPointInsidePolygon(bestCaseCom, supportPolygon)
      && ((direction.dot(vel) > minFallVectorScalar && direction.dot(vel.normalized()) > minNormalizedFallVectorScalar)
-         || bestCaseCom.norm() > minComDistanceToDetetctFall))
+         || bestCaseCom.norm() > minComDistanceToDetectFall))
   {
     return true;
   }
@@ -104,7 +109,7 @@ bool FallDownStateProvider::isFalling() const
     v = v.norm() > maxVelForPrediction ? maxVelForPrediction * v.normalized() : v;
     UKF<5> ukfPredict = UKF<5>((Vector5f() << ukf.mean.head<3>(), v).finished());
     ukfPredict.cov = Matrix5f(ukf.cov);
-    for(float timePast = 0.f; timePast < forwardingTime; timePast += Constants::motionCycleTime)
+    for(float timePast = 0.f; timePast < forwardingTime; timePast += Global::getSettings().motionCycleTime)
     {
       const Matrix3f I = calcInertiaTensor(tiltingEdge);
       auto dynamic = [&](Vector5f& state)
@@ -119,7 +124,7 @@ bool FallDownStateProvider::isFalling() const
       if(direction.dot(vel) < minPredictFallVectorScalar || direction.dot(vel.normalized()) < minPredictNormalizedFallVectorScalar)
         return false;
       const Vector2f& futureCom = ukfPredict.mean.head<2>();
-      comSigma << std::sqrt(ukfPredict.cov(0, 0)) * sigmaArea, std::sqrt(ukfPredict.cov(1, 1)) * sigmaArea, 0.01f;
+      comSigma << std::sqrt(ukfPredict.cov(0, 0)) * sigmaArea, std::sqrt(ukfPredict.cov(1, 1))* sigmaArea, 0.01f;
       bestCaseCom << futureCom - (comSigma.x() * direction), 0.f;
 
       DEBUG_DRAWING3D("module:FallDownStateProvider:fall", "field")
@@ -205,7 +210,7 @@ void FallDownStateProvider::convertToNewOrigin(const Pose3f& originToTorso, cons
 void FallDownStateProvider::getSupportPolygon()
 {
   supportPolygon.clear();
-  supportFoot = theFsrSensorData.totals[Legs::left] > theFsrSensorData.totals[Legs::right] ? Legs::left : Legs::right;
+  supportFoot = theSolePressureState.legInfo[Legs::left].totals > theSolePressureState.legInfo[Legs::right].totals ? Legs::left : Legs::right;
   const Pose3f& leftSoleToTorso = theRobotModel.soleLeft;
   const Pose3f& rightSoleToTorso = theRobotModel.soleRight;
   const Pose3f& supportedFootSoleToTorso = supportFoot == Legs::left ? leftSoleToTorso : rightSoleToTorso;
@@ -214,29 +219,22 @@ void FallDownStateProvider::getSupportPolygon()
 
   const bool useSupportFootOnly = std::abs(com.y()) > std::abs(supportedFootSoleToTorso.translation.y()) - minComDistanceToFootCenter
                                   && sgn(com.y()) == sgn(supportedFootSoleToTorso.translation.y())
-                                  && std::abs(theFsrSensorData.totals[Legs::left] - theFsrSensorData.totals[Legs::right]) > 0.5f
+                                  && std::abs(theSolePressureState.legInfo[Legs::left].totals - theSolePressureState.legInfo[Legs::right].totals) > 0.3f
                                   && !((supportedFootSoleToTorso.translation.x() < com.x() && supportedFootSoleToTorso.translation.x() < otherSupportedFootSoleToTorso.translation.x())
                                        || (supportedFootSoleToTorso.translation.x() > com.x() && supportedFootSoleToTorso.translation.x() > otherSupportedFootSoleToTorso.translation.x()));
-
-  auto scaleFootShape = [](const float xPosition, const float scaling)
-  {
-    return (xPosition > 0.f ? xPosition * scaling : xPosition);
-  };
-
-  const float scalingFootShape = theFootOffset.forward / footShapeToeX;
 
   if(useSupportFootOnly)
   {
     const float sign = supportFoot == Legs::left ? 1.f : -1.f;
-    for(size_t i = 0; i < FootShape::polygon.size(); ++i)
-      supportPolygon.push_back(supportedFootSoleToTorso * Vector3f(scaleFootShape(FootShape::polygon[i].x(), scalingFootShape), sign * FootShape::polygon[i].y(), 0.f));
+    for(const Vector2f& point : theRobotDimensions.soleShape)
+      supportPolygon.push_back(supportedFootSoleToTorso * Vector3f(point.x(), sign * point.y(), 0.f));
   }
   else
   {
-    for(size_t i = 0; i < FootShape::polygon.size(); ++i)
+    for(const Vector2f& point : theRobotDimensions.soleShape)
     {
-      supportPolygon.push_back(leftSoleToTorso * Vector3f(scaleFootShape(FootShape::polygon[i].x(), scalingFootShape), FootShape::polygon[i].y(), 0.f));
-      supportPolygon.push_back(rightSoleToTorso * Vector3f(scaleFootShape(FootShape::polygon[i].x(), scalingFootShape), -FootShape::polygon[i].y(), 0.f));
+      supportPolygon.push_back(leftSoleToTorso * Vector3f(point.x(), point.y(), 0.f));
+      supportPolygon.push_back(rightSoleToTorso * Vector3f(point.x(), -point.y(), 0.f));
     }
   }
   supportPolygon = getConvexHull(supportPolygon);
@@ -355,6 +353,8 @@ Matrix3f FallDownStateProvider::calcInertiaTensor(const Pose3f& originToTorso) c
 void FallDownStateProvider::setState(FallDownState::State state, FallDownState::Direction direction,
                                      Angle odometryRotationOffset)
 {
+  if(theFallDownState->state != state)
+    theFallDownState->timestampSinceStateSwitch = theFrameInfo.time;
   theFallDownState->state = state;
   theFallDownState->direction = direction;
   theFallDownState->odometryRotationOffset = odometryRotationOffset;
@@ -419,11 +419,11 @@ void FallDownStateProvider::draw() const
     SPHERE3D("module:FallDownStateProvider:tiltingEdge", tiltingEdge.translation.x(), tiltingEdge.translation.y(), 0.f, 3.f, ColorRGBA::red);
   }
 
-  DEBUG_DRAWING3D("module:FallDownStateProvider:measurment", "field")
+  DEBUG_DRAWING3D("module:FallDownStateProvider:measurement", "field")
   {
     Vector3f comInOrigin = measure().head<3>();
     Vector3f com = tiltingEdge.translation + comInOrigin;
-    SPHERE3D("module:FallDownStateProvider:measurment", com.x(), com.y(), 0.f, 1.f, ColorRGBA::black);
+    SPHERE3D("module:FallDownStateProvider:measurement", com.x(), com.y(), 0.f, 1.f, ColorRGBA::black);
   }
 
   DEBUG_DRAWING3D("module:FallDownStateProvider:ukf:field", "field")
@@ -438,7 +438,7 @@ void FallDownStateProvider::draw() const
     LINE3D("module:FallDownStateProvider:ukf:field", com.x(), com.y(), 0.f, velDirection.x(), velDirection.y(), 0.f, 3.f, ColorRGBA::blue);
 
     SPHERE3D("module:FallDownStateProvider:ukf:field", com.x(), com.y(), com.z(), 1.f, ColorRGBA::gray);
-    Vector3f comSigma(std::sqrt(ukf.cov(0, 0)), std::sqrt(ukf.cov(1, 1)), Constants::motionCycleTime);
+    Vector3f comSigma(std::sqrt(ukf.cov(0, 0)), std::sqrt(ukf.cov(1, 1)), Global::getSettings().motionCycleTime);
     ELLIPSOID3D("module:FallDownStateProvider:ukf:field", Pose3f(com), comSigma, ColorRGBA(255, 100, 100, 255));
     ELLIPSOID3D("module:FallDownStateProvider:ukf:field", Pose3f(com), Vector3f(comSigma * 2.f), ColorRGBA(150, 150, 100, 100));
     ELLIPSOID3D("module:FallDownStateProvider:ukf:field", Pose3f(com), Vector3f(comSigma * 3.f), ColorRGBA(100, 100, 255, 50));
@@ -456,7 +456,7 @@ void FallDownStateProvider::draw() const
       UKF<5> ukfPredict = UKF<5>(Vector5f(ukf.mean));
       ukfPredict.cov = Matrix5f(ukf.cov);
       const Pose3f& originToTorso = tiltingEdge;
-      for(float timePast = 0.f; timePast < forwardingTime; timePast += Constants::motionCycleTime)
+      for(float timePast = 0.f; timePast < forwardingTime; timePast += Global::getSettings().motionCycleTime)
       {
         const Matrix3f I = calcInertiaTensor(tiltingEdge);
         auto dynamic = [&](Vector5f& state)

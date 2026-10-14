@@ -8,21 +8,48 @@
  */
 
 #include "PerceptionProviders.h"
+#include "Framework/Module.h"
+#include "Representations/Infrastructure/CameraInfo.h"
 #include "Representations/Infrastructure/CameraStatus.h"
-#include "Representations/Perception/GoalPercepts/GoalPostsPercept.h"
+#include "Representations/Infrastructure/JPEGImage.h"
 #include "Representations/Perception/BallPercepts/BallPercept.h"
 #include "Representations/Perception/FieldPercepts/CirclePercept.h"
 #include "Representations/Perception/FieldPercepts/FieldLines.h"
 #include "Representations/Perception/FieldPercepts/FieldLineIntersections.h"
 #include "Representations/Perception/FieldPercepts/IntersectionsPercept.h"
+#include "Representations/Perception/FieldPercepts/MLIntersectionsPercept.h"
 #include "Representations/Perception/FieldPercepts/PenaltyMarkPercept.h"
 #include "Representations/Perception/FieldPercepts/LinesPercept.h"
 #include "Representations/Perception/ImagePreprocessing/BodyContour.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
+#include "Representations/Perception/ImagePreprocessing/ECImage.h"
 #include "Representations/Perception/ImagePreprocessing/FieldBoundary.h"
 #include "Representations/Perception/ObstaclesPercepts/ObstaclesFieldPercept.h"
+#include "Representations/Perception/ObstaclesPercepts/ObstaclesImagePercept.h"
+#include "Threads/Cognition.h"
 
-MAKE_MODULE(PerceptionImageCoordinateSystemProvider, infrastructure);
+// The perception threads already draw these representations
+#undef _MODULE_DRAW
+#define _MODULE_DRAW(...)
+
+// Require both aliases and provide representation
+#define SELECTS(Representation) \
+  REQUIRES(Lower##Representation), \
+  REQUIRES(Upper##Representation), \
+  PROVIDES(Representation)
+
+MODULE(PerceptionImageCoordinateSystemProvider,
+{,
+  REQUIRES(CameraInfo),
+  SELECTS(ImageCoordinateSystem),
+});
+
+MAKE_MODULE(PerceptionImageCoordinateSystemProvider);
+
+class PerceptionImageCoordinateSystemProvider : public PerceptionImageCoordinateSystemProviderBase
+{
+  void update(ImageCoordinateSystem& theImageCoordinateSystem) override;
+};
 
 void PerceptionImageCoordinateSystemProvider::update(ImageCoordinateSystem& theImageCoordinateSystem)
 {
@@ -37,6 +64,38 @@ void PerceptionImageCoordinateSystemProvider::update(ImageCoordinateSystem& theI
     theImageCoordinateSystem.cameraInfo = theCameraInfo;
   }
 }
+
+MODULE(UpperFrameInfoProvider,
+{,
+  REQUIRES(UpperFrameInfo),
+  PROVIDES(FrameInfo),
+});
+
+class UpperFrameInfoProvider : public UpperFrameInfoProviderBase
+{
+  void update(FrameInfo& theFrameInfo) override {theFrameInfo = theUpperFrameInfo;}
+};
+
+MAKE_MODULE(UpperFrameInfoProvider);
+
+// MLIntersectionsPercept only ever comes from the single upper camera.
+STREAMABLE_WITH_BASE(UpperMLIntersectionsPercept, MLIntersectionsPercept, {,});
+
+MODULE(PerceptionMLIntersectionsPerceptProvider,
+{,
+  REQUIRES(UpperMLIntersectionsPercept),
+  PROVIDES(MLIntersectionsPercept),
+});
+
+MAKE_MODULE(PerceptionMLIntersectionsPerceptProvider);
+
+class PerceptionMLIntersectionsPerceptProvider : public PerceptionMLIntersectionsPerceptProviderBase
+{
+  void update(MLIntersectionsPercept& theMLIntersectionsPercept) override
+  {
+    theMLIntersectionsPercept = theUpperMLIntersectionsPercept;
+  }
+};
 
 // Define a module that updates a representation with the newer one of both aliases
 #define ALIAS_MODULE(Representation) \
@@ -56,7 +115,7 @@ void PerceptionImageCoordinateSystemProvider::update(ImageCoordinateSystem& theI
     } \
   }; \
   \
-  MAKE_MODULE(Perception##Representation##Provider, infrastructure)
+  MAKE_MODULE(Perception##Representation##Provider)
 
 // Also declare alias representations
 #define ALIAS(Representation) \
@@ -74,9 +133,11 @@ ALIAS(CirclePercept);
 ALIAS(FieldBoundary);
 ALIAS(FieldLines);
 ALIAS(FieldLineIntersections);
-ALIAS(GoalPostsPercept);
 ALIAS(IntersectionsPercept);
+ALIAS(JPEGImage);
 ALIAS(LinesPercept);
 ALIAS(ObstaclesFieldPercept);
+ALIAS(ObstaclesImagePercept);
+ALIAS(OptionalECImage);
 ALIAS(PenaltyMarkPercept);
 ALIAS(RobotCameraMatrix);

@@ -44,19 +44,20 @@
 #include <QtWidgets/qtwidgetsglobal.h>
 #include <QtWidgets/qwidget.h>
 
-QT_BEGIN_NAMESPACE
+QT_REQUIRE_CONFIG(keysequenceedit);
 
-#ifndef QT_NO_KEYSEQUENCEEDIT
+QT_BEGIN_NAMESPACE
 
 class QKeySequenceEditPrivate;
 class Q_WIDGETS_EXPORT QKeySequenceEdit : public QWidget
 {
     Q_OBJECT
-    Q_PROPERTY(QKeySequence keySequence READ keySequence WRITE setKeySequence NOTIFY keySequenceChanged USER true)
+    Q_PROPERTY(QKeySequence keySequence READ keySequence WRITE setKeySequence
+               NOTIFY keySequenceChanged USER true)
 
 public:
-    explicit QKeySequenceEdit(QWidget *parent = Q_NULLPTR);
-    explicit QKeySequenceEdit(const QKeySequence &keySequence, QWidget *parent = Q_NULLPTR);
+    explicit QKeySequenceEdit(QWidget *parent = nullptr);
+    explicit QKeySequenceEdit(const QKeySequence &keySequence, QWidget *parent = nullptr);
     ~QKeySequenceEdit();
 
     QKeySequence keySequence() const;
@@ -72,17 +73,15 @@ Q_SIGNALS:
 protected:
     QKeySequenceEdit(QKeySequenceEditPrivate &d, QWidget *parent, Qt::WindowFlags f);
 
-    bool event(QEvent *) Q_DECL_OVERRIDE;
-    void keyPressEvent(QKeyEvent *) Q_DECL_OVERRIDE;
-    void keyReleaseEvent(QKeyEvent *) Q_DECL_OVERRIDE;
-    void timerEvent(QTimerEvent *) Q_DECL_OVERRIDE;
+    bool event(QEvent *) override;
+    void keyPressEvent(QKeyEvent *) override;
+    void keyReleaseEvent(QKeyEvent *) override;
+    void timerEvent(QTimerEvent *) override;
 
 private:
     Q_DISABLE_COPY(QKeySequenceEdit)
     Q_DECLARE_PRIVATE(QKeySequenceEdit)
 };
-
-#endif // QT_NO_KEYSEQUENCEEDIT
 
 QT_END_NAMESPACE
 

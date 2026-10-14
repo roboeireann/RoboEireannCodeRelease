@@ -7,9 +7,10 @@
  */
 
 #include "SyntaxHighlighter.h"
+#include "Theme.h"
 
-SyntaxHighlighter::SyntaxHighlighter(QTextDocument* parent) :
-  QSyntaxHighlighter(parent)
+SyntaxHighlighter::SyntaxHighlighter(QTextDocument* parent, QWidget* editor) :
+  QSyntaxHighlighter(parent), editor(editor)
 {
   const QString nameStartCharList = ":A-Z_a-z";
   const QString nameCharList = nameStartCharList + "\\-\\.0-9";
@@ -37,20 +38,31 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument* parent) :
   xmlCloseTagEndExpression = QRegularExpression(">");
   xmlCloseTagEndExpression.optimize();
 
-  xmlTagFormat.setForeground(Qt::darkBlue);
-  xmlTagFormat.setFontItalic(false);
-
   //Attributes
   xmlAttributeStartExpression = QRegularExpression("\\s*" + xmlName + "\\s*=\\s*\\\"");
   xmlAttributeStartExpression.optimize();
   xmlAttributeEndExpression = QRegularExpression("(?<!\\\\)(?:(\\\\\\\\)*)(\")");
   xmlAttributeEndExpression.optimize();
 
-  xmlAttributeFormat.setForeground(Qt::darkMagenta);
-  xmlAttributeFormat.setFontItalic(false);
+  xmlTagFormat.setFontWeight(QFont::Bold);
 
-  xmlAttValFormat.setForeground(QColor(139, 69, 19));
-  xmlAttValFormat.setFontItalic(false);
+  updateColors();
+}
+
+void SyntaxHighlighter::updateColors()
+{
+  if(Theme::isDarkMode(editor))
+  {
+    xmlTagFormat.setForeground(QColor(252, 95, 163));
+    xmlAttributeFormat.setForeground(QColor(191, 133, 85));
+    xmlAttValFormat.setForeground(QColor(252, 106, 93));
+  }
+  else
+  {
+    xmlTagFormat.setForeground(QColor(155, 35, 147));
+    xmlAttributeFormat.setForeground(QColor(129, 95, 3));
+    xmlAttValFormat.setForeground(QColor(196, 26, 22));
+  }
 }
 
 void SyntaxHighlighter::highlightBlock(const QString& text)
@@ -59,11 +71,11 @@ void SyntaxHighlighter::highlightBlock(const QString& text)
   highlightSubBlock(text, 0, previousBlockState());
 }
 
-void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIndex, const int currState)
+void SyntaxHighlighter::highlightSubBlock(const QString& text, const IndexType startIndex, const int currState)
 {
   if(startIndex >= text.length())
     return;
-  int lowest = -1;
+  IndexType lowest = -1;
   int newState = -1;
 
   int effectiveState = currState;
@@ -102,7 +114,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
         case inComment:
         {
           //We're into a comment.
-          setFormat(commentMatch.capturedStart(), commentMatch.capturedLength(), xmlCommentFormat);
+          setFormat(static_cast<int>(commentMatch.capturedStart()), static_cast<int>(commentMatch.capturedLength()), xmlCommentFormat);
           setCurrentBlockState(inComment);
           highlightSubBlock(text, commentMatch.capturedEnd(), inComment);
           break;
@@ -111,7 +123,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
         {
           //We're into an opening tag.
           //Format the matched text
-          setFormat(openTagMatch.capturedStart(), openTagMatch.capturedLength(), xmlTagFormat);
+          setFormat(static_cast<int>(openTagMatch.capturedStart()), static_cast<int>(openTagMatch.capturedLength()), xmlTagFormat);
           //Call this function again with a new offset and state.
           setCurrentBlockState(inOpenTag);
           highlightSubBlock(text, openTagMatch.capturedEnd(), inOpenTag);
@@ -121,7 +133,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
         {
           //We're into a closing tag.
           //Format the matched text
-          setFormat(closeTagMatch.capturedStart(), closeTagMatch.capturedLength(), xmlTagFormat);
+          setFormat(static_cast<int>(closeTagMatch.capturedStart()), static_cast<int>(closeTagMatch.capturedLength()), xmlTagFormat);
           setCurrentBlockState(inCloseTag);
           //Call this function again with a new offset and state.
           highlightSubBlock(text, closeTagMatch.capturedEnd(), inCloseTag);
@@ -156,7 +168,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
         case inNothing:
         {
           //We've come to the end of the open tag.
-          setFormat(openTagEndMatch.capturedStart(), openTagEndMatch.capturedLength(), xmlTagFormat);
+          setFormat(static_cast<int>(openTagEndMatch.capturedStart()), static_cast<int>(openTagEndMatch.capturedLength()), xmlTagFormat);
           setCurrentBlockState(inNothing);
           highlightSubBlock(text, openTagEndMatch.capturedEnd(), inNothing);
           break;
@@ -164,7 +176,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
         case inAttVal:
         {
           //We've started an attribute. First format the attribute name and quote.
-          setFormat(attStartMatch.capturedStart(), attStartMatch.capturedEnd(), xmlAttributeFormat);
+          setFormat(static_cast<int>(attStartMatch.capturedStart()), static_cast<int>(attStartMatch.capturedEnd()), xmlAttributeFormat);
           setCurrentBlockState(inAttVal);
           highlightSubBlock(text, attStartMatch.capturedEnd(), inAttVal);
           break;
@@ -179,16 +191,16 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
       if(match.hasMatch())
       {
         //Do some highlighting. First the attribute value.
-        setFormat(startIndex, match.capturedStart(2) - startIndex, xmlAttValFormat);
+        setFormat(static_cast<int>(startIndex), static_cast<int>(match.capturedStart(2) - startIndex), xmlAttValFormat);
         //Now the closing quote.
-        setFormat(match.capturedStart(2), match.capturedLength(2), xmlAttributeFormat);
+        setFormat(static_cast<int>(match.capturedStart(2)), static_cast<int>(match.capturedLength(2)), xmlAttributeFormat);
         setCurrentBlockState(inOpenTag);
         highlightSubBlock(text, match.capturedEnd(2), inOpenTag);
       }
       else
       {
         //The attribute value runs over the end of the line.
-        setFormat(startIndex, text.length() - startIndex, xmlAttValFormat);
+        setFormat(static_cast<int>(startIndex), static_cast<int>(text.length() - startIndex), xmlAttValFormat);
         setCurrentBlockState(inAttVal);
       }
       break;
@@ -199,7 +211,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
       if(match.hasMatch())
       {
         //We've found the end of the close tag.
-        setFormat(match.capturedStart(), match.capturedLength(), xmlTagFormat);
+        setFormat(static_cast<int>(match.capturedStart()), static_cast<int>(match.capturedLength()), xmlTagFormat);
         setCurrentBlockState(inNothing);
         highlightSubBlock(text, match.capturedEnd(), inNothing);
       }
@@ -217,7 +229,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
       QRegularExpressionMatch match = xmlCommentEndExpression.match(text, startIndex);
       if(match.hasMatch())
       {
-        setFormat(startIndex, match.capturedEnd() - startIndex, xmlCommentFormat);
+        setFormat(static_cast<int>(startIndex), static_cast<int>(match.capturedEnd() - startIndex), xmlCommentFormat);
         setCurrentBlockState(inNothing);
         highlightSubBlock(text, match.capturedEnd(), inNothing);
       }
@@ -225,7 +237,7 @@ void SyntaxHighlighter::highlightSubBlock(const QString& text, const int startIn
       {
         //We leave this block still inside the comment,
         //after formatting the rest of the line.
-        setFormat(startIndex, text.length() - startIndex, xmlCommentFormat);
+        setFormat(static_cast<int>(startIndex), static_cast<int>(text.length() - startIndex), xmlCommentFormat);
         setCurrentBlockState(inComment);
       }
       break;

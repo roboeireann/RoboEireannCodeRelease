@@ -11,9 +11,10 @@
 
 #include "PathPlannerProvider.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/Debugging/Annotation.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Debugging/Annotation.h"
+#include "Tools/BehaviorControl/Strategy/ActiveRole.h"
 #include <algorithm>
 
 /**
@@ -59,16 +60,16 @@
   } \
   while(false)
 
-MAKE_MODULE(PathPlannerProvider, behaviorControl);
+MAKE_MODULE(PathPlannerProvider);
 
 static const float epsilon = 0.1f; /**< Small offset in mm. */
 
 PathPlannerProvider::PathPlannerProvider()
+  : borders({{theFieldDimensions.xPosOpponentGoalLine + fieldBorderLimit, 0.f, 0.f, -1.f},
+             {theFieldDimensions.xPosOwnGoalLine - fieldBorderLimit, 0.f, 0.f, 1.f},
+             {0.f, theFieldDimensions.yPosLeftTouchline + fieldBorderLimit, 1.f, 0.f},
+             {0.f, theFieldDimensions.yPosRightTouchline - fieldBorderLimit, -1.f, 0.f}})
 {
-  borders.emplace_back(theFieldDimensions.xPosOpponentGroundLine + fieldBorderLimit, 0.f, 0.f, -1.f);
-  borders.emplace_back(theFieldDimensions.xPosOwnGroundLine - fieldBorderLimit, 0.f, 0.f, 1.f);
-  borders.emplace_back(0.f, theFieldDimensions.yPosLeftSideline + fieldBorderLimit, 1.f, 0.f);
-  borders.emplace_back(0.f, theFieldDimensions.yPosRightSideline - fieldBorderLimit, -1.f, 0.f);
 }
 
 void PathPlannerProvider::update(PathPlanner& pathPlanner)
@@ -84,11 +85,15 @@ void PathPlannerProvider::update(PathPlanner& pathPlanner)
 
   pathPlanner.plan = [this](const Pose2f& target, const Pose2f& speed) -> MotionRequest::ObstacleAvoidance
   {
-    bool excludeOwnPenaltyArea = !theTeamBehaviorStatus.role.isGoalkeeper() && theLibTeammates.nonKeeperTeammatesInOwnPenaltyArea >= 2;
-    bool excludeOpponentPenaltyArea = theLibTeammates.teammatesInOpponentPenaltyArea >= 3;
+    const bool excludeOwnPenaltyArea = theIllegalAreas.illegal & bit(IllegalAreas::ownPenaltyArea);
+    const bool excludeOpponentPenaltyArea = theIllegalAreas.illegal & bit(IllegalAreas::opponentPenaltyArea);
+    const bool excludeCenterCircle = (theGameState.isReady() && theIllegalAreas.anticipatedTimestamp && -theFrameInfo.getTimeSince(theIllegalAreas.anticipatedTimestamp) < static_cast<int>((theGameState.timeWhenStateEnds - theGameState.timeWhenStateStarted) / 2))
+                                     ? theIllegalAreas.anticipatedIllegal & bit(IllegalAreas::centerCircle)
+                                     : theIllegalAreas.illegal & bit(IllegalAreas::centerCircle);
+
     pathPlannerWasActive = true;
     createBarriers(target, excludeOwnPenaltyArea, excludeOpponentPenaltyArea);
-    createNodes(target, excludeOwnPenaltyArea, excludeOpponentPenaltyArea);
+    createNodes(target, excludeOwnPenaltyArea, excludeOpponentPenaltyArea, excludeCenterCircle);
     plan(nodes[0], nodes[1], speed.translation.x() / speed.rotation);
 
     bool foundPath = false;
@@ -100,7 +105,7 @@ void PathPlannerProvider::update(PathPlanner& pathPlanner)
         for(edge = nodes[1].fromEdge[rotation]; edge->fromNode != &nodes[0]; edge = edge->fromNode->fromEdge[edge->fromRotation])
         {
           obstacleAvoidance.path.emplace_back();
-          obstacleAvoidance.path.back().obstacle = Geometry::Circle(theRobotPose.inversePose * edge->fromNode->center, edge->fromNode->radius + radiusControlOffset);
+          obstacleAvoidance.path.back().obstacle = Geometry::Circle(theRobotPose.inverse() * edge->fromNode->center, edge->fromNode->radius + radiusControlOffset);
           obstacleAvoidance.path.back().clockwise = edge->fromRotation == cw;
         }
         lastDir = edge->toRotation;
@@ -138,7 +143,7 @@ void PathPlannerProvider::update(PathPlanner& pathPlanner)
 void PathPlannerProvider::createBarriers(const Pose2f& target, bool excludeOwnPenaltyArea, bool excludeOpponentPenaltyArea)
 {
   barriers.clear();
-  barriers.reserve(8);
+  barriers.reserve(20);
 
   // Add sides of the goal nets
   barriers.emplace_back(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosLeftGoal,
@@ -150,6 +155,18 @@ void PathPlannerProvider::createBarriers(const Pose2f& target, bool excludeOwnPe
   barriers.emplace_back(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosRightGoal,
                         theFieldDimensions.xPosOwnFieldBorder, theFieldDimensions.yPosRightGoal);
 
+  if(useFastestWalkLeaderboardBarriers)
+  {
+    barriers.emplace_back(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosLeftPenaltyArea,
+                          theFieldDimensions.xPosOwnFieldBorder, theFieldDimensions.yPosLeftPenaltyArea);
+    barriers.emplace_back(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosRightGoalArea,
+                          theFieldDimensions.xPosOpponentFieldBorder, theFieldDimensions.yPosRightGoalArea);
+    barriers.emplace_back(theFieldDimensions.xPosOwnPenaltyMark, 0.f,
+                          theFieldDimensions.xPosOwnFieldBorder, 0.f);
+    barriers.emplace_back(theFieldDimensions.xPosOwnGoalArea, theFieldDimensions.yPosLeftGoalArea,
+                          theFieldDimensions.xPosOpponentFieldBorder, theFieldDimensions.yPosLeftGoalArea);
+  }
+
   if(excludeOwnPenaltyArea)
   {
     float left = theFieldDimensions.yPosLeftPenaltyArea + penaltyAreaRadius - radiusControlOffset;
@@ -160,9 +177,9 @@ void PathPlannerProvider::createBarriers(const Pose2f& target, bool excludeOwnPe
     clipPenaltyArea(target.translation, left, right, front);
 
     barriers.emplace_back(theFieldDimensions.xPosOwnPenaltyArea, left,
-                          theFieldDimensions.xPosOwnGroundLine, left);
+                          theFieldDimensions.xPosOwnGoalLine, left);
     barriers.emplace_back(theFieldDimensions.xPosOwnPenaltyArea, right,
-                          theFieldDimensions.xPosOwnGroundLine, right);
+                          theFieldDimensions.xPosOwnGoalLine, right);
     barriers.emplace_back(front, theFieldDimensions.yPosLeftPenaltyArea,
                           front, theFieldDimensions.yPosRightPenaltyArea);
   }
@@ -177,18 +194,21 @@ void PathPlannerProvider::createBarriers(const Pose2f& target, bool excludeOwnPe
     clipPenaltyArea(target.translation, left, right, front);
 
     barriers.emplace_back(theFieldDimensions.xPosOpponentPenaltyArea, left,
-                          theFieldDimensions.xPosOpponentGroundLine, left);
+                          theFieldDimensions.xPosOpponentGoalLine, left);
     barriers.emplace_back(theFieldDimensions.xPosOpponentPenaltyArea, right,
-                          theFieldDimensions.xPosOpponentGroundLine, right);
+                          theFieldDimensions.xPosOpponentGoalLine, right);
     barriers.emplace_back(front, theFieldDimensions.yPosLeftPenaltyArea,
                           front, theFieldDimensions.yPosRightPenaltyArea);
   }
 
-  if(wrongBallSideCostFactor > 0.f)
+  if(theGameState.isPlaying() && wrongBallSideCostFactor > 0.f)
   {
-    const Vector2f& ballPosition = theTeamBehaviorStatus.role.isBallPlayer() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
-    Vector2f end = ballPosition + (ballPosition - Vector2f(theFieldDimensions.xPosOwnGoal, 0)).normalized(wrongBallSideRadius);
-    barriers.emplace_back(ballPosition.x(), ballPosition.y(), end.x(), end.y(), ballRadius * pi2 * wrongBallSideCostFactor);
+    const Vector2f& ballPosition = theStrategyStatus.role == ActiveRole::toRole(ActiveRole::playBall) ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
+    if((ballPosition - target.translation).norm() >= 1.f)
+    {
+      Vector2f end = ballPosition + (ballPosition - Vector2f(theFieldDimensions.xPosOwnGoal, 0)).normalized(wrongBallSideRadius);
+      barriers.emplace_back(ballPosition.x(), ballPosition.y(), end.x(), end.y(), (ballDistance + theBallSpecification.radius) * pi2 * wrongBallSideCostFactor);
+    }
   }
 }
 
@@ -209,13 +229,13 @@ void PathPlannerProvider::clipPenaltyArea(const Vector2f& position, float& left,
   }
 }
 
-void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenaltyArea, bool excludeOpponentPenaltyArea)
+void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenaltyArea, bool excludeOpponentPenaltyArea, bool excludeCenterCircle)
 {
   nodes.clear();
 
   // Reserve enough space that prevents any reallocation, because the addresses of entries are used.
-  nodes.reserve(sqr((excludeOwnPenaltyArea ? 8 : 6) + (excludeOpponentPenaltyArea ? 2 : 0) +
-                    (useObstacles ? theObstacleModel.obstacles.size() : theTeamPlayersObstacleModel.obstacles.size())));
+  nodes.reserve(sqr((excludeOwnPenaltyArea ? 4 : 0) + (excludeOpponentPenaltyArea ? 4 : 0) +
+                    (excludeCenterCircle ? 1 : 0) + 7 + theObstacleModel.obstacles.size()));
 
   // Insert start and target
   nodes.emplace_back(theRobotPose.translation, 0.f);
@@ -224,6 +244,7 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
   Node& to(nodes.back());
 
   // Insert goalposts
+  const float goalPostRadius = goalPostDistance + theFieldDimensions.goalPostRadius;
   nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosLeftGoal), goalPostRadius - radiusControlOffset);
   nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGoalPost, theFieldDimensions.yPosRightGoal), goalPostRadius - radiusControlOffset);
   nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnGoalPost, theFieldDimensions.yPosLeftGoal), goalPostRadius - radiusControlOffset);
@@ -237,9 +258,9 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
     nodes.back().allowedClones = 1;
     nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnPenaltyArea, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
-    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnGroundLine, theFieldDimensions.yPosLeftPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
+    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosLeftPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
-    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnGroundLine, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
+    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOwnGoalLine, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
   }
 
@@ -251,38 +272,28 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
     nodes.back().allowedClones = 1;
     nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentPenaltyArea, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
-    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosLeftPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
+    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosLeftPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
-    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGroundLine, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
+    nodes.emplace_back(Vector2f(theFieldDimensions.xPosOpponentGoalLine, theFieldDimensions.yPosRightPenaltyArea), penaltyAreaRadius - radiusControlOffset + epsilon);
     nodes.back().allowedClones = 1;
   }
 
   // Insert obstacles if they are on the field.
-  if(useObstacles)
-  {
-    for(const auto& obstacle : theObstacleModel.obstacles)
-      if(obstacle.type != Obstacle::goalpost)
-        addObstacle(theRobotPose * obstacle.center, getRadius(obstacle.type));
-  }
-  else
-  {
-    for(const auto& obstacle : theTeamPlayersObstacleModel.obstacles)
-      if(obstacle.center != theRobotPose.translation && obstacle.type != Obstacle::goalpost)
-        addObstacle(obstacle.center, getRadius(obstacle.type));
-  }
+  for(const auto& obstacle : theObstacleModel.obstacles)
+    addObstacle(theRobotPose * obstacle.center, getRadius(obstacle.type));
 
   // Add ball in playing if it is not the target
-  if(theGameInfo.state == STATE_PLAYING)
+  if(theGameState.isPlaying())
   {
-    const Vector2f& ballPosition = theTeamBehaviorStatus.role.isBallPlayer() ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
-    if(theGameInfo.setPlay != SET_PLAY_NONE && !theGameInfo.isOurKick())
+    const Vector2f& ballPosition = theStrategyStatus.role == ActiveRole::toRole(ActiveRole::playBall) ? theFieldBall.recentBallEndPositionOnField() : theFieldBall.recentBallPositionOnField();
+    if(theGameState.isFreeKick() && !theGameState.isForOwnTeam())
       addObstacle(ballPosition, freeKickRadius);
     else if((ballPosition - to.center).norm() >= 1.f)
-      addObstacle(ballPosition, ballRadius);
+      addObstacle(ballPosition, ballDistance + theBallSpecification.radius);
   }
 
-  if(centerCircleRadius != 0.f && theGameInfo.state == STATE_READY && !theGameInfo.isOurKick())
-    addObstacle(Vector2f::Zero(), centerCircleRadius);
+  if(centerCircleDistance != 0.f && excludeCenterCircle)
+    addObstacle(Vector2f::Zero(), centerCircleDistance + theFieldDimensions.centerCircleRadius);
 
   // If other nodes surround start or target, shrink them.
   for(auto node = nodes.begin(); node != nodes.begin() + 2; ++node)
@@ -338,21 +349,18 @@ void PathPlannerProvider::createNodes(const Pose2f& target, bool excludeOwnPenal
 
 float PathPlannerProvider::getRadius(Obstacle::Type type) const
 {
-  switch(type)
-  {
-    case Obstacle::goalpost:
-      return goalPostRadius - radiusControlOffset;
-    case Obstacle::fallenSomeRobot:
-    case Obstacle::fallenOpponent:
-    case Obstacle::fallenTeammate:
-      if(theGameInfo.state != STATE_READY)
+  if(theGameState.isReady())
+    return readyRobotRadius - radiusControlOffset;
+  else
+    switch(type)
+    {
+      case Obstacle::fallenSomeRobot:
+      case Obstacle::fallenOpponent:
+      case Obstacle::fallenTeammate:
         return fallenRobotRadius - radiusControlOffset;
-    default:
-      if(theGameInfo.state != STATE_READY)
+      default:
         return uprightRobotRadius - radiusControlOffset;
-      else
-        return readyRobotRadius - radiusControlOffset;
-  }
+    }
 }
 
 void PathPlannerProvider::addObstacle(const Vector2f& center, float radius)
@@ -528,7 +536,7 @@ void PathPlannerProvider::createTangents(Node& node, Tangents& tangents)
           else
           {
             // Now we're just intersecting a line with a circle: v*n=c, n*n=1
-            const float h = std::sqrt(std::max(0.f, 1.f - c * c));
+            const float h = std::sqrt(1.f - c * c);
             FOREACH_ENUM(Rotation, j)
             {
               float sign2 = j ? -1.f : 1.f;
@@ -687,9 +695,14 @@ void PathPlannerProvider::addNeighborsFromTangents(Node& node, Tangents& tangent
               Geometry::Line line(fromPoint, tangent->toPoint - fromPoint);
               Vector2f p1;
               Vector2f p2;
-              if(Geometry::getIntersectionOfLineAndCircle(line, *s->toNode, p1, p2) &&
-                 line.direction.squaredNorm() >= (p1 - fromPoint).squaredNorm())
-                goto doNotAddTangent;
+              const int numOfIntersections = Geometry::getIntersectionOfLineAndCircle(line, *s->toNode, p1, p2);
+              if(numOfIntersections > 0)
+              {
+                const float distance = line.direction.squaredNorm();
+                if(distance >= (p1 - fromPoint).squaredNorm() ||
+                   (numOfIntersections == 2 && distance >= (p2 - fromPoint).squaredNorm()))
+                  goto doNotAddTangent;
+              }
             }
           }
         node.edges[rotation].emplace_back(*tangent);
@@ -717,7 +730,7 @@ void PathPlannerProvider::addNeighborsFromTangents(Node& node, Tangents& tangent
 #ifndef NDEBUG
           {
             OutBinaryFile stream("PathPlannerProvider.log");
-            stream << theRobotPose << theTeamPlayersObstacleModel << lastDir;
+            stream << theRobotPose << theObstacleModel << lastDir;
           }
           FAIL("Send Config/PathPlannerProvider.log to Thomas.Roefer@dfki.de.");
 #endif

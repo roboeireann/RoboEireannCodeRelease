@@ -1,0 +1,44 @@
+# -----------------------------------------------------------------
+# green/white team positions - playing left to right
+
+robot robot3
+mvrp 2700 1000 525 0 0 180
+
+robot robot4
+mvrp 0 1500 525 0 0 180
+
+robot robot5
+mvrp -400 2300 525 0 0 180
+
+
+# -----------------------------------------------------------------
+# red/blue team positions
+robot robot21
+mvrp -4300 0 525 0 0 0
+
+robot robot22
+mvrp -2300 -1100 525 0 0 0
+
+robot robot23
+mvrp 2200 500 525 0 0 0
+
+robot robot24
+mvrp -300 -300 525 0 0 115
+
+# robot robot25
+# mvrp -800 -2000 525 0 0 0
+
+# -----------------------------------------------------------------
+# move the ball in front to robot24
+mvb -450 100 1000
+
+# -----------------------------------------------------------------
+# Set GameState
+gc kickOffSecondTeam
+gc playing
+
+# make robot24 kick the ball straight out
+robot robot24
+dr behaviour:StrikerPlayingTask:kickStraightAhead
+
+# gc kickInForFirstTeam

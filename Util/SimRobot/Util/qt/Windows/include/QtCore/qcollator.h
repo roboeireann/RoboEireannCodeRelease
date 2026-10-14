@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Copyright (C) 2013 Aleix Pol Gonzalez <aleixpol@kde.org>
 ** Contact: https://www.qt.io/licensing/
 **
@@ -57,14 +57,13 @@ public:
     QCollatorSortKey(const QCollatorSortKey &other);
     ~QCollatorSortKey();
     QCollatorSortKey &operator=(const QCollatorSortKey &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QCollatorSortKey &operator=(QCollatorSortKey &&other) Q_DECL_NOTHROW
-    { swap(other); return *this; }
-#endif
-    void swap(QCollatorSortKey &other) Q_DECL_NOTHROW
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QCollatorSortKey)
+    void swap(QCollatorSortKey &other) noexcept
     { d.swap(other.d); }
 
     int compare(const QCollatorSortKey &key) const;
+    friend bool operator<(const QCollatorSortKey &lhs, const QCollatorSortKey &rhs)
+    { return lhs.compare(rhs) < 0; }
 
 protected:
     QCollatorSortKey(QCollatorSortKeyPrivate*);
@@ -75,27 +74,20 @@ private:
     QCollatorSortKey();
 };
 
-inline bool operator<(const QCollatorSortKey &lhs, const QCollatorSortKey &rhs)
-{
-    return lhs.compare(rhs) < 0;
-}
-
 class Q_CORE_EXPORT QCollator
 {
 public:
-    explicit QCollator(const QLocale &locale = QLocale());
+    QCollator();
+    explicit QCollator(const QLocale &locale);
     QCollator(const QCollator &);
     ~QCollator();
     QCollator &operator=(const QCollator &);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QCollator(QCollator &&other) Q_DECL_NOTHROW
-        : d(other.d) { other.d = Q_NULLPTR; }
-    QCollator &operator=(QCollator &&other) Q_DECL_NOTHROW
-    { swap(other); return *this; }
-#endif
+    QCollator(QCollator &&other) noexcept
+        : d(other.d) { other.d = nullptr; }
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_MOVE_AND_SWAP(QCollator)
 
-    void swap(QCollator &other) Q_DECL_NOTHROW
-    { qSwap(d, other.d); }
+    void swap(QCollator &other) noexcept
+    { qt_ptr_swap(d, other.d); }
 
     void setLocale(const QLocale &locale);
     QLocale locale() const;
@@ -109,14 +101,24 @@ public:
     void setIgnorePunctuation(bool on);
     bool ignorePunctuation() const;
 
-    int compare(const QString &s1, const QString &s2) const;
-    int compare(const QStringRef &s1, const QStringRef &s2) const;
-    int compare(const QChar *s1, int len1, const QChar *s2, int len2) const;
+#if QT_STRINGVIEW_LEVEL < 2
+    int compare(const QString &s1, const QString &s2) const
+    { return compare(QStringView(s1), QStringView(s2)); }
+    int compare(const QChar *s1, int len1, const QChar *s2, int len2) const
+    { return compare(QStringView(s1, len1), QStringView(s2, len2)); }
 
     bool operator()(const QString &s1, const QString &s2) const
     { return compare(s1, s2) < 0; }
+#endif
+    int compare(QStringView s1, QStringView s2) const;
+
+    bool operator()(QStringView s1, QStringView s2) const
+    { return compare(s1, s2) < 0; }
 
     QCollatorSortKey sortKey(const QString &string) const;
+
+    static int defaultCompare(QStringView s1, QStringView s2);
+    static QCollatorSortKey defaultSortKey(QStringView key);
 
 private:
     QCollatorPrivate *d;

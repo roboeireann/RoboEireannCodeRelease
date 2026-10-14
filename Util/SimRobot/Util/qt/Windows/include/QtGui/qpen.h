@@ -65,24 +65,21 @@ public:
     QPen(const QColor &color);
     QPen(const QBrush &brush, qreal width, Qt::PenStyle s = Qt::SolidLine,
          Qt::PenCapStyle c = Qt::SquareCap, Qt::PenJoinStyle j = Qt::BevelJoin);
-    QPen(const QPen &pen) Q_DECL_NOTHROW;
+    QPen(const QPen &pen) noexcept;
 
     ~QPen();
 
-    QPen &operator=(const QPen &pen) Q_DECL_NOTHROW;
-#ifdef Q_COMPILER_RVALUE_REFS
-    QPen(QPen &&other) Q_DECL_NOTHROW
-        : d(other.d) { other.d = Q_NULLPTR; }
-    QPen &operator=(QPen &&other) Q_DECL_NOTHROW
-    { qSwap(d, other.d); return *this; }
-#endif
-    void swap(QPen &other) Q_DECL_NOTHROW { qSwap(d, other.d); }
+    QPen &operator=(const QPen &pen) noexcept;
+    QPen(QPen &&other) noexcept
+        : d(qExchange(other.d, nullptr)) {}
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QPen)
+    void swap(QPen &other) noexcept { qt_ptr_swap(d, other.d); }
 
     Qt::PenStyle style() const;
     void setStyle(Qt::PenStyle);
 
-    QVector<qreal> dashPattern() const;
-    void setDashPattern(const QVector<qreal> &pattern);
+    QList<qreal> dashPattern() const;
+    void setDashPattern(const QList<qreal> &pattern);
 
     qreal dashOffset() const;
     void setDashOffset(qreal doffset);

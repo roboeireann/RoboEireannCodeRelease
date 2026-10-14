@@ -44,10 +44,9 @@
 #include <QtWidgets/qcombobox.h>
 #include <QtGui/qfontdatabase.h>
 
-#ifndef QT_NO_FONTCOMBOBOX
+QT_REQUIRE_CONFIG(fontcombobox);
 
 QT_BEGIN_NAMESPACE
-
 
 class QFontComboBoxPrivate;
 
@@ -59,7 +58,7 @@ class Q_WIDGETS_EXPORT QFontComboBox : public QComboBox
     Q_PROPERTY(QFont currentFont READ currentFont WRITE setCurrentFont NOTIFY currentFontChanged)
 
 public:
-    explicit QFontComboBox(QWidget *parent = Q_NULLPTR);
+    explicit QFontComboBox(QWidget *parent = nullptr);
     ~QFontComboBox();
 
     void setWritingSystem(QFontDatabase::WritingSystem);
@@ -79,7 +78,16 @@ public:
     FontFilters fontFilters() const;
 
     QFont currentFont() const;
-    QSize sizeHint() const Q_DECL_OVERRIDE;
+    QSize sizeHint() const override;
+
+    void setSampleTextForSystem(QFontDatabase::WritingSystem writingSystem, const QString &sampleText);
+    QString sampleTextForSystem(QFontDatabase::WritingSystem writingSystem) const;
+
+    void setSampleTextForFont(const QString &fontFamily, const QString &sampleText);
+    QString sampleTextForFont(const QString &fontFamily) const;
+
+    void setDisplayFont(const QString &fontFamily, const QFont &font);
+    std::optional<QFont> displayFont(const QString &fontFamily) const;
 
 public Q_SLOTS:
     void setCurrentFont(const QFont &f);
@@ -88,7 +96,7 @@ Q_SIGNALS:
     void currentFontChanged(const QFont &f);
 
 protected:
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
+    bool event(QEvent *e) override;
 
 private:
     Q_DISABLE_COPY(QFontComboBox)
@@ -101,5 +109,4 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(QFontComboBox::FontFilters)
 
 QT_END_NAMESPACE
 
-#endif // QT_NO_FONTCOMBOBOX
 #endif

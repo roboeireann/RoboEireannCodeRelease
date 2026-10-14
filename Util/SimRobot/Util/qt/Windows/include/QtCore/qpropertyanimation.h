@@ -42,40 +42,41 @@
 
 #include <QtCore/qvariantanimation.h>
 
+QT_REQUIRE_CONFIG(animation);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_ANIMATION
 
 class QPropertyAnimationPrivate;
 class Q_CORE_EXPORT QPropertyAnimation : public QVariantAnimation
 {
     Q_OBJECT
-    Q_PROPERTY(QByteArray propertyName READ propertyName WRITE setPropertyName)
-    Q_PROPERTY(QObject* targetObject READ targetObject WRITE setTargetObject)
+    Q_PROPERTY(QByteArray propertyName READ propertyName WRITE setPropertyName
+               BINDABLE bindablePropertyName)
+    Q_PROPERTY(QObject* targetObject READ targetObject WRITE setTargetObject
+               BINDABLE bindableTargetObject)
 
 public:
-    QPropertyAnimation(QObject *parent = Q_NULLPTR);
-    QPropertyAnimation(QObject *target, const QByteArray &propertyName, QObject *parent = Q_NULLPTR);
+    QPropertyAnimation(QObject *parent = nullptr);
+    QPropertyAnimation(QObject *target, const QByteArray &propertyName, QObject *parent = nullptr);
     ~QPropertyAnimation();
 
     QObject *targetObject() const;
     void setTargetObject(QObject *target);
+    QBindable<QObject *> bindableTargetObject();
 
     QByteArray propertyName() const;
     void setPropertyName(const QByteArray &propertyName);
+    QBindable<QByteArray> bindablePropertyName();
 
 protected:
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
-    void updateCurrentValue(const QVariant &value) Q_DECL_OVERRIDE;
-    void updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
+    void updateCurrentValue(const QVariant &value) override;
+    void updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState) override;
 
 private:
     Q_DISABLE_COPY(QPropertyAnimation)
     Q_DECLARE_PRIVATE(QPropertyAnimation)
 };
-
-#endif //QT_NO_ANIMATION
 
 QT_END_NAMESPACE
 

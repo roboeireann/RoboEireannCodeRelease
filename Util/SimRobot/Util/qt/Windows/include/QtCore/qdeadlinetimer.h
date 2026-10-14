@@ -43,6 +43,7 @@
 #include <QtCore/qelapsedtimer.h>
 #include <QtCore/qmetatype.h>
 #include <QtCore/qnamespace.h>
+#include <QtCore/qpair.h>
 
 #ifdef max
 // un-pollute the namespace. We need std::numeric_limits::max() and std::chrono::duration::max()
@@ -51,7 +52,7 @@
 
 #include <limits>
 
-#if QT_HAS_INCLUDE(<chrono>)
+#if __has_include(<chrono>)
 #  include <chrono>
 #endif
 
@@ -62,53 +63,52 @@ class Q_CORE_EXPORT QDeadlineTimer
 public:
     enum ForeverConstant { Forever };
 
-    Q_DECL_CONSTEXPR QDeadlineTimer(Qt::TimerType type_ = Qt::CoarseTimer) Q_DECL_NOTHROW
+    constexpr QDeadlineTimer(Qt::TimerType type_ = Qt::CoarseTimer) noexcept
         : t1(0), t2(0), type(type_) {}
-    Q_DECL_CONSTEXPR QDeadlineTimer(ForeverConstant, Qt::TimerType type_ = Qt::CoarseTimer) Q_DECL_NOTHROW
-        : t1(std::numeric_limits<qint64>::max()), t2(0), type(type_) {}
-    explicit QDeadlineTimer(qint64 msecs, Qt::TimerType type = Qt::CoarseTimer) Q_DECL_NOTHROW;
+    constexpr QDeadlineTimer(ForeverConstant, Qt::TimerType type_ = Qt::CoarseTimer) noexcept
+        : t1((std::numeric_limits<qint64>::max)()), t2(0), type(type_) {}
+    explicit QDeadlineTimer(qint64 msecs, Qt::TimerType type = Qt::CoarseTimer) noexcept;
 
-    void swap(QDeadlineTimer &other) Q_DECL_NOTHROW
-    { qSwap(t1, other.t1); qSwap(t2, other.t2); qSwap(type, other.type); }
+    void swap(QDeadlineTimer &other) noexcept
+    { std::swap(t1, other.t1); std::swap(t2, other.t2); std::swap(type, other.type); }
 
-    Q_DECL_CONSTEXPR bool isForever() const Q_DECL_NOTHROW
+    constexpr bool isForever() const noexcept
     { return t1 == (std::numeric_limits<qint64>::max)(); }
-    bool hasExpired() const Q_DECL_NOTHROW;
+    bool hasExpired() const noexcept;
 
-    Qt::TimerType timerType() const Q_DECL_NOTHROW
+    Qt::TimerType timerType() const noexcept
     { return Qt::TimerType(type & 0xff); }
     void setTimerType(Qt::TimerType type);
 
-    qint64 remainingTime() const Q_DECL_NOTHROW;
-    qint64 remainingTimeNSecs() const Q_DECL_NOTHROW;
-    void setRemainingTime(qint64 msecs, Qt::TimerType type = Qt::CoarseTimer) Q_DECL_NOTHROW;
+    qint64 remainingTime() const noexcept;
+    qint64 remainingTimeNSecs() const noexcept;
+    void setRemainingTime(qint64 msecs, Qt::TimerType type = Qt::CoarseTimer) noexcept;
     void setPreciseRemainingTime(qint64 secs, qint64 nsecs = 0,
-                                 Qt::TimerType type = Qt::CoarseTimer) Q_DECL_NOTHROW;
+                                 Qt::TimerType type = Qt::CoarseTimer) noexcept;
 
-    qint64 deadline() const Q_DECL_NOTHROW Q_DECL_PURE_FUNCTION;
-    qint64 deadlineNSecs() const Q_DECL_NOTHROW Q_DECL_PURE_FUNCTION;
-    void setDeadline(qint64 msecs, Qt::TimerType timerType = Qt::CoarseTimer) Q_DECL_NOTHROW;
+    qint64 deadline() const noexcept Q_DECL_PURE_FUNCTION;
+    qint64 deadlineNSecs() const noexcept Q_DECL_PURE_FUNCTION;
+    void setDeadline(qint64 msecs, Qt::TimerType timerType = Qt::CoarseTimer) noexcept;
     void setPreciseDeadline(qint64 secs, qint64 nsecs = 0,
-                            Qt::TimerType type = Qt::CoarseTimer) Q_DECL_NOTHROW;
+                            Qt::TimerType type = Qt::CoarseTimer) noexcept;
 
-    static QDeadlineTimer addNSecs(QDeadlineTimer dt, qint64 nsecs) Q_DECL_NOTHROW Q_DECL_PURE_FUNCTION;
-    static QDeadlineTimer current(Qt::TimerType timerType = Qt::CoarseTimer) Q_DECL_NOTHROW;
+    static QDeadlineTimer addNSecs(QDeadlineTimer dt, qint64 nsecs) noexcept Q_DECL_PURE_FUNCTION;
+    static QDeadlineTimer current(Qt::TimerType timerType = Qt::CoarseTimer) noexcept;
 
-    friend bool operator==(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator==(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return d1.t1 == d2.t1 && d1.t2 == d2.t2; }
-    friend bool operator!=(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator!=(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return !(d1 == d2); }
-    friend bool operator<(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator<(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return d1.t1 < d2.t1 || (d1.t1 == d2.t1 && d1.t2 < d2.t2); }
-    friend bool operator<=(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator<=(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return d1 == d2 || d1 < d2; }
-    friend bool operator>(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator>(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return d2 < d1; }
-    friend bool operator>=(QDeadlineTimer d1, QDeadlineTimer d2) Q_DECL_NOTHROW
+    friend bool operator>=(QDeadlineTimer d1, QDeadlineTimer d2) noexcept
     { return !(d1 < d2); }
 
-    friend QDeadlineTimer operator+(QDeadlineTimer dt, qint64 msecs)
-    { return QDeadlineTimer::addNSecs(dt, msecs * 1000 * 1000); }
+    friend Q_CORE_EXPORT QDeadlineTimer operator+(QDeadlineTimer dt, qint64 msecs);
     friend QDeadlineTimer operator+(qint64 msecs, QDeadlineTimer dt)
     { return dt + msecs; }
     friend QDeadlineTimer operator-(QDeadlineTimer dt, qint64 msecs)
@@ -120,7 +120,7 @@ public:
     QDeadlineTimer &operator-=(qint64 msecs)
     { *this = *this + (-msecs); return *this; }
 
-#if QT_HAS_INCLUDE(<chrono>) || defined(Q_QDOC)
+#if __has_include(<chrono>) || defined(Q_CLANG_QDOC)
     template <class Clock, class Duration>
     QDeadlineTimer(std::chrono::time_point<Clock, Duration> deadline_,
                    Qt::TimerType type_ = Qt::CoarseTimer) : t2(0)
@@ -159,7 +159,7 @@ public:
             setPreciseRemainingTime(0, std::chrono::nanoseconds(remaining).count(), type_);
     }
 
-    std::chrono::nanoseconds remainingTimeAsDuration() const Q_DECL_NOTHROW
+    std::chrono::nanoseconds remainingTimeAsDuration() const noexcept
     {
         if (isForever())
             return std::chrono::nanoseconds::max();
@@ -185,13 +185,45 @@ private:
     unsigned t2;
     unsigned type;
 
-    qint64 rawRemainingTimeNSecs() const Q_DECL_NOTHROW;
+    qint64 rawRemainingTimeNSecs() const noexcept;
+
+public:
+    // This is not a public function, it's here only for Qt's internal convenience...
+    QPair<qint64, unsigned> _q_data() const { return qMakePair(t1, t2); }
 };
+
+#if __has_include(<chrono>) && (defined(Q_OS_DARWIN) || defined(Q_OS_LINUX) || (defined(Q_CC_MSVC) && Q_CC_MSVC >= 1900))
+// We know for these OS/compilers that the std::chrono::steady_clock uses the same
+// reference time as QDeadlineTimer
+
+template <> inline std::chrono::steady_clock::time_point
+QDeadlineTimer::deadline<std::chrono::steady_clock, std::chrono::steady_clock::duration>() const
+{
+    return std::chrono::steady_clock::time_point(std::chrono::nanoseconds(deadlineNSecs()));
+}
+
+template <> inline void
+QDeadlineTimer::setDeadline<std::chrono::steady_clock, std::chrono::steady_clock::duration>(std::chrono::steady_clock::time_point tp, Qt::TimerType type_)
+{
+    using namespace std::chrono;
+    if (tp == tp.max()) {
+        *this = Forever;
+        type = type_;
+    } else if (type_ != Qt::PreciseTimer) {
+        // if we aren't using PreciseTimer, then we need to convert
+        setPreciseRemainingTime(0, duration_cast<nanoseconds>(tp - steady_clock::now()).count(), type_);
+    } else {
+        setPreciseDeadline(0,
+                           duration_cast<nanoseconds>(tp.time_since_epoch()).count(),
+                           type_);
+    }
+}
+#endif
 
 Q_DECLARE_SHARED(QDeadlineTimer)
 
 QT_END_NAMESPACE
 
-Q_DECLARE_METATYPE(QDeadlineTimer)
+QT_DECL_METATYPE_EXTERN(QDeadlineTimer, Q_CORE_EXPORT)
 
 #endif // QDEADLINETIMER_H

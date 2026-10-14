@@ -1,0 +1,7 @@
+vf tactics
+vfd tactics fieldPolygons
+
+vfd tactics cognition:Reset
+vfd tactics fieldLines
+vfd tactics goalFrame
+vfd tactics behavior:Tactic:voronoiDiagram

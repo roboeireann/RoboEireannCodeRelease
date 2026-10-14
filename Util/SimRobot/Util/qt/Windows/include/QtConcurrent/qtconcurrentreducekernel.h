@@ -3,7 +3,7 @@
 ** Copyright (C) 2016 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
-** This file is part of the QtCore module of the Qt Toolkit.
+** This file is part of the QtConcurrent module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -42,7 +42,7 @@
 
 #include <QtConcurrent/qtconcurrent_global.h>
 
-#ifndef QT_NO_CONCURRENT
+#if !defined(QT_NO_CONCURRENT) || defined(Q_CLANG_QDOC)
 
 #include <QtCore/qatomic.h>
 #include <QtCore/qlist.h>
@@ -50,14 +50,24 @@
 #include <QtCore/qmutex.h>
 #include <QtCore/qthread.h>
 #include <QtCore/qthreadpool.h>
-#include <QtCore/qvector.h>
+
+#include <mutex>
 
 QT_BEGIN_NAMESPACE
 
+namespace QtPrivate {
+
+template<typename Sequence>
+struct SequenceHolder
+{
+    SequenceHolder(const Sequence &s) : sequence(s) { }
+    SequenceHolder(Sequence &&s) : sequence(std::move(s)) { }
+    Sequence sequence;
+};
+
+}
 
 namespace QtConcurrent {
-
-#ifndef Q_QDOC
 
 /*
     The ReduceQueueStartLimit and ReduceQueueThrottleLimit constants
@@ -66,10 +76,17 @@ namespace QtConcurrent {
     MapReduce won't start any new threads, and when it exceeds
     ReduceQueueThrottleLimit running threads will be stopped.
 */
+#ifdef Q_CLANG_QDOC
+enum ReduceQueueLimits {
+    ReduceQueueStartLimit = 20,
+    ReduceQueueThrottleLimit = 30
+};
+#else
 enum {
     ReduceQueueStartLimit = 20,
     ReduceQueueThrottleLimit = 30
 };
+#endif
 
 // IntermediateResults holds a block of intermediate results from a
 // map or filter functor. The begin/end offsets indicates the origin
@@ -79,10 +96,8 @@ class IntermediateResults
 {
 public:
     int begin, end;
-    QVector<T> vector;
+    QList<T> vector;
 };
-
-#endif // Q_QDOC
 
 enum ReduceOption {
     UnorderedReduce = 0x1,
@@ -91,10 +106,9 @@ enum ReduceOption {
     // ParallelReduce = 0x8
 };
 Q_DECLARE_FLAGS(ReduceOptions, ReduceOption)
+#ifndef Q_CLANG_QDOC
 Q_DECLARE_OPERATORS_FOR_FLAGS(ReduceOptions)
-
-#ifndef Q_QDOC
-
+#endif
 // supports both ordered and out-of-order reduction
 template <typename ReduceFunctor, typename ReduceResultType, typename T>
 class ReduceKernel
@@ -104,7 +118,8 @@ class ReduceKernel
     const ReduceOptions reduceOptions;
 
     QMutex mutex;
-    int progress, resultsMapSize, threadCount;
+    int progress, resultsMapSize;
+    const int threadCount;
     ResultsMap resultsMap;
 
     bool canReduce(int begin) const
@@ -120,7 +135,7 @@ class ReduceKernel
                       const IntermediateResults<T> &result)
     {
         for (int i = 0; i < result.vector.size(); ++i) {
-            reduce(r, result.vector.at(i));
+            std::invoke(reduce, r, result.vector.at(i));
         }
     }
 
@@ -136,16 +151,16 @@ class ReduceKernel
     }
 
 public:
-    ReduceKernel(ReduceOptions _reduceOptions)
+    ReduceKernel(QThreadPool *pool, ReduceOptions _reduceOptions)
         : reduceOptions(_reduceOptions), progress(0), resultsMapSize(0),
-          threadCount(QThreadPool::globalInstance()->maxThreadCount())
+          threadCount(pool->maxThreadCount())
     { }
 
     void runReduce(ReduceFunctor &reduce,
                    ReduceResultType &r,
                    const IntermediateResults<T> &result)
     {
-        QMutexLocker locker(&mutex);
+        std::unique_lock<QMutex> locker(mutex);
         if (!canReduce(result.begin)) {
             ++resultsMapSize;
             resultsMap.insert(result.begin, result);
@@ -159,7 +174,7 @@ public:
             // reduce this result
             locker.unlock();
             reduceResult(reduce, r, result);
-            locker.relock();
+            locker.lock();
 
             // reduce all stored results as well
             while (!resultsMap.isEmpty()) {
@@ -168,7 +183,7 @@ public:
 
                 locker.unlock();
                 reduceResults(reduce, r, resultsMapCopy);
-                locker.relock();
+                locker.lock();
 
                 resultsMapSize -= resultsMapCopy.size();
             }
@@ -178,7 +193,7 @@ public:
             // reduce this result
             locker.unlock();
             reduceResult(reduce, r, result);
-            locker.relock();
+            locker.lock();
 
             // OrderedReduce
             progress += result.end - result.begin;
@@ -191,7 +206,7 @@ public:
 
                 locker.unlock();
                 reduceResult(reduce, r, it.value());
-                locker.relock();
+                locker.lock();
 
                 --resultsMapSize;
                 progress += it.value().end - it.value().begin;
@@ -218,28 +233,34 @@ public:
 };
 
 template <typename Sequence, typename Base, typename Functor1, typename Functor2>
-struct SequenceHolder2 : public Base
+struct SequenceHolder2 : private QtPrivate::SequenceHolder<Sequence>, public Base
 {
-    SequenceHolder2(const Sequence &_sequence,
-                    Functor1 functor1,
-                    Functor2 functor2,
+    template<typename S = Sequence, typename F1 = Functor1, typename F2 = Functor2>
+    SequenceHolder2(QThreadPool *pool, S &&_sequence, F1 &&functor1, F2 &&functor2,
                     ReduceOptions reduceOptions)
-        : Base(_sequence.begin(), _sequence.end(), functor1, functor2, reduceOptions),
-          sequence(_sequence)
+        : QtPrivate::SequenceHolder<Sequence>(std::forward<S>(_sequence)),
+          Base(pool, this->sequence.cbegin(), this->sequence.cend(),
+               std::forward<F1>(functor1), std::forward<F2>(functor2), reduceOptions)
     { }
 
-    Sequence sequence;
+    template<typename InitialValueType, typename S = Sequence,
+             typename F1 = Functor1, typename F2 = Functor2>
+    SequenceHolder2(QThreadPool *pool, S &&_sequence, F1 &&functor1, F2 &&functor2,
+                    InitialValueType &&initialValue, ReduceOptions reduceOptions)
+        : QtPrivate::SequenceHolder<Sequence>(std::forward<S>(_sequence)),
+          Base(pool, this->sequence.cbegin(), this->sequence.cend(),
+               std::forward<F1>(functor1), std::forward<F2>(functor2),
+               std::forward<InitialValueType>(initialValue), reduceOptions)
+    { }
 
     void finish() override
     {
         Base::finish();
         // Clear the sequence to make sure all temporaries are destroyed
         // before finished is signaled.
-        sequence = Sequence();
+        this->sequence = Sequence();
     }
 };
-
-#endif //Q_QDOC
 
 } // namespace QtConcurrent
 

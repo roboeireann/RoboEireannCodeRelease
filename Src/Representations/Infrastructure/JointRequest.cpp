@@ -1,10 +1,16 @@
 #include "JointRequest.h"
-#include "Tools/Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Debugging/Plot.h"
+#include "Framework/Blackboard.h"
+#include "Representations/Configuration/MassCalibration.h"
+#include "Representations/Configuration/RobotDimensions.h"
+#include "Representations/Sensing/RobotModel.h"
 
 void JointRequest::draw()
 {
   PLOT("representation:JointRequest:headYaw", angles[Joints::headYaw].toDegrees());
   PLOT("representation:JointRequest:headPitch", angles[Joints::headPitch].toDegrees());
+  PLOT("representation:JointRequest:waistYaw", angles[Joints::waistYaw].toDegrees());
   PLOT("representation:JointRequest:lShoulderPitch", angles[Joints::lShoulderPitch].toDegrees());
   PLOT("representation:JointRequest:lShoulderRoll", angles[Joints::lShoulderRoll].toDegrees());
   PLOT("representation:JointRequest:lElbowYaw", angles[Joints::lElbowYaw].toDegrees());
@@ -29,6 +35,20 @@ void JointRequest::draw()
   PLOT("representation:JointRequest:rKneePitch", angles[Joints::rKneePitch].toDegrees());
   PLOT("representation:JointRequest:rAnklePitch", angles[Joints::rAnklePitch].toDegrees());
   PLOT("representation:JointRequest:rAnkleRoll", angles[Joints::rAnkleRoll].toDegrees());
+
+  DEBUG_DRAWING3D("representation:JointRequest:Limbs", "robot")
+  {
+    if(Blackboard::getInstance().exists("MassCalibration") && Blackboard::getInstance().exists("RobotDimensions"))
+    {
+      const MassCalibration& theMassCalibration = static_cast<MassCalibration&>(Blackboard::getInstance()["MassCalibration"]);
+      const RobotDimensions& theRobotDimensions = static_cast<RobotDimensions&>(Blackboard::getInstance()["RobotDimensions"]);
+      const RobotModel requestedModel(*this, theRobotDimensions, theMassCalibration);
+      FOOT3D("representation:JointRequest:Limbs", requestedModel.soleLeft, true, theRobotDimensions.soleShape, ColorRGBA::blue);
+      FOOT3D("representation:JointRequest:Limbs", requestedModel.soleRight, false, theRobotDimensions.soleShape, ColorRGBA::blue);
+      SUBCOORDINATES3D("representation:JointRequest:Limbs", requestedModel.limbs[Limbs::wristLeft], 50.f, 50.f);
+      SUBCOORDINATES3D("representation:JointRequest:Limbs", requestedModel.limbs[Limbs::wristRight], 50.f, 50.f);
+    }
+  }
 }
 
 JointRequest::JointRequest()
@@ -36,15 +56,15 @@ JointRequest::JointRequest()
   angles.fill(off);
 }
 
-void JointRequest::mirror(const JointRequest& other)
+void JointRequest::mirror(const JointRequest& other, const bool hasSeparateHipYawJoints)
 {
-  JointAngles::mirror(other);
+  JointAngles::mirror(other, hasSeparateHipYawJoints);
   stiffnessData.mirror(other.stiffnessData);
 }
 
-Angle JointRequest::mirror(Joints::Joint joint) const
+Angle JointRequest::mirror(Joints::Joint joint, const bool hasSeparateHipYawJoints) const
 {
-  return JointAngles::mirror(joint);
+  return JointAngles::mirror(joint, hasSeparateHipYawJoints);
 }
 
 bool JointRequest::isValid(bool allowUseDefault) const

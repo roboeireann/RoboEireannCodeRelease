@@ -37,8 +37,8 @@ stty -cread # disable terminal receiver.
 #  - 220: if get_device get an invalid argument
 #  - 221: if the first argument of get_device is not of type "mmcblk[0-9]+" or "sd[a-z]"
 #  - 251: if this script is not launch by PID 1
-#  - 254: if DFU_VERSION is not setted
-#  - 255: if DFU_INIT is not setted
+#  - 254: if DFU_VERSION is not set
+#  - 255: if DFU_INIT is not set
 
 # any size or partition offset is given as multiple of SIZE_BASE, ie. in KByte
 SIZE_BASE="1024"
@@ -92,7 +92,7 @@ NOTIF_WRITING_ERROR=110
 NOTIF_WRITTEN_DATA_INTEGRITY=111
 NOTIF_FACTORY_RESET=120
 # no notification for factory reset failure here,
-# if something went wrong during that step, it wil be detected and handled in the main system.
+# if something went wrong during that step, it will be detected and handled in the main system.
 # NOTIF_FACTORY_RESET_ERROR=
 
 : ${_DEBUG:="true"}
@@ -554,7 +554,7 @@ add_partition() {
   elog "ksize         : ${ksize}"
   cmd="addpart ${device} ${part_num} ${kstart} ${ksize} &>/dev/null ||"
   cmd="${cmd} partx -a --nr ${part_num} ${device} ;"
-  # don't fail here, the detection will take care of this if fails, just avoid to be stucked here
+  # don't fail here, the detection will take care of this if fails, just avoid to be stuck here
   cmd="${cmd} sleep 1 ; while [ ! -b ${newnode} ] ; do sleep 1 ; done"
   elog "cmd: ${cmd}"
   watchdog $((5*60)) true "${cmd}"
@@ -694,7 +694,7 @@ check_partition() {
   # logic error. In that case, bail out.
   if [ ${part_cnt} -ne $(( ${part_num} - 1 )) ] &&
      [ ${part_cnt} -ne ${part_num} ]; then
-    einfo "error: unconsistent partition layout"
+    einfo "error: inconsistent partition layout"
     return 146
   fi
   echo "adding a new partition to the table ..."
@@ -845,7 +845,7 @@ create_user_partition() {
   local disk="$(get_device "${USER_PART}")"
   watchdog $((1*60)) true "sfdisk --part-uuid '${disk}' ${part_nr} 66666666-1120-1120-1120-666666666666"
   watchdog $((15*60)) true "sync ; sync"
-  watchdog $((1*60)) true "mkfs.ext2 -L B-Human-data '$USER_PART'"
+  watchdog $((1*60)) true "mkfs.ext2 -L robo-data '$USER_PART'"
   watchdog $((15*60)) true "sync ; sync"
   killall -q -USR1 setears
 }
@@ -871,8 +871,8 @@ setup_system() {
 
   # Configure hostname and IPs if possible.
   local hostname="$(cat /tmp/userpart/nao/.config/hostname)"
-  local wiredIp="$(cat /tmp/userpart/nao/.config/wiredIp)"
-  local wirelessIp="$(cat /tmp/userpart/nao/.config/wirelessIp)"
+  local wiredIP="$(cat /tmp/userpart/nao/.config/wiredIP)"
+  local wirelessIP="$(cat /tmp/userpart/nao/.config/wirelessIP)"
   if [ -r /tmp/userpart/nao/Config/Robots/robots.cfg ]; then
     local headId="$(/tmp/get-head-id)"
     if [ -n "${headId}" ]; then
@@ -882,18 +882,18 @@ setup_system() {
         if [ -n "${hostname}" ]; then
           local networkFile="/tmp/userpart/nao/Config/Robots/${hostname}/network.cfg"
           if [ -r "${networkFile}" ]; then
-            wiredIp="$(grep "^lan" "${networkFile}" | sed "s%.*\"\([^\"]*\)\".*%\1%")"
-            wirelessIp="$(grep "^wlan" "${networkFile}" | sed "s%.*\"\([^\"]*\)\".*%\1%")"
+            wiredIP="$(grep "^lan" "${networkFile}" | sed "s%.*\"\([^\"]*\)\".*%\1%")"
+            wirelessIP="$(grep "^wlan" "${networkFile}" | sed "s%.*\"\([^\"]*\)\".*%\1%")"
           fi
         fi
       fi
     fi
   fi
-  if [ -n "${hostname}" -a -n "${wiredIp}" -a -n "${wirelessIp}" ]; then
+  if [ -n "${hostname}" -a -n "${wiredIP}" -a -n "${wirelessIP}" ]; then
     sed "s%HOSTNAME_PLACEHOLDER%${hostname}%g" /tmp/rootpart/etc/hosts >/tmp/hosts.tmp && mv /tmp/hosts.tmp /tmp/rootpart/etc/hosts
     sed "s%HOSTNAME_PLACEHOLDER%${hostname}%g" /tmp/rootpart/etc/hostname >/tmp/hostname.tmp && mv /tmp/hostname.tmp /tmp/rootpart/etc/hostname
-    sed "s%WIRED_IP_PLACEHOLDER%${wiredIp}%g" /tmp/rootpart/etc/netplan/default.yaml.base >/tmp/default.yaml.base.tmp && mv /tmp/default.yaml.base.tmp /tmp/rootpart/etc/netplan/default.yaml.base
-    sed "s%WIRELESS_IP_PLACEHOLDER%${wirelessIp}%g" /tmp/rootpart/etc/netplan/default.yaml.wifi >/tmp/default.yaml.wifi.tmp && mv /tmp/default.yaml.wifi.tmp /tmp/rootpart/etc/netplan/default.yaml.wifi
+    sed "s%WIRED_IP_PLACEHOLDER%${wiredIP}%g" /tmp/rootpart/etc/netplan/default.yaml.base >/tmp/default.yaml.base.tmp && mv /tmp/default.yaml.base.tmp /tmp/rootpart/etc/netplan/default.yaml.base
+    sed "s%WIRELESS_IP_PLACEHOLDER%${wirelessIP}%g" /tmp/rootpart/etc/netplan/default.yaml.wifi >/tmp/default.yaml.wifi.tmp && mv /tmp/default.yaml.wifi.tmp /tmp/rootpart/etc/netplan/default.yaml.wifi
   else
     echo "No hostname and IP set. Things will break."
     # TODO: proper error handling

@@ -8,14 +8,17 @@
  */
 
 #include "LinePerceptor.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/ImageProcessing/PixelTypes.h"
-#include "Tools/Math/BHMath.h"
-#include "Tools/Math/Deviation.h"
-#include "Tools/Math/Geometry.h"
-#include "Tools/Math/Transformation.h"
 
-MAKE_MODULE(LinePerceptor, perception);
+#include "Debugging/Annotation.h"
+#include "Debugging/DebugDrawings.h"
+#include "ImageProcessing/PixelTypes.h"
+#include "Math/BHMath.h"
+#include "Math/Deviation.h"
+#include "Math/Geometry.h"
+#include "Tools/Math/Transformation.h"
+#include <ranges>
+
+MAKE_MODULE(LinePerceptor);
 
 void LinePerceptor::update(LinesPercept& linesPercept)
 {
@@ -51,116 +54,49 @@ void LinePerceptor::update(CirclePercept& circlePercept)
     // Find a valid center circle in the circle candidates
     for(CircleCandidate& candidate : circleCandidates)
     {
-      if(candidate.fieldSpots.size() >= minSpotsOnCircle)
+      candidate.removeSpotsCloseToCenter(minSquaredSpotToCircleCenterDistance);
+
+      if(candidate.fieldSpots.size() >= minSpotsOnCircle &&
+         candidate.circlePartInImage() > minCircleAngleBetweenSpots &&
+         getAbsoluteDeviation(candidate.radius, theFieldDimensions.centerCircleRadius) <= maxCircleRadiusDeviation &&
+         candidate.calculateError() <= maxCircleFittingError)
       {
-        Angle inImageAngle = candidate.circlePartInImage();
-        float maxFittingError = maxCircleFittingError;
-        float maxRadiusDeviation = maxCircleRadiusDeviation;
-        if(inImageAngle < circleAngleBetweenSpots && inImageAngle > minCircleAngleBetweenSpots)
+        if(candidate.fieldSpots.size() > bestCandidateSpots)
         {
-          // More narrow bounds for circles of which the robot sees only a small portion
-          float reductionFactor = (inImageAngle - minCircleAngleBetweenSpots) / (circleAngleBetweenSpots - minCircleAngleBetweenSpots);
-          maxFittingError *= reductionFactor;
-          maxRadiusDeviation *= reductionFactor;
-        }
-        if(inImageAngle >= minCircleAngleBetweenSpots &&
-           getAbsoluteDeviation(candidate.radius, theFieldDimensions.centerCircleRadius) <= maxRadiusDeviation &&
-           candidate.calculateError() <= maxFittingError)
-        {
-          if(candidate.fieldSpots.size() > bestCandidateSpots)
-          {
-            checkCandidate = true;
-            bestCandidateSpots = candidate.fieldSpots.size();
-            bestCandidate = candidate;
-          }
+          checkCandidate = true;
+          bestCandidateSpots = candidate.fieldSpots.size();
+          bestCandidate = candidate;
         }
       }
     }
 
     // time intensive checks
+    float lineError;
     if(checkCandidate && correctCircle(bestCandidate) &&
-        isCircleWhite(bestCandidate.center, bestCandidate.radius))
+       isCircleWhite(bestCandidate.center, bestCandidate.radius))
     {
-      circlePercept.pos = bestCandidate.center;
-      circlePercept.wasSeen = true;
-      markLinesOnCircle(bestCandidate.center);
+      const bool accept = isCircleNotALine(bestCandidate, lineError);
       DEBUG_RESPONSE("module:LinePerceptor:circleErrorStats")
       {
-        OUTPUT_TEXT("Part in image: " << bestCandidate.circlePartInImage());
         OUTPUT_TEXT("Fitting error: " << bestCandidate.calculateError());
+        OUTPUT_TEXT("Line fitting error: " << lineError);
         OUTPUT_TEXT("Radius deviation: " << getAbsoluteDeviation(bestCandidate.radius, theFieldDimensions.centerCircleRadius));
       }
-      return;
-    }
-  }
-
-  // Construct a circle from detected lines:
-  // Cluster centers of arcs from detected lines
-  clusters.clear();
-  for(const LinesPercept::Line& line : theLinesPercept.lines)
-  {
-    for(auto it = line.spotsInField.cbegin(); it < line.spotsInField.cend() - 2; it++)
-    {
-      const Vector2f& a = *it;
-      const Vector2f& b = *(++it);
-      const Vector2f& c = *(++it);
-
-      clusterCircleCenter(b + (((a + c) / 2) - b).normalized() * theFieldDimensions.centerCircleRadius);
-    }
-  }
-
-  // Find biggest valid cluster
-  for(size_t n = clusters.size(); n; --n)
-  {
-    // Find current biggest cluster
-    auto biggestCluster = clusters.begin();
-    size_t maxSize = biggestCluster->centers.size();
-    for(auto it = biggestCluster + 1; it < clusters.end(); ++it)
-    {
-      const size_t curSize = it->centers.size();
-      if(curSize > maxSize)
+      if(accept)
       {
-        maxSize = curSize;
-        biggestCluster = it;
+        circlePercept.pos = bestCandidate.center;
+        circlePercept.wasSeen = true;
+        markLinesOnCircle(bestCandidate.center);
+        const Vector2f virtualPosForCovariance(bestCandidate.getAverageDistanceToFieldSpots(), 0.f);
+        circlePercept.cov = theMeasurementCovariance.computeForRelativePosition(virtualPosForCovariance);
+        return;
+      }
+      else
+      {
+        ANNOTATION("LinePerceptor", "Circle rejected because it looks more like a line (" << bestCandidate.calculateError() << " >=" << lineError << ")");
       }
     }
-
-    // Abort if the minimum size is not reached
-    if(maxSize < minCircleClusterSize)
-      break;
-
-    // Check if the cluster is valid
-    if(isCircleWhite(biggestCluster->center, theFieldDimensions.centerCircleRadius))
-    {
-      circlePercept.pos = biggestCluster->center;
-      circlePercept.wasSeen = true;
-      markLinesOnCircle(biggestCluster->center);
-
-      break;
-    }
-
-    // Remove the cluster
-    biggestCluster->centers.clear();
   }
-}
-
-void LinePerceptor::clusterCircleCenter(const Vector2f& center)
-{
-  for(CircleCluster& cluster : clusters)
-  {
-    if((cluster.center - center).squaredNorm() <= sqrCircleClusterRadius)
-    {
-      cluster.centers.emplace_back(center);
-      Vector2f newCenter(0, 0);
-      for(const Vector2f& c : cluster.centers)
-      {
-        newCenter += c;
-      }
-      cluster.center = newCenter / static_cast<float>(cluster.centers.size());
-      return;
-    }
-  }
-  clusters.emplace_back(center);
 }
 
 void LinePerceptor::markLinesOnCircle(const Vector2f& center)
@@ -177,6 +113,7 @@ void LinePerceptor::markLinesOnCircle(const Vector2f& center)
     ;
   }
 }
+
 void LinePerceptor::scanHorizontalScanLines(LinesPercept& linesPercept)
 {
   spotsH.resize(theColorScanLineRegionsHorizontal.scanLines.size());
@@ -194,7 +131,7 @@ void LinePerceptor::scanHorizontalScanLines(LinesPercept& linesPercept)
     {
       for(auto region = scanLine.regions.cbegin() + 1; region != scanLine.regions.cend() - 1; ++region)
       {
-        if(region->color == PixelTypes::Color::white)
+        if(region->color == ScanLineRegion::white)
         {
           auto before = region - 1;
           auto after = region + 1;
@@ -204,15 +141,18 @@ void LinePerceptor::scanHorizontalScanLines(LinesPercept& linesPercept)
           for(int i = 0; i < maxSkipNumber
                          && after->range.right - after->range.left <= maxSkipWidth
                          && after + 1 != scanLine.regions.cend(); ++i, ++after);
-          if(before->color == PixelTypes::Color::field &&
-             after->color == PixelTypes::Color::field &&
-             !isSpotInsideObstacle(region->range.left, region->range.right, scanLine.y, scanLine.y))
+          float regionXMidPos = static_cast<float>((region->range.left + region->range.right)) / 2.f;
+          if(before->color == ScanLineRegion::field &&
+             after->color == ScanLineRegion::field &&
+             !isSpotInsideObstacle(region->range.left, region->range.right, scanLine.y, scanLine.y) &&
+             !isSpotInsideBall(regionXMidPos, static_cast<float>(scanLine.y))
+             )
           {
             if(theFieldBoundary.getBoundaryY((region->range.left + region->range.right) / 2) > static_cast<int>(scanLine.y))
             {
               goto hEndScan;
             }
-            spotsH[scanLineId].emplace_back(static_cast<float>((region->range.left + region->range.right)) / 2.f, scanLine.y);
+            spotsH[scanLineId].emplace_back(regionXMidPos, scanLine.y);
             Spot& thisSpot = spotsH[scanLineId].back();
             Vector2f corrected(theImageCoordinateSystem.toCorrected(thisSpot.image));
             Vector2f otherImage;
@@ -249,7 +189,7 @@ void LinePerceptor::scanHorizontalScanLines(LinesPercept& linesPercept)
               {
                 if(candidate.spots.size() > 1 &&
                    candidate.getDistance(thisSpot.field) <= maxLineFittingError &&
-                      isSegmentValid(thisSpot, *candidate.spots.back(), candidate))
+                   isSegmentValid(thisSpot, *candidate.spots.back(), candidate))
                 {
                   if(!circleFitted)
                   {
@@ -281,7 +221,7 @@ void LinePerceptor::scanHorizontalScanLines(LinesPercept& linesPercept)
                 Candidate& candidate = candidates[spot.candidate];
                 if(candidate.spots.size() == 1 &&
                    getAbsoluteDeviation(spot.image.x(), thisSpot.image.x()) < getAbsoluteDeviation(spot.image.y(), thisSpot.image.y()) &&
-                    isSegmentValid(thisSpot, spot, candidate))
+                   isSegmentValid(thisSpot, spot, candidate))
                 {
                   thisSpot.candidate = candidate.spots.front()->candidate;
                   candidate.spots.emplace_back(&thisSpot);
@@ -338,10 +278,10 @@ hEndScan:
 
       if(flipped)
       {
-        for(auto it = candidate.spots.crbegin(); it != candidate.spots.crend(); it++)
+        for(auto spot : std::ranges::reverse_view(candidate.spots))
         {
-          line.spotsInField.emplace_back((*it)->field);
-          line.spotsInImg.emplace_back(static_cast<Vector2i>((*it)->image.cast<int>()));
+          line.spotsInField.emplace_back(spot->field);
+          line.spotsInImg.emplace_back(static_cast<Vector2i>(spot->image.cast<int>()));
         }
       }
       else
@@ -373,7 +313,7 @@ void LinePerceptor::scanVerticalScanLines(LinesPercept& linesPercept)
     {
       for(auto region = regions.cbegin() + 1; region != regions.cend() - 1; ++region)
       {
-        if(region->color == PixelTypes::Color::white)
+        if(region->color == ScanLineRegion::white)
         {
           auto before = region - 1;
           auto after = region + 1;
@@ -383,11 +323,13 @@ void LinePerceptor::scanVerticalScanLines(LinesPercept& linesPercept)
           for(int i = 0; i < maxSkipNumber
                          && after->range.lower - after->range.upper <= maxSkipWidth
                          && after + 1 != regions.cend(); ++i, ++after);
-          if(before->color == PixelTypes::Color::field &&
-             after->color == PixelTypes::Color::field &&
-             !isSpotInsideObstacle(theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, region->range.upper, region->range.lower))
+          float regionYMidPos = static_cast<float>(region->range.upper + region->range.lower) / 2.f;
+          if(before->color == ScanLineRegion::field &&
+             after->color == ScanLineRegion::field &&
+             !isSpotInsideObstacle(theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, region->range.upper, region->range.lower) &&
+             !isSpotInsideBall(static_cast<float>(theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x), regionYMidPos))
           {
-            spotsV[scanLineId].emplace_back(theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, static_cast<float>(region->range.upper + region->range.lower) / 2.f);
+            spotsV[scanLineId].emplace_back(theColorScanLineRegionsVerticalClipped.scanLines[scanLineIndex].x, regionYMidPos);
             Spot& thisSpot = spotsV[scanLineId].back();
             Vector2f corrected = theImageCoordinateSystem.toCorrected(thisSpot.image);
             Vector2f otherImage;
@@ -423,7 +365,7 @@ void LinePerceptor::scanVerticalScanLines(LinesPercept& linesPercept)
               {
                 if(candidate.spots.size() > 1 &&
                    candidate.getDistance(thisSpot.field) <= maxLineFittingError &&
-                    isSegmentValid(thisSpot, *candidate.spots.back(), candidate))
+                   isSegmentValid(thisSpot, *candidate.spots.back(), candidate))
                 {
                   if(!circleFitted)
                   {
@@ -455,12 +397,12 @@ void LinePerceptor::scanVerticalScanLines(LinesPercept& linesPercept)
                 Candidate& candidate = candidates[spot.candidate];
                 if(candidate.spots.size() == 1 &&
                    getAbsoluteDeviation(spot.image.x(), thisSpot.image.x()) > getAbsoluteDeviation(spot.image.y(), thisSpot.image.y()) &&
-                    isSegmentValid(thisSpot, spot, candidate))
+                   isSegmentValid(thisSpot, spot, candidate))
                 {
                   thisSpot.candidate = candidate.spots.front()->candidate;
-                    candidate.spots.emplace_back(&thisSpot);
-                    candidate.fitLine();
-                    goto vEndAdjacentSearch;
+                  candidate.spots.emplace_back(&thisSpot);
+                  candidate.fitLine();
+                  goto vEndAdjacentSearch;
                 }
               }
             }
@@ -532,7 +474,7 @@ void LinePerceptor::extendLines(LinesPercept& linesPercept) const
   {
     const Vector2f step(static_cast<Vector2f>((line->firstImg - line->lastImg).cast<float>().normalized() * 2.f));
     // Extend left
-    Vector2f n0 (-step.y(), step.x()); // rotates 90 degrees
+    Vector2f n0(-step.y(), step.x());  // rotates 90 degrees
 
     Vector2f pos(line->firstImg.cast<float>() + step);
     bool changed = false;
@@ -541,7 +483,8 @@ void LinePerceptor::extendLines(LinesPercept& linesPercept) const
     {
       Vector2f pointOnField;
       if(!Transformation::imageToRobot(theImageCoordinateSystem.toCorrected(pos), theCameraMatrix, theCameraInfo, pointOnField) ||
-         !isPointWhite(pointOnField, pos.cast<int>(), n0))
+         !isPointWhite(pointOnField, pos.cast<int>(), n0) ||
+         isSpotInsideBall(pos.x(), pos.y()))
         break;
     }
     if(changed)
@@ -564,7 +507,8 @@ void LinePerceptor::extendLines(LinesPercept& linesPercept) const
     {
       Vector2f pointOnField;
       if(!Transformation::imageToRobot(theImageCoordinateSystem.toCorrected(pos), theCameraMatrix, theCameraInfo, pointOnField) ||
-         !isPointWhite(pointOnField, pos.cast<int>(), n0))
+         !isPointWhite(pointOnField, pos.cast<int>(), n0) ||
+         isSpotInsideBall(pos.x(), pos.y()))
         break;
     }
     if(changed)
@@ -624,7 +568,7 @@ void LinePerceptor::trimLine(LinesPercept::Line& line) const
           lower -= dir, p = static_cast<Vector2i>(lower.cast<int>()), ++loopCount)
       {
         if(loopCount > maxWidthImage ||
-            theRelativeFieldColors.isFieldNearWhite(theECImage.grayscaled[p], theECImage.saturated[p],
+           theRelativeFieldColors.isFieldNearWhite(theECImage.grayscaled[p], theECImage.saturated[p],
                                                    luminanceReference, saturationReference))
           break;
       }
@@ -634,7 +578,7 @@ void LinePerceptor::trimLine(LinesPercept::Line& line) const
           upper += dir, p = static_cast<Vector2i>(upper.cast<int>()), ++loopCount)
       {
         if(loopCount > maxWidthImage ||
-            theRelativeFieldColors.isFieldNearWhite(theECImage.grayscaled[p], theECImage.saturated[p],
+           theRelativeFieldColors.isFieldNearWhite(theECImage.grayscaled[p], theECImage.saturated[p],
                                                    luminanceReference, saturationReference))
           break;
       }
@@ -917,8 +861,8 @@ bool LinePerceptor::correctCircle(CircleCandidate& circle) const
           circle.fieldSpots.emplace_back((outerField + innerField) / 2);
           COMPLEX_DRAWING("module:LinePerceptor:circlePoint")
           {
-            Vector2f uncor = (theImageCoordinateSystem.fromCorrected(outer) + theImageCoordinateSystem.fromCorrected(inner)) / 2.f;
-            CROSS("module:LinePerceptor:circlePoint", uncor.x(), uncor.y(), 3, 1, Drawings::solidPen, ColorRGBA::gray);
+            Vector2f uncorrected = (theImageCoordinateSystem.fromCorrected(outer) + theImageCoordinateSystem.fromCorrected(inner)) / 2.f;
+            CROSS("module:LinePerceptor:circlePoint", uncorrected.x(), uncorrected.y(), 3, 1, Drawings::solidPen, ColorRGBA::gray);
           }
           CROSS("module:LinePerceptor:circlePointField", circle.fieldSpots.back().x(), circle.fieldSpots.back().y(), 5, 2, Drawings::solidPen, ColorRGBA::black);
         }
@@ -986,6 +930,55 @@ bool LinePerceptor::isCircleWhite(const Vector2f& center, const float radius) co
   return count > 0 && static_cast<float>(whiteCount) / static_cast<float>(count) >= minCircleWhiteRatio;
 }
 
+bool LinePerceptor::isPotentialCircle(const CircleCandidate& circle) const
+{
+  // Fit line through the first and last points of the circle candidate
+  const Vector2f& first = circle.fieldSpots.front();
+  const Vector2f& last = circle.fieldSpots.back();
+  Vector2f lineDirection = (last - first).normalized();
+  Vector2f lineNormal(-lineDirection.y(), lineDirection.x());
+  float lineDistance = lineNormal.dot(first);
+
+  // Compute maximum distance of spots to the line
+  float maxLineDistance = 0.f;
+  for(const Vector2f& spot : circle.fieldSpots)
+  {
+    float distance = std::abs(lineNormal.dot(spot) - lineDistance);
+    if(distance > maxLineDistance)
+    {
+      maxLineDistance = distance;
+    }
+  }
+  if(maxLineDistance < minCircleDeviation)
+  {
+    return false;
+  }
+  return true;
+}
+
+bool LinePerceptor::isCircleNotALine(const CircleCandidate& candidate, float& lineError) const
+{
+  ASSERT(candidate.fieldSpots.size() >= 2);
+  if(!isPotentialCircle(candidate))
+  {
+    return false;
+  }
+  LeastSquares::LineFitter fitter;
+  for(const Vector2f& spot : candidate.fieldSpots)
+    fitter.add(spot);
+
+  Vector2f n0;
+  float d;
+  VERIFY(fitter.fit(n0, d));
+
+  lineError = 0.f;
+  for(const Vector2f& spot : candidate.fieldSpots)
+    lineError += std::abs(n0.dot(spot) - d);
+  lineError /= static_cast<float>(candidate.fieldSpots.size());
+
+  return candidate.calculateError() < lineError;
+}
+
 bool LinePerceptor::isPointWhite(const Vector2f& pointOnField, const Vector2i& pointInImage, const Vector2f& n0) const
 {
   Vector2f nw = calcWhiteCheckDistance(pointOnField) * n0;
@@ -1033,12 +1026,12 @@ bool LinePerceptor::isPointWhite(const Vector2f& pointOnField, const Vector2i& p
       {
         CROSS("module:LinePerceptor:isWhite", referencePointInImage.x(), referencePointInImage.y(), 2, 1, Drawings::solidPen, ColorRGBA::orange);
         LINE("module:LinePerceptor:isWhite", pointInImage.x(), pointInImage.y(), referencePointInImage.x(), referencePointInImage.y(),
-               1, Drawings::solidPen, ColorRGBA::orange);
+             1, Drawings::solidPen, ColorRGBA::orange);
       }
     }
   }
-  return theRelativeFieldColors.isWhiteNearField(theECImage.grayscaled[pointInImage],theECImage.saturated[pointInImage],
-                                                  static_cast<unsigned char>(luminanceReference), static_cast<unsigned char>(saturationReference));
+  return theRelativeFieldColors.isWhiteNearField(theECImage.grayscaled[pointInImage], theECImage.saturated[pointInImage],
+                                                 static_cast<unsigned char>(luminanceReference), static_cast<unsigned char>(saturationReference));
 }
 
 bool LinePerceptor::isPointWhite(const Vector2f& pointInImage, const Vector2f& n) const
@@ -1047,7 +1040,7 @@ bool LinePerceptor::isPointWhite(const Vector2f& pointInImage, const Vector2f& n
   unsigned short luminanceReference = 0, saturationReference = 0;
   Vector2i outerReference = (pointInImage + n).cast<int>();
   if(outerReference.x() >= 0 && outerReference.x() < theCameraInfo.width &&
-      outerReference.y() >= 0 && outerReference.y() < theCameraInfo.height)
+     outerReference.y() >= 0 && outerReference.y() < theCameraInfo.height)
   {
     luminanceReference = theECImage.grayscaled[outerReference];
     saturationReference = theECImage.saturated[outerReference];
@@ -1079,7 +1072,7 @@ bool LinePerceptor::isPointWhite(const Vector2f& pointInImage, const Vector2f& n
     }
   }
   Vector2i intPointInImage = pointInImage.cast<int>();
-  return theRelativeFieldColors.isWhiteNearField(theECImage.grayscaled[intPointInImage],theECImage.saturated[intPointInImage],
+  return theRelativeFieldColors.isWhiteNearField(theECImage.grayscaled[intPointInImage], theECImage.saturated[intPointInImage],
                                                  static_cast<unsigned char>(luminanceReference), static_cast<unsigned char>(saturationReference));
 }
 
@@ -1133,4 +1126,17 @@ bool LinePerceptor::isSpotInsideObstacle(const int fromX, const int toX, const i
       return false;
   };
   return std::any_of(theObstaclesImagePercept.obstacles.cbegin(), theObstaclesImagePercept.obstacles.cend(), predicate);
+}
+
+bool LinePerceptor::isSpotInsideBall(const float xPos, const float yPos) const
+{
+  if (theBallPercept.status != BallPercept::seen)
+    return false;
+  float radius = theBallPercept.radiusInImage * ballCheckRadiusFactor;
+  float xDistance = std::abs(theBallPercept.positionInImage.x() - xPos);
+  float yDistance = std::abs(theBallPercept.positionInImage.y() - yPos);
+  if (xDistance > radius || yDistance > radius)
+    return false;
+  return yDistance <= std::cos(pi_2 * xDistance / radius) * radius
+      && xDistance <= std::cos(pi_2 * yDistance / radius) * radius;
 }

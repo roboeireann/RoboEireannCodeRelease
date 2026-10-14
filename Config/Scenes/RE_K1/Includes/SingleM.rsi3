@@ -1,0 +1,34 @@
+<Simulation>
+  <Compound name="robots">
+    <Body ref="K1" name="robot3">
+      <Set name="TeamColor" value="skin"/>
+      <Translation x="2" z="0.525m"/>
+      <Rotation z="180degree"/>
+    </Body>
+  </Compound>
+
+  <Compound name="balls">
+    <Body ref="ball">
+      <Translation z="1m"/>
+    </Body>
+  </Compound>
+
+  <Compound name="teams">
+    <Compound name="RoboEireann">
+      <Compound name="42"/>
+      <Compound name="green"/>
+      <Compound name="white"/>
+    </Compound>
+    <Compound name="B-Team">
+      <Compound name="70"/>
+      <Compound name="red"/>
+      <Compound name="blue"/>
+    </Compound>
+  </Compound>
+    
+
+  <Compound name="location">
+    <Compound name="Field2026-M"/>
+  </Compound>
+
+</Simulation>

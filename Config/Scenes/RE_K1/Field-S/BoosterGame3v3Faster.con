@@ -1,0 +1,8 @@
+call ../../Includes/BoosterPerceptOracle
+call ../../Includes/3vs3
+
+# explicit even though it matches the GameController default - avoids silently breaking if that default changes
+gc competitionTypeMiddleFoundation
+
+# this forces the robots to be positioned where setupPoses.cfg specifies
+dr representation:SetupPoses:place

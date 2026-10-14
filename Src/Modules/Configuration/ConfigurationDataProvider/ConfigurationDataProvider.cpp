@@ -5,37 +5,23 @@
  */
 
 #include "ConfigurationDataProvider.h"
-#include "Tools/Framework/ModuleContainer.h"
-#include "Tools/Streams/InExpr.h"
-#include "Tools/Settings.h"
-
-#include "Tools/TextLogging.h"
-
-#include <unordered_map>
-#include <string>
-
-
-DECL_TLOGGER(tlogger, "ConfigurationDataProvider", TextLogging::INFO);
-
-
-thread_local ConfigurationDataProvider* ConfigurationDataProvider::theInstance = nullptr;
+#include "Debugging/Debugging.h"
+#include "Tools/Modeling/BallPhysics.h"
+#include "Framework/Settings.h"
 
 ConfigurationDataProvider::ConfigurationDataProvider()
 {
-  theInstance = this;
-
   read(theCameraSettings);
 
   theFieldDimensions = std::make_unique<FieldDimensions>();
   theFieldDimensions->load();
-  theIntersectionRelations = std::make_unique<IntersectionRelations>(*theFieldDimensions);
 
   read(theBallSpecification);
+  read(theBehaviorParameters);
   read(theCameraCalibration);
+  read(theCameraIntrinsics);
   read(theDamageConfigurationBody);
   read(theDamageConfigurationHead);
-  read(theFootOffset);
-  read(theGlobalOptions);
   read(theHeadLimits);
   read(theIMUCalibration);
   read(theJointCalibration);
@@ -44,27 +30,17 @@ ConfigurationDataProvider::ConfigurationDataProvider()
   read(theKickInfo);
   read(theMassCalibration);
   read(theRelativeFieldColorsParameters);
+  read(theREGameConfig);
   read(theRobotDimensions);
   read(theStiffnessSettings);
-
-  // theSetupPoses
-  std::unordered_map<std::string, float> fieldSymbols;
-  theFieldDimensions->populateSymbols(fieldSymbols);
-
-  theSetupPoses = std::make_unique<SetupPoses>();
-  // loadModuleParameters(*theSetupPoses, TypeRegistry::demangle(typeid(T).name()).c_str(), fileName);
-  InExprMapFile stream("setupPoses.cfg", fieldSymbols);
-  ASSERT(stream.exists());
-  stream >> *theSetupPoses;
-
-
-  read(theGameConfig);
-  read(theWalkModifier);
+  read(theStaticJointPoses);
 }
 
-ConfigurationDataProvider::~ConfigurationDataProvider()
+void ConfigurationDataProvider::update(BehaviorParameters& behaviorParameters)
 {
-  theInstance = nullptr;
+  update(behaviorParameters, theBehaviorParameters);
+  ASSERT(behaviorParameters.noCommunicationAfterUnpenalizedTime < behaviorParameters.noSkillRequestAfterUnpenalizedTime);
+  ASSERT(behaviorParameters.noSkillRequestAfterUnpenalizedTime < behaviorParameters.lookAroundAfterUnpenalizedTime);
 }
 
 void ConfigurationDataProvider::update(CameraCalibration& cameraCalibration)
@@ -82,18 +58,20 @@ void ConfigurationDataProvider::update(JointLimits& jointLimits)
 
 void ConfigurationDataProvider::update(KickInfo& kickInfo)
 {
-  const bool wasEmpty = theKickInfo == nullptr;
-  update(kickInfo, theKickInfo);
-  if(wasEmpty)
-    return;
-  for(KickInfo::Kick& kick : kickInfo.kicks)
+  if(theKickInfo) // Not copied to representation yet
   {
-    // Comment this in, if the velocity needs to be recalculated
-    //kick.ballVelocity.min = BallPhysics::velocityForDistance(kick.range.min, ConfigurationDataProviderBase::theBallSpecification.friction);
-    //kick.ballVelocity.max = BallPhysics::velocityForDistance(kick.range.max, ConfigurationDataProviderBase::theBallSpecification.friction);
+    update(kickInfo, theKickInfo);
+    for(KickInfo::Kick& kick : kickInfo.kicks)
+    {
+      const BallSpecification& ballSpecification = theBallSpecification ? *theBallSpecification : ConfigurationDataProviderBase::theBallSpecification;
 
-    kick.range.min = (BallPhysics::getEndPosition(Vector2f(0.f, 0.f), Vector2f(kick.ballVelocity.min, 0.f), ConfigurationDataProviderBase::theBallSpecification.friction)).norm();
-    kick.range.max = (BallPhysics::getEndPosition(Vector2f(0.f, 0.f), Vector2f(kick.ballVelocity.max, 0.f), ConfigurationDataProviderBase::theBallSpecification.friction)).norm();
+      // Comment this in, if the velocity needs to be recalculated
+      //kick.ballVelocity.min = BallPhysics::velocityForDistance(kick.range.min, ballSpecification.friction);
+      //kick.ballVelocity.max = BallPhysics::velocityForDistance(kick.range.max, ballSpecification.friction);
+
+      kick.range.min = (BallPhysics::getEndPosition(Vector2f(0.f, 0.f), Vector2f(kick.ballVelocity.min, 0.f), ballSpecification.friction)).norm();
+      kick.range.max = (BallPhysics::getEndPosition(Vector2f(0.f, 0.f), Vector2f(kick.ballVelocity.max, 0.f), ballSpecification.friction)).norm();
+    }
   }
 }
 
@@ -103,4 +81,4 @@ void ConfigurationDataProvider::update(RobotDimensions& robotDimensions)
   DEBUG_RESPONSE_ONCE("representation:RobotDimensions:once") OUTPUT(idRobotDimensions, bin, robotDimensions);
 }
 
-MAKE_MODULE(ConfigurationDataProvider, infrastructure);
+MAKE_MODULE(ConfigurationDataProvider);

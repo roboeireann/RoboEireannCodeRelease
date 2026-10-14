@@ -40,10 +40,6 @@
 #ifndef QTCORE_QEXCEPTION_H
 #define QTCORE_QEXCEPTION_H
 
-#include <QtCore/qglobal.h>
-
-#ifndef QT_NO_QFUTURE
-
 #include <QtCore/qatomic.h>
 #include <QtCore/qshareddata.h>
 
@@ -51,62 +47,57 @@
 #  include <exception>
 #endif
 
+QT_REQUIRE_CONFIG(future);
+
 QT_BEGIN_NAMESPACE
 
 
-#ifndef QT_NO_EXCEPTIONS
+#if !defined(QT_NO_EXCEPTIONS) || defined(Q_CLANG_QDOC)
 
 class Q_CORE_EXPORT QException : public std::exception
 {
 public:
-    ~QException()
-#ifdef Q_COMPILER_NOEXCEPT
-    noexcept
-#else
-    throw()
-#endif
-    ;
+    ~QException() noexcept;
     virtual void raise() const;
     virtual QException *clone() const;
 };
 
-class Q_CORE_EXPORT QUnhandledException : public QException
+class QUnhandledExceptionPrivate;
+class Q_CORE_EXPORT QUnhandledException final : public QException
 {
 public:
-    ~QUnhandledException()
-#ifdef Q_COMPILER_NOEXCEPT
-    noexcept
-#else
-    throw()
-#endif
-    ;
-    void raise() const Q_DECL_OVERRIDE;
-    QUnhandledException *clone() const Q_DECL_OVERRIDE;
+    QUnhandledException(std::exception_ptr exception = nullptr) noexcept;
+    ~QUnhandledException() noexcept override;
+
+    QUnhandledException(QUnhandledException &&other) noexcept;
+    QUnhandledException(const QUnhandledException &other) noexcept;
+
+    void swap(QUnhandledException &other) noexcept { d.swap(other.d); }
+
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QUnhandledException)
+    QUnhandledException &operator=(const QUnhandledException &other) noexcept;
+
+    void raise() const override;
+    QUnhandledException *clone() const override;
+
+    std::exception_ptr exception() const;
+
+private:
+    QSharedDataPointer<QUnhandledExceptionPrivate> d;
 };
 
 namespace QtPrivate {
-
-class Base;
-class Q_CORE_EXPORT ExceptionHolder
-{
-public:
-    ExceptionHolder(QException *exception = Q_NULLPTR);
-    ExceptionHolder(const ExceptionHolder &other);
-    void operator=(const ExceptionHolder &other); // ### Qt6: copy-assign operator shouldn't return void. Remove this method and the copy-ctor, they are unneeded.
-    ~ExceptionHolder();
-    QException *exception() const;
-    QExplicitlySharedDataPointer<Base> base;
-};
 
 class Q_CORE_EXPORT ExceptionStore
 {
 public:
     void setException(const QException &e);
+    void setException(std::exception_ptr e);
     bool hasException() const;
-    ExceptionHolder exception();
+    std::exception_ptr exception() const;
     void throwPossibleException();
-    bool hasThrown() const;
-    ExceptionHolder exceptionHolder;
+    Q_NORETURN void rethrowException() const;
+    std::exception_ptr exceptionHolder;
 };
 
 } // namespace QtPrivate
@@ -120,6 +111,7 @@ class Q_CORE_EXPORT ExceptionStore
 public:
     ExceptionStore() { }
     inline void throwPossibleException() {}
+    inline void rethrowException() const { }
 };
 
 } // namespace QtPrivate
@@ -127,7 +119,5 @@ public:
 #endif // QT_NO_EXCEPTIONS
 
 QT_END_NAMESPACE
-
-#endif // QT_NO_QFUTURE
 
 #endif

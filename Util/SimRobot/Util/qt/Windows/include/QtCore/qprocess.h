@@ -48,40 +48,40 @@
 
 QT_REQUIRE_CONFIG(processenvironment);
 
+#if defined(Q_OS_WIN) || defined(Q_CLANG_QDOC)
+struct _PROCESS_INFORMATION;
+struct _SECURITY_ATTRIBUTES;
+struct _STARTUPINFOW;
+using Q_PROCESS_INFORMATION = _PROCESS_INFORMATION;
+using Q_SECURITY_ATTRIBUTES = _SECURITY_ATTRIBUTES;
+using Q_STARTUPINFO = _STARTUPINFOW;
+#endif
+
 QT_BEGIN_NAMESPACE
 
 class QProcessPrivate;
-
-#if !defined(Q_OS_WIN) || defined(Q_CLANG_QDOC)
-typedef qint64 Q_PID;
-#else
-QT_END_NAMESPACE
-typedef struct _PROCESS_INFORMATION *Q_PID;
-typedef struct _SECURITY_ATTRIBUTES Q_SECURITY_ATTRIBUTES;
-typedef struct _STARTUPINFOW Q_STARTUPINFO;
-QT_BEGIN_NAMESPACE
-#endif
-
 class QProcessEnvironmentPrivate;
 
 class Q_CORE_EXPORT QProcessEnvironment
 {
 public:
+    enum Initialization { InheritFromParent };
+
     QProcessEnvironment();
+    QProcessEnvironment(Initialization) noexcept;
     QProcessEnvironment(const QProcessEnvironment &other);
     ~QProcessEnvironment();
-#ifdef Q_COMPILER_RVALUE_REFS
-    QProcessEnvironment &operator=(QProcessEnvironment && other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QProcessEnvironment)
     QProcessEnvironment &operator=(const QProcessEnvironment &other);
 
-    void swap(QProcessEnvironment &other) Q_DECL_NOTHROW { qSwap(d, other.d); }
+    void swap(QProcessEnvironment &other) noexcept { d.swap(other.d); }
 
     bool operator==(const QProcessEnvironment &other) const;
     inline bool operator!=(const QProcessEnvironment &other) const
     { return !(*this == other); }
 
     bool isEmpty() const;
+    [[nodiscard]] bool inheritsFromParent() const;
     void clear();
 
     bool contains(const QString &name) const;
@@ -112,7 +112,7 @@ class Q_CORE_EXPORT QProcess : public QIODevice
     Q_OBJECT
 public:
     enum ProcessError {
-        FailedToStart, //### file not found, resource error
+        FailedToStart,
         Crashed,
         Timedout,
         ReadError,
@@ -155,15 +155,14 @@ public:
     };
     Q_ENUM(ExitStatus)
 
-    explicit QProcess(QObject *parent = Q_NULLPTR);
+    explicit QProcess(QObject *parent = nullptr);
     virtual ~QProcess();
 
-    void start(const QString &program, const QStringList &arguments, OpenMode mode = ReadWrite);
-#if !defined(QT_NO_PROCESS_COMBINED_ARGUMENT_START)
-    void start(const QString &command, OpenMode mode = ReadWrite);
-#endif
+    void start(const QString &program, const QStringList &arguments = {}, OpenMode mode = ReadWrite);
     void start(OpenMode mode = ReadWrite);
-    bool open(OpenMode mode = ReadWrite) Q_DECL_OVERRIDE;
+    void startCommand(const QString &command, OpenMode mode = ReadWrite);
+    bool startDetached(qint64 *pid = nullptr);
+    bool open(OpenMode mode = ReadWrite) override;
 
     QString program() const;
     void setProgram(const QString &program);
@@ -171,8 +170,6 @@ public:
     QStringList arguments() const;
     void setArguments(const QStringList & arguments);
 
-    ProcessChannelMode readChannelMode() const;
-    void setReadChannelMode(ProcessChannelMode mode);
     ProcessChannelMode processChannelMode() const;
     void setProcessChannelMode(ProcessChannelMode mode);
     InputChannelMode inputChannelMode() const;
@@ -203,12 +200,16 @@ public:
         void *environment;
         const wchar_t *currentDirectory;
         Q_STARTUPINFO *startupInfo;
-        Q_PID processInformation;
+        Q_PROCESS_INFORMATION *processInformation;
     };
     typedef std::function<void(CreateProcessArguments *)> CreateProcessArgumentModifier;
     CreateProcessArgumentModifier createProcessArgumentsModifier() const;
     void setCreateProcessArgumentsModifier(CreateProcessArgumentModifier modifier);
 #endif // Q_OS_WIN || Q_CLANG_QDOC
+#if defined(Q_OS_UNIX) || defined(Q_CLANG_QDOC)
+    std::function<void(void)> childProcessModifier() const;
+    void setChildProcessModifier(const std::function<void(void)> &modifier);
+#endif
 
     QString workingDirectory() const;
     void setWorkingDirectory(const QString &dir);
@@ -221,13 +222,11 @@ public:
     QProcess::ProcessError error() const;
     QProcess::ProcessState state() const;
 
-    // #### Qt 5: Q_PID is a pointer on Windows and a value on Unix
-    Q_PID pid() const;
     qint64 processId() const;
 
     bool waitForStarted(int msecs = 30000);
-    bool waitForReadyRead(int msecs = 30000) Q_DECL_OVERRIDE;
-    bool waitForBytesWritten(int msecs = 30000) Q_DECL_OVERRIDE;
+    bool waitForReadyRead(int msecs = 30000) override;
+    bool waitForBytesWritten(int msecs = 30000) override;
     bool waitForFinished(int msecs = 30000);
 
     QByteArray readAllStandardOutput();
@@ -237,30 +236,19 @@ public:
     QProcess::ExitStatus exitStatus() const;
 
     // QIODevice
-    qint64 bytesAvailable() const Q_DECL_OVERRIDE; // ### Qt6: remove trivial override
-    qint64 bytesToWrite() const Q_DECL_OVERRIDE;
-    bool isSequential() const Q_DECL_OVERRIDE;
-    bool canReadLine() const Q_DECL_OVERRIDE; // ### Qt6: remove trivial override
-    void close() Q_DECL_OVERRIDE;
-    bool atEnd() const Q_DECL_OVERRIDE; // ### Qt6: remove trivial override
+    qint64 bytesToWrite() const override;
+    bool isSequential() const override;
+    void close() override;
 
-    static int execute(const QString &program, const QStringList &arguments);
-    static int execute(const QString &command);
-
-    static bool startDetached(const QString &program, const QStringList &arguments,
-                              const QString &workingDirectory
-#if defined(Q_QDOC)
-                              = QString()
-#endif
-                              , qint64 *pid = Q_NULLPTR);
-#if !defined(Q_QDOC)
-    static bool startDetached(const QString &program, const QStringList &arguments); // ### Qt6: merge overloads
-#endif
-    static bool startDetached(const QString &command);
+    static int execute(const QString &program, const QStringList &arguments = {});
+    static bool startDetached(const QString &program, const QStringList &arguments = {},
+                              const QString &workingDirectory = QString(), qint64 *pid = nullptr);
 
     static QStringList systemEnvironment();
 
     static QString nullDevice();
+
+    static QStringList splitCommand(QStringView command);
 
 public Q_SLOTS:
     void terminate();
@@ -268,11 +256,7 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void started(QPrivateSignal);
-    void finished(int exitCode); // ### Qt 6: merge the two signals with a default value
-    void finished(int exitCode, QProcess::ExitStatus exitStatus);
-#if QT_DEPRECATED_SINCE(5,6)
-    void error(QProcess::ProcessError error);
-#endif
+    void finished(int exitCode, QProcess::ExitStatus exitStatus = NormalExit);
     void errorOccurred(QProcess::ProcessError error);
     void stateChanged(QProcess::ProcessState state, QPrivateSignal);
 
@@ -282,22 +266,30 @@ Q_SIGNALS:
 protected:
     void setProcessState(ProcessState state);
 
-    virtual void setupChildProcess();
-
     // QIODevice
-    qint64 readData(char *data, qint64 maxlen) Q_DECL_OVERRIDE;
-    qint64 writeData(const char *data, qint64 len) Q_DECL_OVERRIDE;
+    qint64 readData(char *data, qint64 maxlen) override;
+    qint64 writeData(const char *data, qint64 len) override;
 
 private:
     Q_DECLARE_PRIVATE(QProcess)
     Q_DISABLE_COPY(QProcess)
 
+#if QT_VERSION < QT_VERSION_CHECK(7,0,0)
+    // ### Qt7: Remove this struct and the virtual function; they're here only
+    // to cause build errors in Qt 5 code that wasn't updated to Qt 6's
+    // setChildProcessModifier()
+    struct Use_setChildProcessModifier_Instead {};
+    QT_DEPRECATED_X("Use setChildProcessModifier() instead")
+    virtual Use_setChildProcessModifier_Instead setupChildProcess();
+#endif
+
     Q_PRIVATE_SLOT(d_func(), bool _q_canReadStandardOutput())
     Q_PRIVATE_SLOT(d_func(), bool _q_canReadStandardError())
+#ifdef Q_OS_UNIX
     Q_PRIVATE_SLOT(d_func(), bool _q_canWrite())
+#endif
     Q_PRIVATE_SLOT(d_func(), bool _q_startupNotification())
-    Q_PRIVATE_SLOT(d_func(), bool _q_processDied())
-    friend class QProcessManager;
+    Q_PRIVATE_SLOT(d_func(), void _q_processDied())
 };
 
 #endif // QT_CONFIG(process)

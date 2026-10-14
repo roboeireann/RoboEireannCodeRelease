@@ -41,13 +41,12 @@
 #define QDYNAMICTOOLBAR_H
 
 #include <QtWidgets/qtwidgetsglobal.h>
-#include <QtWidgets/qaction.h>
+#include <QtGui/qaction.h>
 #include <QtWidgets/qwidget.h>
 
+QT_REQUIRE_CONFIG(toolbar);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_TOOLBAR
 
 class QToolBarPrivate;
 
@@ -60,14 +59,10 @@ class Q_WIDGETS_EXPORT QToolBar : public QWidget
 {
     Q_OBJECT
 
-    Q_PROPERTY(bool movable READ isMovable WRITE setMovable
-               DESIGNABLE (qobject_cast<QMainWindow *>(parentWidget()) != 0)
-               NOTIFY movableChanged)
+    Q_PROPERTY(bool movable READ isMovable WRITE setMovable NOTIFY movableChanged)
     Q_PROPERTY(Qt::ToolBarAreas allowedAreas READ allowedAreas WRITE setAllowedAreas
-               DESIGNABLE (qobject_cast<QMainWindow *>(parentWidget()) != 0)
                NOTIFY allowedAreasChanged)
     Q_PROPERTY(Qt::Orientation orientation READ orientation WRITE setOrientation
-               DESIGNABLE (qobject_cast<QMainWindow *>(parentWidget()) == 0)
                NOTIFY orientationChanged)
     Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize NOTIFY iconSizeChanged)
     Q_PROPERTY(Qt::ToolButtonStyle toolButtonStyle READ toolButtonStyle WRITE setToolButtonStyle
@@ -76,8 +71,8 @@ class Q_WIDGETS_EXPORT QToolBar : public QWidget
     Q_PROPERTY(bool floatable READ isFloatable WRITE setFloatable)
 
 public:
-    explicit QToolBar(const QString &title, QWidget *parent = Q_NULLPTR);
-    explicit QToolBar(QWidget *parent = Q_NULLPTR);
+    explicit QToolBar(const QString &title, QWidget *parent = nullptr);
+    explicit QToolBar(QWidget *parent = nullptr);
     ~QToolBar();
 
     void setMovable(bool movable);
@@ -95,62 +90,13 @@ public:
     void clear();
 
     using QWidget::addAction;
+#if QT_WIDGETS_REMOVED_SINCE(6, 3)
     QAction *addAction(const QString &text);
     QAction *addAction(const QIcon &icon, const QString &text);
     QAction *addAction(const QString &text, const QObject *receiver, const char* member);
     QAction *addAction(const QIcon &icon, const QString &text,
                        const QObject *receiver, const char* member);
-#ifdef Q_QDOC
-    template<typename PointerToMemberFunction>
-    QAction *addAction(const QString &text, const QObject *receiver, PointerToMemberFunction method);
-    template<typename Functor>
-    QAction *addAction(const QString &text, Functor functor);
-    template<typename Functor>
-    QAction *addAction(const QString &text, const QObject *context, Functor functor);
-    template<typename PointerToMemberFunction>
-    QAction *addAction(const QIcon &icon, const QString &text, const QObject *receiver, PointerToMemberFunction method);
-    template<typename Functor>
-    QAction *addAction(const QIcon &icon, const QString &text, Functor functor);
-    template<typename Functor>
-    QAction *addAction(const QIcon &icon, const QString &text, const QObject *context, Functor functor);
-#else
-    // addAction(QString): Connect to a QObject slot / functor or function pointer (with context)
-    template<class Obj, typename Func1>
-    inline typename std::enable_if<!std::is_same<const char*, Func1>::value
-        && QtPrivate::IsPointerToTypeDerivedFromQObject<Obj*>::Value, QAction *>::type
-        addAction(const QString &text, const Obj *object, Func1 slot)
-    {
-        QAction *result = addAction(text);
-        connect(result, &QAction::triggered, object, slot);
-        return result;
-    }
-    // addAction(QString): Connect to a functor or function pointer (without context)
-    template <typename Func1>
-    inline QAction *addAction(const QString &text, Func1 slot)
-    {
-        QAction *result = addAction(text);
-        connect(result, &QAction::triggered, slot);
-        return result;
-    }
-    // addAction(QString): Connect to a QObject slot / functor or function pointer (with context)
-    template<class Obj, typename Func1>
-    inline typename std::enable_if<!std::is_same<const char*, Func1>::value
-        && QtPrivate::IsPointerToTypeDerivedFromQObject<Obj*>::Value, QAction *>::type
-        addAction(const QIcon &actionIcon, const QString &text, const Obj *object, Func1 slot)
-    {
-        QAction *result = addAction(actionIcon, text);
-        connect(result, &QAction::triggered, object, slot);
-        return result;
-    }
-    // addAction(QIcon, QString): Connect to a functor or function pointer (without context)
-    template <typename Func1>
-    inline QAction *addAction(const QIcon &actionIcon, const QString &text, Func1 slot)
-    {
-        QAction *result = addAction(actionIcon, text);
-        connect(result, &QAction::triggered, slot);
-        return result;
-    }
-#endif // !Q_QDOC
+#endif
 
     QAction *addSeparator();
     QAction *insertSeparator(QAction *before);
@@ -188,11 +134,11 @@ Q_SIGNALS:
     void visibilityChanged(bool visible);
 
 protected:
-    void actionEvent(QActionEvent *event) Q_DECL_OVERRIDE;
-    void changeEvent(QEvent *event) Q_DECL_OVERRIDE;
-    void paintEvent(QPaintEvent *event) Q_DECL_OVERRIDE;
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
-    void initStyleOption(QStyleOptionToolBar *option) const;
+    void actionEvent(QActionEvent *event) override;
+    void changeEvent(QEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
+    bool event(QEvent *event) override;
+    virtual void initStyleOption(QStyleOptionToolBar *option) const;
 
 
 private:
@@ -210,8 +156,6 @@ private:
 
 inline QAction *QToolBar::actionAt(int ax, int ay) const
 { return actionAt(QPoint(ax, ay)); }
-
-#endif // QT_NO_TOOLBAR
 
 QT_END_NAMESPACE
 

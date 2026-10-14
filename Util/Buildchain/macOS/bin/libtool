@@ -1,0 +1,56 @@
+#!/bin/bash
+basePath=$(dirname "$(which "$0")")
+CALL=
+FILELIST=
+while true; do
+  case $1 in
+    "")
+      break
+      ;;
+    "-arch_only")
+      shift
+      ;;
+    "-D")
+      ;;
+    "-dependency_info")
+      shift
+      INFO="$1"
+      ;;
+    "-o")
+      shift
+      OUTPUT="$1"
+      ;;
+    "-static")
+      ;;
+    "-syslibroot")
+      shift
+      ;;
+    "-L"*)
+      ;;
+    "-filelist")
+      shift
+      FILELIST="$FILELIST$(cat "$1" | tr '\n' '|')"
+      CALL="$CALL $(sed <"$1" "s%\(.*\)%'\1'%" | tr '\n' ' ')"
+      ;;
+    "-V")
+      libtool -V
+      exit 0
+      ;;
+    *)
+      CALL="$CALL '$1'"
+      ;;
+  esac
+  shift
+done
+
+if [ ! -z "$INFO" ]; then
+  (
+    echo ""
+    libtool -V | sed 's%.* %%'
+    echo -n "$FILELIST" | tr '|' '\n' | sed 's%^%|%' | tr '|' $'\x10'
+    echo -n $'\x40'
+    echo "$OUTPUT"
+  ) | tr '\n' '\0' >"$INFO"
+fi
+
+bash -c "\"${basePath}/ar\" rcs \"$OUTPUT\" $CALL"

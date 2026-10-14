@@ -13,32 +13,28 @@
 #pragma once
 
 #include "Representations/Configuration/FieldDimensions.h"
-#include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Modeling/PerceptRegistration.h"
-#include "Representations/MotionControl/MotionInfo.h"
 #include "Representations/Perception/FieldPercepts/CirclePercept.h"
 #include "Representations/Perception/FieldPercepts/FieldLineIntersections.h"
 #include "Representations/Perception/FieldPercepts/FieldLines.h"
+#include "Representations/Perception/FieldPercepts/MLIntersectionsPercept.h"
 #include "Representations/Perception/FieldPercepts/PenaltyMarkPercept.h"
-#include "Representations/Perception/FieldFeatures/MidCircle.h"
+#include "Representations/Perception/FieldFeatures/CenterCircleWithLine.h"
 #include "Representations/Perception/FieldFeatures/PenaltyMarkWithPenaltyAreaLine.h"
-#include "Representations/Perception/GoalPercepts/GoalPostsPercept.h"
-#include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
-#include "Tools/Module/Module.h"
+#include "Representations/Perception/FieldFeatures/PenaltyAreaAndGoalArea.h"
+#include "Framework/Module.h"
 
 MODULE(PerceptRegistrationProvider,
 {,
-  REQUIRES(CameraMatrix),
+  REQUIRES(CenterCircleWithLine),
   REQUIRES(CirclePercept),
   REQUIRES(FieldDimensions),
   REQUIRES(FieldLineIntersections),
   REQUIRES(FieldLines),
-  REQUIRES(FrameInfo),
-  REQUIRES(GoalPostsPercept),
-  REQUIRES(MidCircle),
-  REQUIRES(MotionInfo),
+  REQUIRES(MLIntersectionsPercept),
   REQUIRES(PenaltyMarkPercept),
   REQUIRES(PenaltyMarkWithPenaltyAreaLine),
+  REQUIRES(PenaltyAreaAndGoalArea),
   PROVIDES(PerceptRegistration),
   LOADS_PARAMETERS(
   {,
@@ -49,11 +45,9 @@ MODULE(PerceptRegistrationProvider,
     (float) lineAssociationCorridor,                  /**< Maximum distance between points on a perceived line and a line in the world model */
     (float) globalPoseAssociationMaxDistanceDeviation,/**< Distance threshold (metric) for associating a computed pose (by field feature) and the currently estimated pose */
     (Angle) globalPoseAssociationMaxAngularDeviation, /**< Angular threshold for associating a computed pose (by field feature) and the currently estimated pose */
-    (Vector2f) robotRotationDeviation,                /**< Deviation of the rotation of the robot's torso */
-    (Vector2f) robotRotationDeviationInStand,         /**< Deviation of the rotation of the robot's torso when it is standing. */
+    (bool) useIntersectionDirections,                 /**< If set to false, the directions of intersections are ignored in the matching process. */
   }),
 });
-
 
 /**
  * @class PerceptRegistrationProvider
@@ -88,19 +82,15 @@ private:
       dir = end - start;
       length = dir.norm();
       dir.normalize();
-      isCenterLine = start.x() == 0.f && end.x() == 0.f;
+      isHalfwayLine = start.x() == 0.f && end.x() == 0.f;
     }
 
-    Vector2f start;    /**< The starting point of the line. */
-    Vector2f end;      /**< The ending point of the line. */
-    Vector2f dir;      /**< The normalized direction of the line (from starting point). */
-    float length;      /**< The length of the line. */
-    bool isCenterLine; /**< True, if the line is the center line. False otherwise. */
+    Vector2f start;     /**< The starting point of the line. */
+    Vector2f end;       /**< The ending point of the line. */
+    Vector2f dir;       /**< The normalized direction of the line (from starting point). */
+    float length;       /**< The length of the line. */
+    bool isHalfwayLine; /**< True, if the line is the halfway line. False otherwise. */
   };
-
-
-  Pose3f inverseCameraMatrix;                                 /**< Precomputed matrix that is needed multiple times */
-  Vector2f currentRotationDeviation;                          /**< Set to either robotRotationDeviation or robotRotationDeviationInStand */
 
   Vector2f ownPenaltyMarkWorldModel;                          /**< Original position of own penalty mark (in field coordinates) */
   Vector2f opponentPenaltyMarkWorldModel;                     /**< Original position of opponent penalty mark (in field coordinates) */
@@ -109,16 +99,9 @@ private:
   std::vector<WorldModelFieldLine> verticalLinesWorldModel;   /**< Field lines to match against, lines in this list are parallel to the field's x axis */
   std::vector<WorldModelFieldLine> horizontalLinesWorldModel; /**< Field lines to match against, lines in this list are parallel to the field's y axis */
 
-  Matrix2f penaltyMarkCovariance;                             /**< Covariance of last penalty mark perception (saved, as it is needed multiple times in one frame)*/
-  unsigned int timeOfLastPenaltyMarkCovarianceUpdate;         /**< Timestamp of frame in which the penalty mark covariance was computed the last time*/
-  Matrix2f centerCircleCovariance;                            /**< Covariance of last center circle perception (saved, as it is needed multiple times in one frame)*/
-  unsigned int timeOfLastCenterCircleCovarianceUpdate;        /**< Timestamp of frame in which the center circle covariance was computed the last time*/
-  std::vector<Matrix2f> intersectionCovariances;              /**< Covariances of last intersection perceptions (saved, as they are needed multiple times in one frame)*/
-  std::vector<unsigned int> timesOfLastIntersectionCovarianceUpdates; /**< Timestamps of frames in which the intersection perceptions covariances were computed the last time*/
-  std::vector<Matrix2f> goalPostsCovariances;                     /**< Covariances of last goal post perceptions (saved, as they are needed multiple times in one frame)*/
-  std::vector<unsigned int> timesOfLastGoalPostCovarianceUpdates; /**< Timestamps of frames in which the goal post perception covariances were computed the last time*/
-  std::vector<Matrix2f> lineCovariances;                      /**< Covariance of last line perceptions (saved, as they are needed multiple times in one frame)*/
-  std::vector<unsigned int> timesOfLastLineCovarianceUpdates; /**< Timestamps of frames in which the line perceptions covariances were computed the last time*/
+  std::vector<Vector2f> xIntersectionsWorld;                  /**< List of all x intersections in global field coordinates (used when direction checking is off) */
+  std::vector<Vector2f> tIntersectionsWorld;                  /**< List of all t intersections in global field coordinates (used when direction checking is off). Contains all x intersections, too. */
+  std::vector<Vector2f> lIntersectionsWorld;                  /**< List of all l intersections in global field coordinates (used when direction checking is off). Contains all x and t intersections, too. */
 
   float maxCenterCircleDeviation;                             /**< The maximum distance (in mm) between model and perception for registering a center circle percept */
   float maxGoalPostDeviation;                                 /**< The maximum distance (in mm) between model and perception for registering a goal post percept */
@@ -155,13 +138,13 @@ private:
   void registerSingleAbsolutePoseMeasurement(const Pose2f& pose, const FieldFeature& measurement, std::vector<RegisteredAbsolutePoseMeasurement>& absolutePoseMeasurements);
 
   /**
-  * A FieldFeature is - in most cases - ambiguous. This functions tries to find the
-  * most likely of the two possibilities.
-  * @param robotPose The assumed current robot pose
-  * @param fieldFeature The absolute pose measurement / field feature representation
-  * @param pickedPose A reference to a post. The more likely of the two hypotheses will be assigned to it.
-  * @return true, if one the two hypotheses appears to be more likely than the other one. false, if not.
-  */
+   * A FieldFeature is - in most cases - ambiguous. This functions tries to find the
+   * most likely of the two possibilities.
+   * @param robotPose The assumed current robot pose
+   * @param fieldFeature The absolute pose measurement / field feature representation
+   * @param pickedPose A reference to a post. The more likely of the two hypotheses will be assigned to it.
+   * @return true, if one the two hypotheses appears to be more likely than the other one. false, if not.
+   */
   bool pickPoseFromFieldFeature(const Pose2f& robotPose, const FieldFeature& fieldFeature, Pose2f& pickedPose) const;
 
   /**
@@ -201,13 +184,35 @@ private:
 
   /**
    * Determine, if the perceived field line intersection matches one of the intersections on the
-   * field. Position as well as orientation (in steps of 90 degrees) are checked.
+   * field. Position, type as well as orientation (in steps of 90 degrees) are checked.
    * If this is the case, the matching intersection is returned.
    * @param pose The assumed pose of the robot
    * @param intersectionPercept The position of the perceived intersection (in robot coordinates)
    * @param intersectionWorldModel The position of the real intersection (in field coordinates)
-  */
+   * @return true, if a matching intersection was found
+   */
   bool getCorrespondingIntersection(const Pose2f& pose, const FieldLineIntersections::Intersection& intersectionPercept, Vector2f& intersectionWorldModel) const;
+
+  /**
+   * Determine, if the perceived field line intersection matches one of the intersections on the
+   * field. Position and type are checked, rotation is not checked.
+   * If this is the case, the matching intersection is returned.
+   * @param pose The assumed pose of the robot
+   * @param intersectionPercept The position of the perceived intersection (in robot coordinates)
+   * @param intersectionWorldModel The position of the real intersection (in field coordinates)
+   * @return true, if a matching intersection was found
+   */
+  bool getCorrespondingIntersectionNoDirections(const Pose2f& pose, const FieldLineIntersections::Intersection& intersectionPercept, Vector2f& intersectionWorldModel) const;
+
+  /**
+   * Determine, if an ML-detected intersection matches one of the intersections on the field.
+   * Position and type are checked; direction is not checked (ML detections carry no direction information).
+   * @param pose The assumed pose of the robot
+   * @param intersection The ML-detected intersection (position in robot coordinates)
+   * @param intersectionWorldModel The position of the matching intersection (in field coordinates)
+   * @return true, if a matching intersection was found
+   */
+  bool getCorrespondingMLIntersection(const Pose2f& pose, const MLIntersectionsPercept::Intersection& intersection, Vector2f& intersectionWorldModel) const;
 
   /**
    * L and T intersections are stored in lists depending on their direction (0,90,180,270) on the field.
@@ -227,7 +232,7 @@ private:
    * @param lineLength The length of the line
    * @param isPartOfCenterCircle Set to true by this function, if the given line appears to be on the center circle.
    * @return A pointer to the line entry in the world model (if a normal line was found) or a nullptr (otherwise). Special case: If the line is on the center circle, nullptr is returned, too, but isPartOfCenterCircle is set to true
-  */
+   */
   const WorldModelFieldLine* getPointerToCorrespondingLineInWorldModel(const Pose2f& pose, const Vector2f& start, const Vector2f& end, float lineLength, bool& isPartOfCenterCircle) const;
 
   /**
@@ -247,6 +252,6 @@ private:
    * @param length The length of the line
    * @param point The point from which the distance to the line is computed
    * @return The distance from the point to the line
-  */
+   */
   float getSqrDistanceToLineSegment(const Vector2f& base, const Vector2f& dir, float length, const Vector2f& point) const;
 };

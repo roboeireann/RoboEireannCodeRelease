@@ -59,15 +59,15 @@ class Q_CORE_EXPORT QPluginLoader : public QObject
     Q_PROPERTY(QString fileName READ fileName WRITE setFileName)
     Q_PROPERTY(QLibrary::LoadHints loadHints READ loadHints WRITE setLoadHints)
 public:
-    explicit QPluginLoader(QObject *parent = Q_NULLPTR);
-    explicit QPluginLoader(const QString &fileName, QObject *parent = Q_NULLPTR);
+    explicit QPluginLoader(QObject *parent = nullptr);
+    explicit QPluginLoader(const QString &fileName, QObject *parent = nullptr);
     ~QPluginLoader();
 
     QObject *instance();
     QJsonObject metaData() const;
 
     static QObjectList staticInstances();
-    static QVector<QStaticPlugin> staticPlugins();
+    static QList<QStaticPlugin> staticPlugins();
 
     bool load();
     bool unload();
@@ -93,11 +93,11 @@ class Q_CORE_EXPORT QPluginLoader
 {
 public:
     static QObjectList staticInstances();
-    static QVector<QStaticPlugin> staticPlugins();
+    static QList<QStaticPlugin> staticPlugins();
 };
 
 #endif // QT_CONFIG(library)
 
 QT_END_NAMESPACE
 
-#endif //QPLUGINLOADER_H
+#endif // QPLUGINLOADER_H

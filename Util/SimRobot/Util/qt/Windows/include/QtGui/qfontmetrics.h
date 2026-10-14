@@ -49,28 +49,22 @@
 
 QT_BEGIN_NAMESPACE
 
-
-
-class QTextCodec;
 class QRect;
-
+class QTextOption;
 
 class Q_GUI_EXPORT QFontMetrics
 {
 public:
     explicit QFontMetrics(const QFont &);
-    QFontMetrics(const QFont &, QPaintDevice *pd);
+    QFontMetrics(const QFont &font, const QPaintDevice *pd);
     QFontMetrics(const QFontMetrics &);
     ~QFontMetrics();
 
     QFontMetrics &operator=(const QFontMetrics &);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QFontMetrics &operator=(QFontMetrics &&other) Q_DECL_NOEXCEPT
-    { qSwap(d, other.d); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QFontMetrics)
 
-    void swap(QFontMetrics &other) Q_DECL_NOEXCEPT
-    { qSwap(d, other.d); }
+    void swap(QFontMetrics &other) noexcept
+    { d.swap(other.d); }
 
     int ascent() const;
     int capHeight() const;
@@ -90,24 +84,23 @@ public:
 
     int leftBearing(QChar) const;
     int rightBearing(QChar) const;
-    int width(const QString &, int len = -1) const;
-    int width(const QString &, int len, int flags) const;
 
-    int width(QChar) const;
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-    QT_DEPRECATED int charWidth(const QString &str, int pos) const;
-#endif
+    int horizontalAdvance(const QString &, int len = -1) const;
+    int horizontalAdvance(const QString &, const QTextOption &textOption) const;
+    int horizontalAdvance(QChar) const;
 
     QRect boundingRect(QChar) const;
 
     QRect boundingRect(const QString &text) const;
-    QRect boundingRect(const QRect &r, int flags, const QString &text, int tabstops = 0, int *tabarray = Q_NULLPTR) const;
+    QRect boundingRect(const QString &text, const QTextOption &textOption) const;
+    QRect boundingRect(const QRect &r, int flags, const QString &text, int tabstops = 0, int *tabarray = nullptr) const;
     inline QRect boundingRect(int x, int y, int w, int h, int flags, const QString &text,
-                              int tabstops = 0, int *tabarray = Q_NULLPTR) const
+                              int tabstops = 0, int *tabarray = nullptr) const
         { return boundingRect(QRect(x, y, w, h), flags, text, tabstops, tabarray); }
-    QSize size(int flags, const QString& str, int tabstops = 0, int *tabarray = Q_NULLPTR) const;
+    QSize size(int flags, const QString& str, int tabstops = 0, int *tabarray = nullptr) const;
 
     QRect tightBoundingRect(const QString &text) const;
+    QRect tightBoundingRect(const QString &text, const QTextOption &textOption) const;
 
     QString elidedText(const QString &text, Qt::TextElideMode mode, int width, int flags = 0) const;
 
@@ -115,6 +108,8 @@ public:
     int overlinePos() const;
     int strikeOutPos() const;
     int lineWidth() const;
+
+    qreal fontDpi() const;
 
     bool operator==(const QFontMetrics &other) const;
     inline bool operator !=(const QFontMetrics &other) const { return !operator==(other); }
@@ -131,20 +126,17 @@ Q_DECLARE_SHARED(QFontMetrics)
 class Q_GUI_EXPORT QFontMetricsF
 {
 public:
-    explicit QFontMetricsF(const QFont &);
-    QFontMetricsF(const QFont &, QPaintDevice *pd);
+    explicit QFontMetricsF(const QFont &font);
+    QFontMetricsF(const QFont &font, const QPaintDevice *pd);
     QFontMetricsF(const QFontMetrics &);
     QFontMetricsF(const QFontMetricsF &);
     ~QFontMetricsF();
 
     QFontMetricsF &operator=(const QFontMetricsF &);
     QFontMetricsF &operator=(const QFontMetrics &);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QFontMetricsF &operator=(QFontMetricsF &&other)
-    { qSwap(d, other.d); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QFontMetricsF)
 
-    void swap(QFontMetricsF &other) { qSwap(d, other.d); }
+    void swap(QFontMetricsF &other) noexcept { d.swap(other.d); }
 
     qreal ascent() const;
     qreal capHeight() const;
@@ -164,16 +156,19 @@ public:
 
     qreal leftBearing(QChar) const;
     qreal rightBearing(QChar) const;
-    qreal width(const QString &string) const;
 
-    qreal width(QChar) const;
+    qreal horizontalAdvance(const QString &string, int length = -1) const;
+    qreal horizontalAdvance(QChar) const;
+    qreal horizontalAdvance(const QString &string, const QTextOption &textOption) const;
 
     QRectF boundingRect(const QString &string) const;
+    QRectF boundingRect(const QString &text, const QTextOption &textOption) const;
     QRectF boundingRect(QChar) const;
-    QRectF boundingRect(const QRectF &r, int flags, const QString& string, int tabstops = 0, int *tabarray = Q_NULLPTR) const;
-    QSizeF size(int flags, const QString& str, int tabstops = 0, int *tabarray = Q_NULLPTR) const;
+    QRectF boundingRect(const QRectF &r, int flags, const QString& string, int tabstops = 0, int *tabarray = nullptr) const;
+    QSizeF size(int flags, const QString& str, int tabstops = 0, int *tabarray = nullptr) const;
 
     QRectF tightBoundingRect(const QString &text) const;
+    QRectF tightBoundingRect(const QString &text, const QTextOption &textOption) const;
 
     QString elidedText(const QString &text, Qt::TextElideMode mode, qreal width, int flags = 0) const;
 
@@ -181,6 +176,8 @@ public:
     qreal overlinePos() const;
     qreal strikeOutPos() const;
     qreal lineWidth() const;
+
+    qreal fontDpi() const;
 
     bool operator==(const QFontMetricsF &other) const;
     inline bool operator !=(const QFontMetricsF &other) const { return !operator==(other); }

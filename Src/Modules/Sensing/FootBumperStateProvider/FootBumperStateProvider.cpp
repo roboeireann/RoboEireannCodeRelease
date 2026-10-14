@@ -7,16 +7,19 @@
  */
 
 #include "FootBumperStateProvider.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Math/Geometry.h"
+#include "Debugging/Plot.h"
+#include "Framework/Settings.h"
+#include "Math/Geometry.h"
+#include "Platform/SystemCall.h"
+#include "Streaming/Global.h"
 
-MAKE_MODULE(FootBumperStateProvider, sensing);
+MAKE_MODULE(FootBumperStateProvider);
 
 void FootBumperStateProvider::update(FootBumperState& footBumperState)
 {
   bool ignoreInnerBumper = ignoreContact();
   bool ignoreByState = !((theMotionInfo.executedPhase == MotionPhase::stand || theMotionInfo.executedPhase == MotionPhase::walk) &&
-                         (theGameInfo.state == STATE_READY || theGameInfo.state == STATE_SET || theGameInfo.state == STATE_PLAYING) && //The bumper is used for configuration in initial
+                         (theGameState.isReady() || theGameState.isSet() || theGameState.isPlaying()) && //The bumper is used for configuration in initial
                          (theFallDownState.state == FallDownState::upright));
   // Check, if any bumper is pressed
   const bool leftFootLeft = !theDamageConfigurationBody.sides[Legs::left].footBumperDefect && checkContact(KeyStates::lFootLeft, leftFootLeftDuration);
@@ -70,9 +73,9 @@ void FootBumperStateProvider::update(FootBumperState& footBumperState)
     contactDurationRight = 0;
   }
   // Generate model
-  int thresholdContacts = static_cast<int>(1.f / Constants::motionCycleTime / contactThreshold);
+  int thresholdContacts = static_cast<int>(1.f / Global::getSettings().motionCycleTime / contactThreshold);
   if((theMotionInfo.executedPhase == MotionPhase::stand || theMotionInfo.executedPhase == MotionPhase::walk) &&
-     (theGameInfo.state == STATE_READY || theGameInfo.state == STATE_SET || theGameInfo.state == STATE_PLAYING) && //The bumper is used for configuration in initial
+     (theGameState.isReady() || theGameState.isSet() || theGameState.isPlaying()) && //The bumper is used for configuration in initial
      (theFallDownState.state == FallDownState::upright))
   {
     // One contact buffer must exceed the threshold and both bumper sensors of one foot must detected at least 1 contact. Otherwise no contact is detected
@@ -110,6 +113,13 @@ void FootBumperStateProvider::update(FootBumperState& footBumperState)
   }
 
   // Debugging stuff:
+
+  if(debug && theFrameInfo.getTimeSince(lastSoundTime) > static_cast<int>(soundDelay) && (footBumperState.status[Legs::left].contact || footBumperState.status[Legs::right].contact))
+  {
+    lastSoundTime = theFrameInfo.time;
+    SystemCall::playSound("doh.wav");
+  }
+
   PLOT("module:FootBumperStateProvider:sumLeft", contactBufferLeft.sum());
   PLOT("module:FootBumperStateProvider:durationLeft", contactDurationLeft);
   PLOT("module:FootBumperStateProvider:sumRight", contactBufferRight.sum());

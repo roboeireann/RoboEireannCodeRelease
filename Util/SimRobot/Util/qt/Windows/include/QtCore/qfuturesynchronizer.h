@@ -42,7 +42,7 @@
 
 #include <QtCore/qfuture.h>
 
-#ifndef QT_NO_QFUTURE
+QT_REQUIRE_CONFIG(future);
 
 QT_BEGIN_NAMESPACE
 
@@ -105,11 +105,10 @@ public:
     }
 
 protected:
-    QList<QFuture<T> > m_futures;
+    QList<QFuture<T>> m_futures;
     bool m_cancelOnWait;
 };
 
 QT_END_NAMESPACE
-#endif // QT_NO_QFUTURE
 
 #endif // QFUTURESYNCHRONIZER_H

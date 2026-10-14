@@ -43,6 +43,7 @@
 #include <QtGui/qtguiglobal.h>
 #include <QtCore/qpoint.h>
 #include <QtGui/qwindowdefs.h>
+#include <QtGui/qbitmap.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -82,25 +83,27 @@ public:
     QCursor();
     QCursor(Qt::CursorShape shape);
     QCursor(const QBitmap &bitmap, const QBitmap &mask, int hotX=-1, int hotY=-1);
-    QCursor(const QPixmap &pixmap, int hotX=-1, int hotY=-1);
+    explicit QCursor(const QPixmap &pixmap, int hotX=-1, int hotY=-1);
     QCursor(const QCursor &cursor);
     ~QCursor();
     QCursor &operator=(const QCursor &cursor);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QCursor(QCursor &&other) Q_DECL_NOTHROW : d(other.d) { other.d = Q_NULLPTR; }
-    inline QCursor &operator=(QCursor &&other) Q_DECL_NOTHROW
-    { swap(other); return *this; }
-#endif
+    QCursor(QCursor &&other) noexcept : d(qExchange(other.d, nullptr)) {}
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_MOVE_AND_SWAP(QCursor)
 
-    void swap(QCursor &other) Q_DECL_NOTHROW { qSwap(d, other.d); }
+    void swap(QCursor &other) noexcept { qt_ptr_swap(d, other.d); }
 
     operator QVariant() const;
 
     Qt::CursorShape shape() const;
     void setShape(Qt::CursorShape newShape);
 
-    const QBitmap *bitmap() const;
-    const QBitmap *mask() const;
+#if QT_DEPRECATED_SINCE(6, 0)
+    QBitmap bitmap(Qt::ReturnByValueConstant) const { return bitmap(); }
+    QBitmap mask(Qt::ReturnByValueConstant) const { return mask(); }
+#endif // QT_DEPRECATED_SINCE(6, 0)
+    QBitmap bitmap() const;
+    QBitmap mask() const;
+
     QPixmap pixmap() const;
     QPoint hotSpot() const;
 
@@ -112,9 +115,11 @@ public:
     inline static void setPos(QScreen *screen, const QPoint &p) { setPos(screen, p.x(), p.y()); }
 
 private:
+    friend Q_GUI_EXPORT bool operator==(const QCursor &lhs, const QCursor &rhs) noexcept;
+    friend inline bool operator!=(const QCursor &lhs, const QCursor &rhs) noexcept { return !(lhs == rhs); }
     QCursorData *d;
 };
-Q_DECLARE_SHARED_NOT_MOVABLE_UNTIL_QT6(QCursor)
+Q_DECLARE_SHARED(QCursor)
 
 /*****************************************************************************
   QCursor stream functions

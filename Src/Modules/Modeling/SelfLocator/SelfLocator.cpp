@@ -4,34 +4,38 @@
  * Implements a class that performs self-localization
  *
  * @author <a href="mailto:tlaue@uni-bremen.de">Tim Laue</a>
+ * @author Rudi Villing (minor modifications)
  */
 
 #include "SelfLocator.h"
+#include "Debugging/Annotation.h"
+#include "Debugging/Plot.h"
+#include "Framework/Settings.h"
+#include "Math/Eigen.h"
+#include "Math/Probabilistics.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Debugging/Annotation.h"
-#include "Tools/Math/Probabilistics.h"
-#include "Tools/Math/Eigen.h"
-
-#include "Tools/TextLogging.h"
-#include "Tools/FmtCommonTypes.h"
+#include "TextLogging/TextLogging.h"
+#include "Tools/RECommon/FmtCommonTypes.h"
 
 #include <algorithm>
-
-using namespace std;
 
 
 DECL_TLOGGER(tlogger, "SelfLocator", TextLogging::INFO);
 
-SelfLocator::SelfLocator() : lastTimeFarFieldBorderSeen(0), lastTimeJumpSound(0),
-  timeOfLastReturnFromPenalty(0), lastTimeNotInStandWalkKick(0),
+SelfLocator::SelfLocator() : lastTimeJumpSound(0),
+  timeOfLastReturnFromPenalty(0),
   nextSampleNumber(0), idOfLastBestSample(-1), averageWeighting(0.5f), lastAlternativePoseTimestamp(0),
-  nextManualPlacementPoseNumber(0), lastTimePenaltyMarkSeen(0), lastTimeCirclePerceptSeen(0),
   validitiesHaveBeenUpdated(false)
 {
   // Create sample set with samples at the typical walk-in positions
   samples = new SampleSet<UKFRobotPoseHypothesis>(numberOfSamples);
   for(int i = 0; i < samples->size(); ++i)
     samples->at(i).init(getNewPoseAtWalkInPosition(), walkInPoseDeviation, nextSampleNumber++, 0.5f);
+  lastGroundTruthRobotPose = theGroundTruthRobotPose;
+
+  // Initialize statistics:
+  sumOfPerceivedLandmarks = sumOfPerceivedLines = 0;
+  sumOfUsedLines = sumOfUsedLandmarks = 0.f;
 }
 
 SelfLocator::~SelfLocator()
@@ -41,61 +45,9 @@ SelfLocator::~SelfLocator()
 
 void SelfLocator::update(RobotPose& robotPose)
 {
-#ifndef NDEBUG
-  ASSERT(!std::isnan(theOdometer.distanceWalked));
-  ASSERT(!std::isnan(static_cast<float>(theOdometer.odometryOffset.rotation)));
-  ASSERT(!std::isnan(theOdometer.odometryOffset.translation.x()));
-  ASSERT(!std::isnan(theOdometer.odometryOffset.translation.y()));
-  ASSERT(!std::isnan(theSideInformation.largestXCoordinatePossible));
-  if(theFrameInfo.getTimeSince(lastTimeCirclePerceptSeen) < 10 && lastTimeCirclePerceptSeen != 0)
-  {
-    ASSERT(!std::isnan(theCirclePercept.pos.x()));
-    ASSERT(!std::isnan(theCirclePercept.pos.y()));
-  }
-  if(thePenaltyMarkPercept.wasSeen)
-  {
-    ASSERT(!std::isnan(thePenaltyMarkPercept.positionOnField.x()));
-    ASSERT(!std::isnan(thePenaltyMarkPercept.positionOnField.y()));
-  }
-  if(theFieldBoundary.isValid)
-  {
-    for(const Vector2f& v : theFieldBoundary.boundaryOnField)
-    {
-      ASSERT(!std::isnan(v.x()));
-      ASSERT(!std::isnan(v.y()));
-    }
-  }
-#endif
-
-  DEBUG_RESPONSE_ONCE("module:SelfLocator:RobotPose")
-    OUTPUT_TEXT(fmt::format("TheRobotPose t{}-r{}: {:.0f} {:.0f} {:.0f}deg", theGameInfo.ourTeam().teamNumber,
-                            theGameInfo.playerNumber, robotPose.translation.x(), robotPose.translation.y(),
-                            robotPose.rotation.toDegrees()));
-
-  // this is useful to when positioning robots in the simulator if you want their coordinates
-  DEBUG_RESPONSE_ONCE("module:SelfLocator:GroundTruthRobotPoseInSim")
-  {
-    Pose2f pose = theGroundTruthRobotPose;
-    if (theGameInfo.ourTeam().teamNumber == 1) // left side simulated team
-    {
-      pose.rotation = Angle::normalize(pose.rotation + pi);
-      pose.translation.x() = -pose.translation.x();
-      pose.translation.y() = -pose.translation.y();
-    }
-    OUTPUT_TEXT(fmt::format("GroundTruthRobotPose t{}-r{}: {:.0f} {:.0f} {:.0f}deg", theGameInfo.ourTeam().teamNumber,
-                            theGameInfo.playerNumber, pose.translation.x(), pose.translation.y(),
-                            pose.rotation.toDegrees()));
-  }
-
   /* Initialize variable(s) */
   sampleSetHasBeenReset = false;
   validitiesHaveBeenUpdated = false;
-  inverseCameraMatrix = theCameraMatrix.inverse();
-  currentRotationDeviation = theMotionInfo.executedPhase == MotionPhase::stand ? robotRotationDeviationInStand : robotRotationDeviation;
-  if(thePenaltyMarkPercept.wasSeen)
-    lastTimePenaltyMarkSeen = theFrameInfo.time;
-  if(theCirclePercept.wasSeen)
-    lastTimeCirclePerceptSeen = theFrameInfo.time;
 
   /* Modify sample set according to certain changes of the game state:
    *  - Reset mirror in SET
@@ -104,21 +56,17 @@ void SelfLocator::update(RobotPose& robotPose)
    */
   handleGameStateChanges();
 
-  // Modify samples according to ground truth (usually from simulator)
-  // If it is once, we match ground truth precisely.
-  // If it is continuous, we match ground truth to within a tolerance
-  DEBUG_RESPONSE_ONCE("module:SelfLocator:updateFromGroundTruthOnce")
-    updateSamplesFromGroundTruth(robotPose, true);
+  // update to match the (sim) ground truth position once (immediately)
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:resetSamplesToGroundTruthOnce")
+    resetSamplesToGroundTruth(true);
 
-  DEBUG_RESPONSE("module:SelfLocator:updateFromGroundTruth")
-    updateSamplesFromGroundTruth(robotPose, false);
+  // continuous updates based on ground truth pose deviation (E.g. when moving
+  // the robot around)
+  DEBUG_RESPONSE("module:SelfLocator:resetSamplesToGroundTruthAsNeeded")
+    resetSamplesToGroundTruth(false);
 
-  // allow manual overriding of the self locator pose from SimRobot
-  // @deprecated
-  overridePose.defendingHalf = DefendingHalf::none;
-  MODIFY_ONCE("selfLocator:overridePose", overridePose);
-  updateSamplesFromOverridePoseIfNeeded();
-
+  // In any case, remember last ground truth robot pose
+  lastGroundTruthRobotPose = theGroundTruthRobotPose;
 
   /* Move all samples according to the current odometry.
    */
@@ -155,13 +103,9 @@ void SelfLocator::update(RobotPose& robotPose)
   PLOT("module:SelfLocator:maxWeighting", maxWeighting);
   PLOT("module:SelfLocator:averageWeighting", averageWeighting);
 
-  /** Handle information about a possibly flipped pose */
-  handleSideInformation();
-
-  /* Actually: Hacks and workaround :-)
-   *  - Treat keeper rotation problem
+  /* Add hacks and workarounds here. ***************
+   * However, always remember: "Ich sage Ihnen, gleich richtig machen – das bringt's immer und überall, und das bringt einen auch überall hin." (c) Katz & Goldt | cspell:disable-line
    */
-  domainSpecificSituationHandling();
 
   /* Particle filter resampling step
    *  - not executed during penalty shootout!
@@ -169,8 +113,8 @@ void SelfLocator::update(RobotPose& robotPose)
    *  - only executed if validities have changed this frame
    */
   if(validitiesHaveBeenUpdated &&
-     theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) > 4000 &&
-     theGameInfo.gamePhase != GAME_PHASE_PENALTYSHOOT)
+     theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) > timeoutForResamplingAfterReturnFromPenalty &&
+     !theGameState.isPenaltyShootout())
     resampling();
 
   /* Fill the RobotPose representation based on the current sample set
@@ -191,6 +135,12 @@ void SelfLocator::update(RobotPose& robotPose)
     PLOT("module:SelfLocator:sampleResetting", 0.f);
   }
 
+  /** In Initial, the setup pose is directly set to avoid jumping.
+   */
+  if (forceInitialPoseAllowed && theGameState.gameControllerActive && theGameState.isInitial() &&
+      !theGameState.isPenaltyShootout())
+    robotPose = getNewPoseAtWalkInPosition();
+
   /* Finally, update internal variables, debug and draw stuff.
    */
   DEBUG_RESPONSE("module:SelfLocator:templates_only")
@@ -209,16 +159,42 @@ void SelfLocator::update(RobotPose& robotPose)
     }
   }
 
-  if((theWorldModelPrediction.robotPose.translation - robotPose.translation).norm() > positionJumpNotificationDistance &&
-     theGameInfo.state == STATE_PLAYING && !theSideInformation.mirror)
+  /* Some statistics */
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:output_statistics")
   {
-    if(theFrameInfo.getTimeSince(lastTimeJumpSound) > 1337)
+    const int percentLandmarks = static_cast<int>(sumOfUsedLandmarks / sumOfPerceivedLandmarks * 100.f);
+    const int percentLines = static_cast<int>(sumOfUsedLines / sumOfPerceivedLines * 100.f);
+    OUTPUT_TEXT("Landmarks perceived: " << sumOfPerceivedLandmarks << "  used: " << sumOfUsedLandmarks << " = " << percentLandmarks << "%");
+    OUTPUT_TEXT("Lines perceived: " << sumOfPerceivedLines << "  used: " << sumOfUsedLines << " = " << percentLines << "%");
+  }
+
+  // Check, if there is a huge difference between the current and the previous robot pose:
+  const float robotPoseDelta = (theWorldModelPrediction.robotPose.translation - robotPose.translation).norm();
+  if(robotPoseDelta > positionJumpNotificationDistance && theGameState.isPlaying())
+  {
+    // Play annoying sound
+    if(theFrameInfo.getTimeSince(lastTimeJumpSound) > timeoutBetweenTwoJumpSounds)
     {
       SystemCall::say("Jump");
       lastTimeJumpSound = theFrameInfo.time;
     }
+    // Annotate jump depending on current situation:
+    // A jump when returning from a penalty is intended, thus we do not annotate it (in most cases) for some seconds.
+    if(theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) < timeoutForJumpAnnotationAfterReturnFromPenalty)
+    {
+      // This indicates that the robot was unsure about the side at which it was placed.
+      // This is not so cool and should be annotated:
+      if(timeOfLastReturnFromPenalty < robotPose.timestampLastJump)
+      {
+        ANNOTATION("SelfLocator", "Robot was unsure after return from penalty!");
+      }
+    }
+    // Standard case:
+    else
+    {
+      ANNOTATION("SelfLocator", "Robot position has jumped over " << static_cast<int>(robotPoseDelta) << " mm!");
+    }
     robotPose.timestampLastJump = theFrameInfo.time;
-    ANNOTATION("SelfLocator", "Robot position has jumped!");
   }
 
   MODIFY("representation:RobotPose", robotPose);
@@ -227,6 +203,50 @@ void SelfLocator::update(RobotPose& robotPose)
   {
     Pose2f origin = robotPose + theOdometryData.inverse();
     ORIGIN("cognition:Odometry", origin.translation.x(), origin.translation.y(), origin.rotation);
+  }
+
+  // useful to get robot positions in the simulator console
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:OutputRobotPose")
+    OUTPUT_TEXT(fmt::format("t{}-r{} RobotPose: HSL {{rot={:.0f}_deg; x={:.0f}; y={:.0f}}}", theGameState.ownTeam.number,
+                            theGameState.playerNumber, robotPose.translation.x(), robotPose.translation.y(),
+                            robotPose.rotation.toDegrees()));
+
+  // this is useful to when positioning robots in the simulator if you want their coordinates
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:OutputGroundTruthRobotPose")
+  {
+    Pose2f pose = theGroundTruthRobotPose;
+    Pose2f simPose = pose;
+    bool leftToRight = (theGameState.ownTeam.number == theGameControllerData.teams[0].teamNumber);
+    if (leftToRight) // need to convert sim coord output in this case
+    {
+      simPose.rotation = Angle::normalize(pose.rotation + pi);
+      simPose.translation.x() = -pose.translation.x();
+      simPose.translation.y() = -pose.translation.y();
+    }
+    OUTPUT_TEXT(fmt::format(
+        "t{}-r{} GroundTruthRobotPose: HSL {{rot={:.0f}_deg; x={:.0f}; y={:.0f}}}, Sim {{ {:.0f} {:.0f} {:.0f}deg }}",
+        theGameState.ownTeam.number, theGameState.playerNumber, pose.rotation.toDegrees(), pose.translation.x(),
+        pose.translation.y(), simPose.rotation.toDegrees(), simPose.translation.x(), simPose.translation.y()));
+  }
+
+  // update the ground truth robot pose to match the robot's belief. This is useful to make the simulated robot in
+  // the 3D field view roughly match where the robot was in the real world (if the self localisation is vaguely
+  // OK)
+  DEBUG_RESPONSE_ONCE("module:SelfLocator:UpdateGroundTruthRobotPoseOnce")
+  {
+    Pose2f pose = robotPose;
+
+    bool leftToRight = (theGameState.ownTeam.number == theGameControllerData.teams[0].teamNumber);
+    if (leftToRight)
+    {
+      pose.rotation = Angle::normalize(pose.rotation + pi);
+      pose.translation.x() = -pose.translation.x();
+      pose.translation.y() = -pose.translation.y();
+    }
+
+    OUTPUT(idConsole, text,
+           "mv " << pose.translation.x() << " " << pose.translation.y() << " " << theRobotDimensions.simOriginHeight
+                 << " 0 0 " << pose.rotation.toDegrees());
   }
 }
 
@@ -258,8 +278,6 @@ void SelfLocator::computeModel(RobotPose& robotPose)
   robotPose = resultPose;
   Matrix3f cov = bestSample.getCov();
   robotPose.covariance = cov;
-  if(theSideInformation.mirror)
-    robotPose.timestampLastJump = theFrameInfo.time;
   idOfLastBestSample = bestSample.id;
   // Finally, set the quality information:
   float validityOfBestHypothesis = bestSample.validity;
@@ -272,7 +290,7 @@ void SelfLocator::setLocalizationQuality(RobotPose& robotPose, float validityOfB
   if(sampleSetIsUnimodal(robotPose))
   {
     const float translationalStandardDeviation = robotPose.getTranslationalStandardDeviation();
-    const float rotationalStandardDeviation = std::sqrt(robotPose.covariance(2,2));
+    const float rotationalStandardDeviation = std::sqrt(robotPose.covariance(2, 2));
     if(validityOfBestHypothesis >= minValidityForSuperbLocalizationQuality &&
        translationalStandardDeviation < maxTranslationDeviationForSuperbLocalizationQuality &&
        rotationalStandardDeviation < maxRotationalDeviationForSuperbLocalizationQuality)
@@ -312,6 +330,9 @@ void SelfLocator::motionUpdate()
   // This is a nasty workaround but should help us in cases of bad/slow assistant referees:
   // If the robot returns from a penalty and is not walking, any rotation (that might come from
   // the z-axis gyro as the robot is turned too late!) is ignored!
+  // As of 2024, this workaround should not be necessary anymore as the updated rules require the assistant
+  // referees to place the robots "facing towards the field of play" for the whole time.
+  // TODO: Observe, if this always happens correctly in 2024. If yes, remove this workaround.
   float odometryRotation = theOdometer.odometryOffset.rotation;
   if(theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) < 10000 && theMotionInfo.executedPhase != MotionPhase::walk)
     odometryRotation = 0.f;
@@ -319,15 +340,15 @@ void SelfLocator::motionUpdate()
   const float transX = theOdometer.odometryOffset.translation.x();
   const float transY = theOdometer.odometryOffset.translation.y();
   const float dist = theOdometer.odometryOffset.translation.norm();
-  const float angle = abs(odometryRotation);
+  const float angle = std::abs(odometryRotation);
   const float angleWeightNoise = theMotionInfo.executedPhase == MotionPhase::walk ? movedAngleWeightRotationNoise : movedAngleWeightRotationNoiseNotWalking;
 
   // Precalculate rotational error that has to be adapted to all samples
-  const float rotError = max(dist * movedDistWeightRotationNoise, angle * angleWeightNoise);
+  const float rotError = std::max(dist * movedDistWeightRotationNoise, angle * angleWeightNoise);
 
   // pre-calculate translational error that has to be adapted to all samples
-  const float transXError = max(abs(transX * majorDirTransWeight), abs(transY * minorDirTransWeight));
-  const float transYError = max(abs(transY * majorDirTransWeight), abs(transX * minorDirTransWeight));
+  const float transXError = std::max(std::abs(transX * majorDirTransWeight), std::abs(transY * minorDirTransWeight));
+  const float transYError = std::max(std::abs(transY * majorDirTransWeight), std::abs(transX * minorDirTransWeight));
 
   // update samples
   for(int i = 0; i < numberOfSamples; ++i)
@@ -342,20 +363,23 @@ void SelfLocator::motionUpdate()
 
 void SelfLocator::sensorUpdate()
 {
-  // Do not update during certain motions as the percepts might have a low quality
-  if(currentMotionIsUnsafe())
-    return;
-  // In the penalty shootout, the goalkeeper should not perform any real localization
-  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT && !theGameInfo.isOurKick())
-    return;
-
-  // Perform integration of measurements:
   bool useLines = true;
   bool useLandmarks = true;
   bool usePoses = true;
   MODIFY("module:SelfLocator:useLines", useLines);
   MODIFY("module:SelfLocator:useLandmarks", useLandmarks);
   MODIFY("module:SelfLocator:usePoses", usePoses);
+
+  // Do not update during certain motions as the percepts might have a low quality
+  if(currentMotionIsUnsafe())
+    return;
+  // In the penalty shootout, the goalkeeper should not perform any real localization
+  if(theGameState.isPenaltyShootout() && theGameState.isForOpponentTeam())
+    return;
+
+  // Perform integration of measurements:
+  unsigned int usedLines = 0;
+  unsigned int usedLandmarks = 0;
   std::vector<RegisteredAbsolutePoseMeasurement> absolutePoseMeasurements;
   std::vector<RegisteredLandmark> landmarks;
   std::vector<RegisteredLine> lines;
@@ -367,14 +391,15 @@ void SelfLocator::sensorUpdate()
     if(usePoses && thePerceptRegistration.totalNumberOfAvailableAbsolutePoseMeasurements > 0)
     {
       thePerceptRegistration.registerAbsolutePoseMeasurements(samplePose, absolutePoseMeasurements);
-      for(const auto& pose : absolutePoseMeasurements)
-        samples->at(i).updateByPose(pose, theCameraMatrix, inverseCameraMatrix, currentRotationDeviation, theFieldDimensions);
+      for(const auto& measuredPose : absolutePoseMeasurements)
+        samples->at(i).updateByPose(measuredPose);
       numerator += validityFactorPoseMeasurement * (static_cast<float>(absolutePoseMeasurements.size()) / thePerceptRegistration.totalNumberOfAvailableAbsolutePoseMeasurements);
       denominator += validityFactorPoseMeasurement;
     }
     if(useLandmarks && thePerceptRegistration.totalNumberOfAvailableLandmarks > 0)
     {
       thePerceptRegistration.registerLandmarks(samplePose, landmarks);
+      usedLandmarks += static_cast<unsigned int>(landmarks.size());
       for(const auto& landmark : landmarks)
         samples->at(i).updateByLandmark(landmark);
       numerator += validityFactorLandmarkMeasurement * (static_cast<float>(landmarks.size()) / thePerceptRegistration.totalNumberOfAvailableLandmarks);
@@ -383,6 +408,7 @@ void SelfLocator::sensorUpdate()
     if(useLines && thePerceptRegistration.totalNumberOfAvailableLines > 0)
     {
       thePerceptRegistration.registerLines(samplePose, lines);
+      usedLines += static_cast<unsigned int>(lines.size());
       for(const auto& line : lines)
       {
         if(line.partOfCenterCircle) // This is not a classic line and is thus treated as a different kind of measurement
@@ -410,7 +436,7 @@ void SelfLocator::sensorUpdate()
   }
 
   // Apply side information:
-  if(theGameInfo.gamePhase != GAME_PHASE_PENALTYSHOOT)
+  if(!theGameState.isPenaltyShootout())
   {
     for(int i = 0; i < numberOfSamples; ++i)
     {
@@ -426,6 +452,12 @@ void SelfLocator::sensorUpdate()
     if(!theFieldDimensions.isInsideCarpet(position))
       samples->at(i).invalidate();
   }
+
+  // Statistics
+  sumOfPerceivedLines += thePerceptRegistration.totalNumberOfAvailableLines;
+  sumOfPerceivedLandmarks += thePerceptRegistration.totalNumberOfAvailableLandmarks;
+  sumOfUsedLines += static_cast<float>(usedLines) / numberOfSamples;
+  sumOfUsedLandmarks += static_cast<float>(usedLandmarks) / numberOfSamples;
 }
 
 bool SelfLocator::currentMotionIsUnsafe()
@@ -435,18 +467,16 @@ bool SelfLocator::currentMotionIsUnsafe()
     return true;
   // If the robot turns too fast, things go wrong.
   // TODO: Move hardcoded number to parameter. Values is guessed by Philip.
-  if(std::abs(theGyroState.mean.z()) > 50_deg)
+  if(std::abs(theIMUValueState.gyroValues.mean.z()) > 50_deg)
     return true;
   return false;
 }
 
 bool SelfLocator::sensorResetting(const RobotPose& robotPose)
 {
-  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT) // Don't replace samples in penalty shootout
+  if(theGameState.isPenaltyShootout())                       // Don't replace samples in penalty shootout
     return false;
-  if(theSideInformation.mirror)                          // Don't replace samples in mirror cycle
-    return false;
-  if(timeOfLastReturnFromPenalty != 0 && theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) < 7000)
+  if(timeOfLastReturnFromPenalty != 0 && theFrameInfo.getTimeSince(timeOfLastReturnFromPenalty) < timeoutForSensorResettingAfterReturnFromPenalty)
     return false;
   if(theFallDownState.state != FallDownState::upright
      && theFallDownState.state != FallDownState::squatting)  // Don't replace samples, if robot is not upright (e.g. lying or staggering)
@@ -464,7 +494,7 @@ bool SelfLocator::sensorResetting(const RobotPose& robotPose)
     if(theAlternativeRobotPoseHypothesis.isInOwnHalf)
     {
       if(alternativeIsCompatibleToRobotPose)
-        return false; // Everything is OK, no reseting required
+        return false; // Everything is OK, no resetting required
     }
     else // mirrored alternative has also to be considered
     {
@@ -474,7 +504,7 @@ bool SelfLocator::sensorResetting(const RobotPose& robotPose)
         return false; // Everything is OK, no resetting required
     }
     // Resetting seems to be required:
-    float resettingValidity = max(0.5f, averageWeighting); // TODO: Recompute?
+    float resettingValidity = std::max(0.5f, averageWeighting); // TODO: Recompute?
     int worstSampleIdx = 0;
     float worstSampleValidity = samples->at(0).validity;
     for(int i = 1; i < numberOfSamples; ++i)
@@ -495,6 +525,38 @@ bool SelfLocator::sensorResetting(const RobotPose& robotPose)
     return true;
   }
   return false;
+}
+
+void SelfLocator::resetSamplesToGroundTruth(bool updateImmediately)
+{
+  if (theGroundTruthRobotPose.timestamp != theFrameInfo.time)
+    return;
+
+  // once we override the ground truth pose we don't want it immediately set back to the initial pose
+  if (SystemCall::getMode() != SystemCall::physicalRobot)
+    forceInitialPoseAllowed = false;
+
+  // if we haven't asked for an immediate update, check if the robot has been moved around manually or teleported
+  // such that the ground truth pose changes suddenly
+  if (!updateImmediately)
+  {
+    const float distanceDeviation =
+        std::abs((theGroundTruthRobotPose.translation - lastGroundTruthRobotPose.translation).norm());
+    const float rotationDeviation =
+        std::abs(Angle::normalize(theGroundTruthRobotPose.rotation - lastGroundTruthRobotPose.rotation));
+    // Numbers are guessed and hardcoded, but this is a debugging function anyway ...
+    updateImmediately = (distanceDeviation > 300.f || rotationDeviation > Angle::fromDegrees(30.f));
+  }
+
+  if (updateImmediately)
+  {
+    for(int i = 0; i < samples->size(); ++i)
+      samples->at(i).init(theGroundTruthRobotPose, penaltyShootoutPoseDeviation, nextSampleNumber++, 0.9f);
+    sampleSetHasBeenReset = true;
+    idOfLastBestSample = -1;
+
+    TLOGI(tlogger, "resetSamplesToGroundTruth: samples updated to {}", static_cast<Pose2f>(theGroundTruthRobotPose));
+  }
 }
 
 bool SelfLocator::alternativeRobotPoseIsCompatibleToPose(const Pose2f& robotPose)
@@ -562,87 +624,23 @@ void SelfLocator::resampling()
   PLOT("module:SelfLocator:sampleReplacements", replacements);
 }
 
-void SelfLocator::handleSideInformation()
-{
-  if(!theSideInformation.mirror || sampleSetHasBeenReset)
-    return;
-  for(int i = 0; i < numberOfSamples; ++i)
-  {
-    samples->at(i).mirror();
-  }
-  ANNOTATION("SelfLocator", "Mirrrrrrooaaaarred!");
-}
-
-
-void SelfLocator::updateSamplesFromGroundTruth(const RobotPose& robotPose, bool immediateUpdate)
-{
-  if (!immediateUpdate)
-  {
-    // check if we need an immediate update anyway due to current robotPose having diverged
-    // too far from the ground truth pose
-    immediateUpdate = ((theGroundTruthRobotPose.translation - robotPose.translation).squaredNorm() > sqr(250.f)) ||
-                      (std::abs(Angle::normalize(theGroundTruthRobotPose.rotation - robotPose.rotation)) > 20_deg);
-  }
-
-  if (immediateUpdate)
-  {
-    for(int i = 0; i < samples->size(); ++i)
-      samples->at(i).init(theGroundTruthRobotPose, penaltyShootoutPoseDeviation, nextSampleNumber++, 1.f);
-    sampleSetHasBeenReset = true;
-    idOfLastBestSample = -1;
-
-    TLOGI(tlogger, "updateSamplesFromGroundTruth: samples updated to {}", theGroundTruthRobotPose);
-  }
-}
-
-void SelfLocator::updateSamplesFromOverridePoseIfNeeded()
-{
-  if (overridePose.defendingHalf != DefendingHalf::none)
-  {
-    for(int i = 0; i < samples->size(); ++i)
-      samples->at(i).init(overridePose.pose, manualPlacementPoseDeviation, nextSampleNumber++, 0.5f);
-    sampleSetHasBeenReset = true;
-
-    Pose2f& p = overridePose.pose;
-
-    // make the robot move in simRobot
-    const Angle altRotation = p.rotation >= 0 ? p.rotation - pi : p.rotation + pi;
-
-    // output the command in case we want to modify it again
-    TLOGI(tlogger, "robot {}: set selfLocator:overridePose defendingHalf={}; pose={{ rotation={}deg; translation={{ "
-                      "x={}; y={}; }}; }};",
-                      theGameInfo.playerNumber, TypeRegistry::getEnumName(overridePose.defendingHalf), p.rotation.toDegrees(),
-                      p.translation.x(), p.translation.y());
-
-    std::string mvCommand =
-        overridePose.defendingHalf == DefendingHalf::left
-            ? fmt::format("mv {} {} 320 0 0 {}deg", -p.translation.x(), -p.translation.y(), altRotation.toDegrees())
-            : fmt::format("mv {} {} 320 0 0 {}deg", p.translation.x(), p.translation.y(), p.rotation.toDegrees());
-    OUTPUT(idConsole, text, mvCommand);
-
-    // tell SimRobot users what's happened
-    // OUTPUT_TEXT(fmt::format("mv {} {} 320 0 0 {}deg", -p.translation.x(), -p.translation.y(), rotation.toDegrees()));
-    // OUTPUT_TEXT(fmt::format("Robot{} pose manually repositioned to SPL pose ({}deg, {},{}) = SimRobot {}", theGameInfo.playerNumber, p.rotation.toDegrees(),
-    //                         p.translation.x(), p.translation.y(), mvCommand));
-  }
-}
-
-
 void SelfLocator::handleGameStateChanges()
 {
-  if(theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
+  if(theGameState.isPenaltyShootout())
   {
     // penalty shoot: if game state switched to playing reset samples to start position
-    if((theExtendedGameInfo.gameStateLastFrame != STATE_PLAYING && theGameInfo.state == STATE_PLAYING) ||
-       (theExtendedGameInfo.penaltyLastFrame != PENALTY_NONE && !theGameInfo.isPenalized()))
+    if((theGameState.isPlaying() && !theExtendedGameState.wasPlaying()) ||
+       (!theGameState.isPenalized() && theExtendedGameState.wasPenalized()))
     {
       for(int i = 0; i < samples->size(); ++i)
         samples->at(i).init(getNewPoseAtPenaltyShootoutPosition(), penaltyShootoutPoseDeviation, nextSampleNumber++, 1.f);
       sampleSetHasBeenReset = true;
     }
   }
-  // If the robot has been lifted during SET, reset samples to manual positioning line positions
-  else if(theExtendedGameInfo.manuallyPlaced && theGameInfo.state == STATE_SET)
+  // If the robot has been lifted during SET in a 1v1 demo (and not just been unpenalized), reset samples to custom positions
+  else if(theLibDemo.isOneVsOneDemoActive && theGameState.isSet() &&
+          theGameState.playerState == GameState::active && theFrameInfo.getTimeSince(theExtendedGameState.timeWhenPlayerStateStarted[GameState::active]) > 5000 &&
+          theFallDownState.state == FallDownState::pickedUp)
   {
     for(int i = 0; i < samples->size(); ++i)
     {
@@ -652,11 +650,8 @@ void SelfLocator::handleGameStateChanges()
     timeOfLastReturnFromPenalty = theFrameInfo.time;
   }
   // If a penalty is over, reset samples to reenter positions
-  // (Not for the first chestbutton transition from penalized/INITIAL to playing so that we can use
-  // the chest button to start in arbitrary parts of the field)
-  else if (theExtendedGameInfo.returnFromGameControllerPenalty ||
-           ((theExtendedGameInfo.gameStateLastFrame != STATE_INITIAL) && theExtendedGameInfo.returnFromManualPenalty) ||
-           theExtendedGameInfo.startingCalibration)
+  else if(theExtendedGameState.returnFromGameControllerPenalty || theExtendedGameState.returnFromManualPenalty ||
+          (theGameState.playerState == GameState::calibration && theGameState.playerState != theExtendedGameState.playerStateLastFrame))
   {
     int startOfSecondHalfOfSampleSet = samples->size() / 2;
     // The first half of the new sample set is left of the own goal ...
@@ -668,12 +663,12 @@ void SelfLocator::handleGameStateChanges()
     sampleSetHasBeenReset = true;
     timeOfLastReturnFromPenalty = theFrameInfo.time;
   }
-  // Normal game is about to start: We start on the sidelines looking at our goal: (this is for checking in TeamCom)
-  else if((theExtendedGameInfo.gameStateLastFrame != STATE_INITIAL && theGameInfo.state == STATE_INITIAL) ||
-          // Normal game really starts: We start on the sidelines looking at our goal: (this is for actual setup)
-          (theExtendedGameInfo.gameStateLastFrame == STATE_INITIAL && theGameInfo.state == STATE_READY) ||
-          // switch from unstiff to active (we assume at setup pose position)
-          (theExtendedGameInfo.modeLastFrame == GameInfo::unstiff && theGameInfo.playerMode == GameInfo::active))
+  // Normal game is about to start: We start on the touchlines looking at our goal: (this is for checking in TeamCom)
+  else if((theGameState.isInitial() && !theExtendedGameState.wasInitial()) ||
+          // Normal game really starts: We start on the touchlines looking at our goal: (this is for actual setup)
+          // Standard case should be the transition from initial/standby to ready. However, when the referee
+          // gesture was not detected, we directly go to set.
+          ((theGameState.isReady() || theGameState.isSet()) && theExtendedGameState.wasInitial()))
   {
     for(int i = 0; i < samples->size(); ++i)
       samples->at(i).init(getNewPoseAtWalkInPosition(), walkInPoseDeviation, nextSampleNumber++, 0.5f);
@@ -686,9 +681,10 @@ void SelfLocator::handleGameStateChanges()
       samples->at(i).init(theStaticInitialPose.staticPoseOnField, manualPlacementPoseDeviation, nextSampleNumber++, 0.5f);
     sampleSetHasBeenReset = true;
   }
-
   if(sampleSetHasBeenReset)
+  {
     idOfLastBestSample = -1;
+  }
 }
 
 UKFRobotPoseHypothesis& SelfLocator::getMostValidSample()
@@ -736,54 +732,6 @@ UKFRobotPoseHypothesis& SelfLocator::getMostValidSample()
     return *returnSample;
 }
 
-void SelfLocator::domainSpecificSituationHandling()
-{
-  // Keep track of the time during which the robot was in "normal" and stable operation, i.e. not jumping or getting up or stuff like that
-  if(theMotionInfo.executedPhase != MotionPhase::stand && theMotionInfo.executedPhase != MotionPhase::walk && theMotionInfo.executedPhase != MotionPhase::kick)
-    lastTimeNotInStandWalkKick = theFrameInfo.time;
-
-  // Calculate distance to furthest point on field boundary
-  float maxDistance = 0.f;
-  for(const Vector2f& p : theFieldBoundary.boundaryOnField)
-  {
-    if(p.norm() > maxDistance)
-      maxDistance = p.norm();
-  }
-  if(maxDistance > goalieFieldBorderDistanceThreshold)
-    lastTimeFarFieldBorderSeen = theFrameInfo.time;
-
-  // Currently, this method only handles the case that the
-  // keeper is turned by 180 degrees but assumes to stand correctly
-  if(!goalieActivateTwistHandling ||
-     !theGameInfo.isGoalkeeper() ||
-     theGameInfo.state != STATE_PLAYING ||
-     theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT)
-    return;
-  // The robot is in its goal area and assumes to look at the opponent half
-  // and guards its goal.
-  if(theRobotPose.translation.x() < theFieldDimensions.xPosOwnGoalArea + 200 &&
-     abs(theRobotPose.translation.y()) < theFieldDimensions.yPosLeftGoalArea &&
-     abs(theRobotPose.rotation) < 45_deg &&
-     theFrameInfo.getTimeSince(lastTimeNotInStandWalkKick) > goalieTwistNoStandWalkKickTimeout &&
-     theFieldBoundary.isValid)
-  {
-    // It has not seen important stuff for a long time but the field border appears
-    // to be close. This means that it is probably twisted:
-    if(theFrameInfo.getTimeSince(theBallModel.timeWhenLastSeen) > goalieNoPerceptsThreshold &&
-       lastTimeCirclePerceptSeen != 0 && lastTimePenaltyMarkSeen != 0 &&
-       theFrameInfo.getTimeSince(lastTimeCirclePerceptSeen) > goalieNoPerceptsThreshold &&
-       theFrameInfo.getTimeSince(lastTimePenaltyMarkSeen) > goalieNoPerceptsThreshold &&
-       theFrameInfo.getTimeSince(theFieldFeatureOverview.combinedStatus.lastSeen) > goalieNoPerceptsThreshold &&
-       lastTimeFarFieldBorderSeen != 0 &&
-       theFrameInfo.getTimeSince(lastTimeFarFieldBorderSeen) > goalieNoFarFieldBorderThreshold)
-    {
-      ANNOTATION("SelfLocator", "Goalie Twist!");
-      for(int i = 0; i < numberOfSamples; ++i)
-        samples->at(i).twist();
-    }
-  }
-}
-
 void SelfLocator::draw(const RobotPose& robotPose)
 {
   // Visualizes effect of current function's parameters
@@ -808,16 +756,16 @@ void SelfLocator::draw(const RobotPose& robotPose)
     }
   }
   // Visualize hypothetical percept registration for the current pose
-//  std::vector<RegisteredAbsolutePoseMeasurement> absolutePoseMeasurements; TODO: Draw
+  std::vector<RegisteredAbsolutePoseMeasurement> absolutePoseMeasurements;
   std::vector<RegisteredLandmark> landmarks;
   std::vector<RegisteredLine> lines;
-//  thePerceptRegistration.registerAbsolutePoseMeasurements(robotPose, absolutePoseMeasurements); TODO: Draw
+  thePerceptRegistration.registerAbsolutePoseMeasurements(robotPose, absolutePoseMeasurements);
   thePerceptRegistration.registerLandmarks(robotPose, landmarks);
   thePerceptRegistration.registerLines(robotPose, lines);
 
   DEBUG_DRAWING("module:SelfLocator:perceptRegistrationWorld", "drawingOnField")
   {
-    THREAD("module:SelfLocator:perceptRegistrationWorld", theCameraInfo.camera == CameraInfo::upper ? "Upper" : "Lower");
+    THREAD("module:SelfLocator:perceptRegistrationWorld", theCameraInfo.getThreadName());
     for(const auto& line : lines)
     {
       const ColorRGBA col = line.partOfCenterCircle ? ColorRGBA(128, 255, 0, 180) : ColorRGBA(128, 0, 255, 180);
@@ -831,18 +779,34 @@ void SelfLocator::draw(const RobotPose& robotPose)
       CIRCLE("module:SelfLocator:perceptRegistrationWorld", landmark.model.x(), landmark.model.y(),
              200, 20, Drawings::noPen, ColorRGBA::blue, Drawings::solidPen, ColorRGBA::blue);
     }
+    for(const auto& absolutePose : absolutePoseMeasurements)
+    {
+      // Covariance of the pose measurement
+      ColorRGBA c99(255, 255, 100, 100);
+      ColorRGBA c95(255, 128, 50, 100);
+      ColorRGBA c68(255, 100, 100, 100);
+      Matrix2f covMatrix2D = absolutePose.covariance.topLeftCorner(2, 2);
+      covMatrix2D(0, 1) = covMatrix2D(1, 0) = 0.1f; // Set to small value as drawing does not always work properly, if matrix is axis-aligned ...
+
+      COVARIANCE_ELLIPSES_2D_OWN_COLORS("module:SelfLocator:perceptRegistrationWorld",
+                                        covMatrix2D, absolutePose.absolutePoseOnField.translation, c99, c95, c68);
+      // Depict rotational covariance as an arc of the standard deviation
+      float stdDev = std::sqrt(absolutePose.covariance(2, 2));
+      ARC("module:SelfLocator:perceptRegistrationWorld", absolutePose.absolutePoseOnField.translation.x(), absolutePose.absolutePoseOnField.translation.y(),
+          200.f, (-(stdDev) / 2.f + absolutePose.absolutePoseOnField.rotation), stdDev, 20, Drawings::solidPen, ColorRGBA::white, Drawings::noBrush, ColorRGBA::white);
+    }
   }
   DEBUG_DRAWING("module:SelfLocator:perceptRegistrationRobot", "drawingOnField")
   {
-    THREAD("module:SelfLocator:perceptRegistrationRobot", theCameraInfo.camera == CameraInfo::upper ? "Upper" : "Lower");
+    THREAD("module:SelfLocator:perceptRegistrationRobot", theCameraInfo.getThreadName());
     for(const auto& line : lines)
     {
       // Covariance of center of field line (has to be drawn relative to the robot)
       COVARIANCE_ELLIPSES_2D("module:SelfLocator:perceptRegistrationRobot", line.covPerceptCenter, line.perceptCenter);
     }
-    ColorRGBA c99(255,255,100,100);
-    ColorRGBA c95(255,128,50,100);
-    ColorRGBA c68(255,100,100,100);
+    ColorRGBA c99(255, 255, 100, 100);
+    ColorRGBA c95(255, 128, 50, 100);
+    ColorRGBA c68(255, 100, 100, 100);
     for(const auto& landmark : landmarks)
     {
       // Drawing of covariance (has to be drawn relative to the robot)
@@ -888,81 +852,57 @@ Pose2f SelfLocator::getNewPoseReturnFromPenaltyPosition(bool leftSideOfGoal)
   // Special stuff for some demos:
   if(demoUseCustomReturnFromPenaltyPoses)
   {
-    if(theGameInfo.isGoalkeeper())
+    if(theGameState.isGoalkeeper())
       return demoCustomReturnFromPenaltyPoseGoalie;
     else
       return demoCustomReturnFromPenaltyPoseFieldPlayer;
   }
   // Testing purposes: Static start position
-  if(theStaticInitialPose.isActive && (theExtendedGameInfo.penaltyLastFrame == PENALTY_MANUAL || theExtendedGameInfo.penaltyLastFrame == PENALTY_SPL_PLAYER_PUSHING))
+  if(theStaticInitialPose.isActive)
   {
     return theStaticInitialPose.staticPoseOnField;
   }
+  // If the penalty was "Illegal Motion in Standby", the robots are placed at their normal
+  // walk-in positions (or are still standing there anyway) and not at the normal spots for returning from a penalty:
+  // if(theExtendedGameState.playerStateLastFrame == GameState::penalizedIllegalMotionInStandby)
+  // {
+  //   return getNewPoseAtWalkInPosition();
+  // }
   // Normal stuff:
-  float xPosition = Random::triangular(theFieldDimensions.xPosOwnPenaltyMark - returnFromPenaltyMaxXOffset,
-                                       theFieldDimensions.xPosOwnPenaltyMark,
-                                       theFieldDimensions.xPosOwnPenaltyMark + returnFromPenaltyMaxXOffset);
-  const float leftPenaltyReturn = theFieldDimensions.yPosLeftSideline + 450.f;
-  float yPosition = Random::triangular(leftPenaltyReturn - 150.f,
-                                       leftPenaltyReturn,
-                                       leftPenaltyReturn + 150.f);
+  float xPosition = Random::triangular(theFieldDimensions.xPosReturnFromPenalty - returnFromPenaltyMaxXOffset,
+                                       theFieldDimensions.xPosReturnFromPenalty,
+                                       theFieldDimensions.xPosReturnFromPenalty + returnFromPenaltyMaxXOffset);
   if(leftSideOfGoal)
-    return Pose2f(-pi_2, xPosition, yPosition);
+    return Pose2f(-pi_2, xPosition, theFieldDimensions.yPosLeftReturnFromPenalty);
   else
-    return Pose2f(pi_2, xPosition, -yPosition);
+    return Pose2f(pi_2, xPosition, theFieldDimensions.yPosRightReturnFromPenalty);
 }
 
 Pose2f SelfLocator::getNewPoseAtWalkInPosition()
 {
-  const int effectivePlayerNumber = theGameInfo.ourTeam().getSubstitutedPlayerNumber(theGameInfo.playerNumber);
-  if(effectivePlayerNumber >= 1 && effectivePlayerNumber <= Settings::numPlayerNumbers)
-  {
-    const SetupPoses::SetupPose& p = theSetupPoses.getPoseOfRobot(effectivePlayerNumber);
-    Pose2f result;
-    result.translation = p.position;
-    result.rotation    = (p.turnedTowards - p.position).angle();
-    return result;
-  }
-  else
-  {
-    ASSERT(false);   // This point will be reached as soon as we have higher numbers -> The assert will remind us that work has to be done ;-)
-    return Pose2f(); // Dummy return
-  }
+  const SetupPoses::SetupPose& p = theSetupPoses.getPoseOfRobot(theGameState.playerNumber);
+  Pose2f result;
+  result.translation = p.position;
+  result.rotation    = (p.turnedTowards - p.position).angle();
+  return result;
 }
 
 Pose2f SelfLocator::getNewPoseAtManualPlacementPosition()
 {
   // Goalie
-  if(theGameInfo.isGoalkeeper())
+  if(theGameState.isGoalkeeper())
   {
-    return Pose2f(0.f, theFieldDimensions.xPosOwnGroundLine + 52.f, 0.f);
+    return Pose2f(0.f, theFieldDimensions.xPosOwnGoalLine + 52.f, 0.f);
   }
   else
   {
-    Pose2f result;
-    switch(nextManualPlacementPoseNumber)
-    {
-      case 0:
-        result = Pose2f(0.f, theGameInfo.isOurKick() ? -theFieldDimensions.centerCircleRadius - 127.f : theFieldDimensions.xPosOwnPenaltyArea + 127.f, 0.f);
-        break;
-      case 1:
-        result = Pose2f(0.f, theFieldDimensions.xPosOwnPenaltyMark, 0.f);
-        break;
-      case 2:
-        result = Pose2f(0.f, theFieldDimensions.xPosOwnPenaltyMark, (theFieldDimensions.yPosLeftPenaltyArea + theFieldDimensions.yPosLeftSideline) / 2.f);
-        break;
-      case 3:
-        result = Pose2f(0.f, theFieldDimensions.xPosOwnPenaltyMark, (theFieldDimensions.yPosRightPenaltyArea + theFieldDimensions.yPosRightSideline) / 2.f);
-        break;
-    }
-    nextManualPlacementPoseNumber = (nextManualPlacementPoseNumber + 1) % 4;
-    return result;
+    return Pose2f(0.f, demoCustomReturnFromPenaltyPoseFieldPlayer.translation.x(), demoCustomReturnFromPenaltyPoseFieldPlayer.translation.y());
   }
 }
 
 Pose2f SelfLocator::getNewPoseAtPenaltyShootoutPosition()
 {
-  if(theGameInfo.isOurKick())
+  if(theGameState.isForOwnTeam())
   {
     //striker pose (edge of penalty area, looking towards opponent goal)
     return Pose2f(0.f, theFieldDimensions.xPosPenaltyStrikerStartPosition, 0.f);
@@ -970,14 +910,14 @@ Pose2f SelfLocator::getNewPoseAtPenaltyShootoutPosition()
   else
   {
     //goalie pose (in the center of the goal, looking towards the field's center)
-    return Pose2f(0.f, theFieldDimensions.xPosOwnGroundLine, 0.f);
+    return Pose2f(0.f, theFieldDimensions.xPosOwnGoalLine, 0.f);
   }
 }
 
 bool SelfLocator::isMirrorCloser(const Pose2f& currentPose, const Pose2f& lastPose) const
 {
   const Vector2f& translation = currentPose.translation;
-  Vector2f rotationWeight(std::max(theFieldDimensions.yPosLeftSideline * 1.1f - std::min(std::abs(translation.x()), std::abs(lastPose.translation.x())), 0.f), 0);
+  Vector2f rotationWeight(std::max(theFieldDimensions.yPosLeftTouchline * 1.1f - std::min(std::abs(translation.x()), std::abs(lastPose.translation.x())), 0.f), 0);
   Vector2f opponentGoal(theFieldDimensions.xPosOpponentGoalPost, 0.f);
   const Vector2f rotation = Pose2f(Geometry::angleTo(currentPose, opponentGoal)) * rotationWeight;
   const Vector2f lastRotation = Pose2f(Geometry::angleTo(lastPose, opponentGoal)) * rotationWeight;
@@ -986,4 +926,4 @@ bool SelfLocator::isMirrorCloser(const Pose2f& currentPose, const Pose2f& lastPo
   return result;
 }
 
-MAKE_MODULE(SelfLocator, modeling);
+MAKE_MODULE(SelfLocator);

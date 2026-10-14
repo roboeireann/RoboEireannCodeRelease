@@ -4,6 +4,9 @@
  * This file declares a representation of the team behavior status in the 2019 behavior.
  *
  * @author Arne Hasselbring
+ * @author Rudi Villing (modifications)
+ * 
+ * @note [BH2021]: Ported from B-Human 2021 Code Release
  */
 
 #pragma once
@@ -11,15 +14,16 @@
 #include "Representations/BehaviorControl/PlayerRole.h"
 #include "Representations/BehaviorControl/TeammateRoles.h"
 #include "Representations/BehaviorControl/TimeToReachBall.h"
-#include "Representations/BehaviorControl/PassStatus.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Streams/Enum.h"
+#include "Representations/BehaviorControl/REPassStatus.h"
+#include "Tools/Communication/BHumanMessageParticle.h"
+#include "Streaming/AutoStreamable.h"
+#include "Streaming/Enum.h"
 
 /**
- * @struct TeamplayStatus
+ * @struct RETeamPlayStatus
  * representation of teamplay such as passes, touches by teammates, etc.
  */
-STREAMABLE(TeamPlayStatus,
+STREAMABLE(RETeamPlayStatus,
 {
   /******** streamable members follow (note comma at end of comment) ********/,
 
@@ -31,28 +35,28 @@ STREAMABLE(TeamPlayStatus,
 });
 
 
-STREAMABLE(TeamBehaviorStatus,
+STREAMABLE(TeamBehaviorStatus, COMMA public BHumanCompressedMessageParticle<TeamBehaviorStatus>
 {
-  ENUM(TeamActivity,
-  {,
-    noTeam,
-
-    // RE additions
-    minimalTeam,
-    dynamicBallHandlingTeam,
-  });
-  static constexpr TeamActivity numOfTeamActivities = numOfTeamActivitys;
+//   ENUM(TeamActivity,
+//   {,
+//     noTeam,
+// 
+//     // RE additions
+//     minimalTeam,
+//     dynamicBallHandlingTeam,
+//   });
+//   static constexpr TeamActivity numOfTeamActivities = numOfTeamActivitys;
 
   void draw() const;
   
     /**** streamable fields follow - note comma at end of this line ****/,
 
-  (TeamActivity)(noTeam) teamActivity,
+  // (TeamActivity)(noTeam) teamActivity,
   (TimeToReachBall) timeToReachBall,
   (TeammateRoles) teammateRoles,
   (PlayerRole) role,
-  (PassStatus) passStatus, // deprecated
-  (TeamPlayStatus) teamPlayStatus,
+  (REPassStatus) passStatus, // deprecated
+  (RETeamPlayStatus) teamPlayStatus,
 });
 
-typedef TeamBehaviorStatus TeamBehaviourStatus; // alias with "correct" spelling
+// typedef TeamBehaviorStatus TeamBehaviourStatus; // alias with "correct" spelling

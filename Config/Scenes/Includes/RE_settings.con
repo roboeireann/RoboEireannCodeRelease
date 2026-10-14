@@ -1,8 +1,0 @@
-# location and scenario for RE_Normal/Fast/PerceptOracle scenes
-
-# location
-# cl newLocation
-
-# scenario
-# cs somescenario
-cs RC2025-Cup-5v5

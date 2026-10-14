@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtWidgets module of the Qt Toolkit.
@@ -37,65 +37,7 @@
 **
 ****************************************************************************/
 
-#ifndef QSHORTCUT_H
-#define QSHORTCUT_H
-
-#include <QtWidgets/qtwidgetsglobal.h>
-#include <QtWidgets/qwidget.h>
-#include <QtGui/qkeysequence.h>
+#include <QtGui/QShortcut>
 
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_SHORTCUT
-
-class QShortcutPrivate;
-class Q_WIDGETS_EXPORT QShortcut : public QObject
-{
-    Q_OBJECT
-    Q_DECLARE_PRIVATE(QShortcut)
-    Q_PROPERTY(QKeySequence key READ key WRITE setKey)
-    Q_PROPERTY(QString whatsThis READ whatsThis WRITE setWhatsThis)
-    Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled)
-    Q_PROPERTY(bool autoRepeat READ autoRepeat WRITE setAutoRepeat)
-    Q_PROPERTY(Qt::ShortcutContext context READ context WRITE setContext)
-public:
-    explicit QShortcut(QWidget *parent);
-    QShortcut(const QKeySequence& key, QWidget *parent,
-              const char *member = Q_NULLPTR, const char *ambiguousMember = Q_NULLPTR,
-              Qt::ShortcutContext context = Qt::WindowShortcut);
-    ~QShortcut();
-
-    void setKey(const QKeySequence& key);
-    QKeySequence key() const;
-
-    void setEnabled(bool enable);
-    bool isEnabled() const;
-
-    void setContext(Qt::ShortcutContext context);
-    Qt::ShortcutContext context() const;
-
-    void setWhatsThis(const QString &text);
-    QString whatsThis() const;
-
-    void setAutoRepeat(bool on);
-    bool autoRepeat() const;
-
-    int id() const;
-
-    inline QWidget *parentWidget() const
-    { return static_cast<QWidget *>(QObject::parent()); }
-
-Q_SIGNALS:
-    void activated();
-    void activatedAmbiguously();
-
-protected:
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
-};
-
-#endif // QT_NO_SHORTCUT
-
 QT_END_NAMESPACE
-
-#endif // QSHORTCUT_H

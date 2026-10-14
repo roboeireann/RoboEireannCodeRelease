@@ -44,10 +44,9 @@
 #include <QtCore/qobject.h>
 #include <QtWidgets/qstyleoption.h>
 
+QT_REQUIRE_CONFIG(itemviews);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_ITEMVIEWS
 
 class QPainter;
 class QModelIndex;
@@ -70,7 +69,7 @@ public:
         RevertModelCache
     };
 
-    explicit QAbstractItemDelegate(QObject *parent = Q_NULLPTR);
+    explicit QAbstractItemDelegate(QObject *parent = nullptr);
     virtual ~QAbstractItemDelegate();
 
     // painting
@@ -104,15 +103,12 @@ public:
                              const QStyleOptionViewItem &option,
                              const QModelIndex &index);
 
-    static QString elidedText(const QFontMetrics &fontMetrics, int width,
-                              Qt::TextElideMode mode, const QString &text);
-
     virtual bool helpEvent(QHelpEvent *event,
                            QAbstractItemView *view,
                            const QStyleOptionViewItem &option,
                            const QModelIndex &index);
 
-    virtual QVector<int> paintingRoles() const;
+    virtual QList<int> paintingRoles() const;
 
 Q_SIGNALS:
     void commitData(QWidget *editor);
@@ -120,14 +116,12 @@ Q_SIGNALS:
     void sizeHintChanged(const QModelIndex &);
 
 protected:
-    QAbstractItemDelegate(QObjectPrivate &, QObject *parent = Q_NULLPTR);
+    QAbstractItemDelegate(QObjectPrivate &, QObject *parent = nullptr);
 private:
     Q_DECLARE_PRIVATE(QAbstractItemDelegate)
     Q_DISABLE_COPY(QAbstractItemDelegate)
     Q_PRIVATE_SLOT(d_func(), void _q_commitDataAndCloseEditor(QWidget*))
 };
-
-#endif // QT_NO_ITEMVIEWS
 
 QT_END_NAMESPACE
 

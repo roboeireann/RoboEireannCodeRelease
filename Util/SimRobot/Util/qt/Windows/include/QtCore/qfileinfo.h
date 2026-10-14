@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -44,13 +44,13 @@
 #include <QtCore/qlist.h>
 #include <QtCore/qshareddata.h>
 #include <QtCore/qmetatype.h>
+#include <QtCore/qdatetime.h>
 
 QT_BEGIN_NAMESPACE
 
 
 class QDir;
 class QDirIteratorPrivate;
-class QDateTime;
 class QFileInfoPrivate;
 
 class Q_CORE_EXPORT QFileInfo
@@ -59,27 +59,53 @@ class Q_CORE_EXPORT QFileInfo
 public:
     explicit QFileInfo(QFileInfoPrivate *d);
 
+#ifdef QT_IMPLICIT_QFILEINFO_CONSTRUCTION
+#define QFILEINFO_MAYBE_EXPLICIT Q_IMPLICIT
+#else
+#define QFILEINFO_MAYBE_EXPLICIT explicit
+#endif
+
     QFileInfo();
-    QFileInfo(const QString &file);
-    QFileInfo(const QFile &file);
-    QFileInfo(const QDir &dir, const QString &file);
+    QFILEINFO_MAYBE_EXPLICIT QFileInfo(const QString &file);
+    QFILEINFO_MAYBE_EXPLICIT QFileInfo(const QFileDevice &file);
+    QFILEINFO_MAYBE_EXPLICIT QFileInfo(const QDir &dir, const QString &file);
     QFileInfo(const QFileInfo &fileinfo);
+#ifdef Q_CLANG_QDOC
+    QFileInfo(const std::filesystem::path &file);
+    QFileInfo(const QDir &dir, const std::filesystem::path &file);
+#elif QT_CONFIG(cxx17_filesystem)
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    QFILEINFO_MAYBE_EXPLICIT QFileInfo(const T &file) : QFileInfo(QtPrivate::fromFilesystemPath(file)) { }
+
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    QFILEINFO_MAYBE_EXPLICIT QFileInfo(const QDir &dir, const T &file) : QFileInfo(dir, QtPrivate::fromFilesystemPath(file))
+    {
+    }
+#endif // QT_CONFIG(cxx17_filesystem)
+
+#undef QFILEINFO_MAYBE_EXPLICIT
+
     ~QFileInfo();
 
     QFileInfo &operator=(const QFileInfo &fileinfo);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QFileInfo &operator=(QFileInfo &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QFileInfo)
 
-    void swap(QFileInfo &other) Q_DECL_NOTHROW
-    { qSwap(d_ptr, other.d_ptr); }
+    void swap(QFileInfo &other) noexcept
+    { d_ptr.swap(other.d_ptr); }
 
     bool operator==(const QFileInfo &fileinfo) const;
     inline bool operator!=(const QFileInfo &fileinfo) const { return !(operator==(fileinfo)); }
 
     void setFile(const QString &file);
-    void setFile(const QFile &file);
+    void setFile(const QFileDevice &file);
     void setFile(const QDir &dir, const QString &file);
+#ifdef Q_CLANG_QDOC
+    void setFile(const std::filesystem::path &file);
+#elif QT_CONFIG(cxx17_filesystem)
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    void setFile(const T &file) { setFile(QtPrivate::fromFilesystemPath(file)); }
+#endif // QT_CONFIG(cxx17_filesystem)
+
     bool exists() const;
     static bool exists(const QString &file);
     void refresh();
@@ -87,6 +113,14 @@ public:
     QString filePath() const;
     QString absoluteFilePath() const;
     QString canonicalFilePath() const;
+#if QT_CONFIG(cxx17_filesystem) || defined(Q_CLANG_QDOC)
+    std::filesystem::path filesystemFilePath() const
+    { return QtPrivate::toFilesystemPath(filePath()); }
+    std::filesystem::path filesystemAbsoluteFilePath() const
+    { return QtPrivate::toFilesystemPath(absoluteFilePath()); }
+    std::filesystem::path filesystemCanonicalFilePath() const
+    { return QtPrivate::toFilesystemPath(canonicalFilePath()); }
+#endif // QT_CONFIG(cxx17_filesystem)
     QString fileName() const;
     QString baseName() const;
     QString completeBaseName() const;
@@ -97,6 +131,13 @@ public:
     QString path() const;
     QString absolutePath() const;
     QString canonicalPath() const;
+#if QT_CONFIG(cxx17_filesystem) || defined(Q_CLANG_QDOC)
+    std::filesystem::path filesystemPath() const { return QtPrivate::toFilesystemPath(path()); }
+    std::filesystem::path filesystemAbsolutePath() const
+    { return QtPrivate::toFilesystemPath(absolutePath()); }
+    std::filesystem::path filesystemCanonicalPath() const
+    { return QtPrivate::toFilesystemPath(canonicalPath()); }
+#endif // QT_CONFIG(cxx17_filesystem)
     QDir dir() const;
     QDir absoluteDir() const;
 
@@ -113,11 +154,22 @@ public:
     bool isFile() const;
     bool isDir() const;
     bool isSymLink() const;
+    bool isSymbolicLink() const;
+    bool isShortcut() const;
+    bool isJunction() const;
     bool isRoot() const;
     bool isBundle() const;
 
-    QString readLink() const;
-    inline QString symLinkTarget() const { return readLink(); }
+    QString symLinkTarget() const;
+    QString junctionTarget() const;
+
+#if QT_CONFIG(cxx17_filesystem) || defined(Q_CLANG_QDOC)
+    std::filesystem::path filesystemSymLinkTarget() const
+    { return QtPrivate::toFilesystemPath(symLinkTarget()); }
+
+    std::filesystem::path filesystemJunctionTarget() const
+    { return QtPrivate::toFilesystemPath(junctionTarget()); }
+#endif // QT_CONFIG(cxx17_filesystem)
 
     QString owner() const;
     uint ownerId() const;
@@ -129,12 +181,15 @@ public:
 
     qint64 size() const;
 
-    QDateTime created() const;
-    QDateTime lastModified() const;
-    QDateTime lastRead() const;
+    QDateTime birthTime() const { return fileTime(QFile::FileBirthTime); }
+    QDateTime metadataChangeTime() const { return fileTime(QFile::FileMetadataChangeTime); }
+    QDateTime lastModified() const { return fileTime(QFile::FileModificationTime); }
+    QDateTime lastRead() const { return fileTime(QFile::FileAccessTime); }
+    QDateTime fileTime(QFile::FileTime time) const;
 
     bool caching() const;
     void setCaching(bool on);
+    void stat();
 
 protected:
     QSharedDataPointer<QFileInfoPrivate> d_ptr;
@@ -151,8 +206,12 @@ Q_DECLARE_SHARED(QFileInfo)
 
 typedef QList<QFileInfo> QFileInfoList;
 
+#ifndef QT_NO_DEBUG_STREAM
+Q_CORE_EXPORT QDebug operator<<(QDebug, const QFileInfo &);
+#endif
+
 QT_END_NAMESPACE
 
-Q_DECLARE_METATYPE(QFileInfo)
+QT_DECL_METATYPE_EXTERN(QFileInfo, Q_CORE_EXPORT)
 
 #endif // QFILEINFO_H

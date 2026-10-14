@@ -8,18 +8,19 @@
  */
 
 #include "AlternativeRobotPoseProvider.h"
-#include "Tools/Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings.h"
 #include <algorithm>
 #include <cmath>
 
-MAKE_MODULE(AlternativeRobotPoseProvider, modeling);
+MAKE_MODULE(AlternativeRobotPoseProvider);
 
 void AlternativeRobotPoseProvider::update(AlternativeRobotPoseHypothesis& alternativeRobotPoseHypothesis)
 {
+  DECLARE_DEBUG_DRAWING("module:AlternativeRobotPoseProvider:buffer", "drawingOnField");
   clusters.clear();
   alternativeRobotPoseHypothesis.isValid = false;
   if(currentStateOrMotionRuinsOdometry() || // Things are going on and might (but must not) ruin the odometry completely
-     (theExtendedGameInfo.timeSinceLastCalibrationStarted > 5000 && theGameInfo.playerMode == GameInfo::calibration)) // Robot is calibrating
+     (theGameState.playerState == GameState::calibration && theFrameInfo.getTimeSince(theExtendedGameState.timeWhenPlayerStateStarted[GameState::calibration]) > 5000)) // Robot is calibrating
   {
     observations.clear();
     return;
@@ -30,9 +31,9 @@ void AlternativeRobotPoseProvider::update(AlternativeRobotPoseHypothesis& altern
   // Buffer new features, if possible:
   if(currentMotionAllowsAcceptanceOfNewFeatures())
   {
-    addFieldFeatureToBuffer(&theMidCircle);
-    addFieldFeatureToBuffer(&thePenaltyArea);
+    addFieldFeatureToBuffer(&theCenterCircleWithLine);
     addFieldFeatureToBuffer(&thePenaltyMarkWithPenaltyAreaLine);
+    addFieldFeatureToBuffer(&thePenaltyAreaAndGoalArea);
   }
 
   drawObservations();
@@ -59,10 +60,10 @@ void AlternativeRobotPoseProvider::update(AlternativeRobotPoseHypothesis& altern
 bool AlternativeRobotPoseProvider::currentStateOrMotionRuinsOdometry()
 {
   // The robot was manually placed:
-  if(theGameInfo.state == STATE_SET && !theGroundContactState.contact)
+  if(theGameState.isSet() && !theGroundContactState.contact)
     return true;
   // There is nothing reasonable to do before the robot finally enters READY:
-  if(theGameInfo.state == STATE_INITIAL)
+  if(theGameState.isInitial())
     return true;
   // Some motion phases can be troublesome as the odometry offset between configurations cannot be determined:
   if(theMotionInfo.isMotion(bit(MotionPhase::playDead) | bit(MotionPhase::fall) | bit(MotionPhase::getUp)))
@@ -77,13 +78,11 @@ bool AlternativeRobotPoseProvider::currentMotionAllowsAcceptanceOfNewFeatures()
   if(!theMotionInfo.isMotion(bit(MotionPhase::walk) | bit(MotionPhase::stand)))
     return false;
   // Making fast turns produces strange projections of lines to the ground:
-  // TODO: Move hardcoded number to parameter. Value is guessed by Philip.
-  if(std::abs(theGyroState.mean.z()) > 50_deg)
+  if(std::abs(theIMUValueState.gyroValues.mean.z()) > gyroZThreshold)
     return false;
   // Everything else if probably OK:
   return true;
 }
-
 
 void AlternativeRobotPoseProvider::addFieldFeatureToBuffer(const FieldFeature* ff)
 {
@@ -92,9 +91,9 @@ void AlternativeRobotPoseProvider::addFieldFeatureToBuffer(const FieldFeature* f
     const FieldFeature::RobotPoseToFF poses = ff->getGlobalRobotPosition();
     const Pose2f& ownSidePose = poses.pos1.translation.x() <= 0.f ? poses.pos1 : poses.pos2;
     PoseObservation newObservation;
-    newObservation.pose              = ownSidePose;
-    newObservation.timeOfObservation = theFrameInfo.time;
-    newObservation.stillInOwnHalf    = theSideInformation.robotMustBeInOwnHalf;
+    newObservation.pose                      = ownSidePose;
+    newObservation.timeOfObservation         = theFrameInfo.time;
+    newObservation.stillInOwnHalf            = theSideInformation.robotMustBeInOwnHalf;
     observations.push_front(newObservation);
     if(!newObservation.stillInOwnHalf) // We have to consider the alternative, too
     {
@@ -165,7 +164,6 @@ void AlternativeRobotPoseProvider::odometryUpdate()
 
 void AlternativeRobotPoseProvider::drawObservations()
 {
-  DECLARE_DEBUG_DRAWING("module:AlternativeRobotPoseProvider:buffer", "drawingOnField");
   for(unsigned int i = 0; i < observations.size(); i++)
   {
     const PoseObservation& obs = observations[i];

@@ -11,10 +11,10 @@
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/ImageProcessing/Image.h"
-#include "Tools/ImageProcessing/PixelTypes.h"
-#include "Tools/Debugging/DebugImages.h"
+#include "Streaming/AutoStreamable.h"
+#include "ImageProcessing/Image.h"
+#include "ImageProcessing/PixelTypes.h"
+#include "Debugging/DebugImages.h"
 
 /**
  * A representation containing both a color classified and a grayscale version of
@@ -28,10 +28,23 @@ STREAMABLE(ECImage,
     SEND_DEBUG_IMAGE("GrayscaledImage", grayscaled);
     SEND_DEBUG_IMAGE("SaturatedImage", saturated);
     SEND_DEBUG_IMAGE("HuedImage", hued);
+    SEND_DEBUG_IMAGE("BlueChromaticityImage", blueChromaticity);
+    SEND_DEBUG_IMAGE("RedChromaticityImage", redChromaticity);
   },
 
   (unsigned)(0) timestamp,
   (Image<PixelTypes::GrayscaledPixel>) grayscaled,
   (Image<PixelTypes::GrayscaledPixel>) saturated,
   (Image<PixelTypes::HuePixel>) hued,
+  (Image<PixelTypes::GrayscaledPixel>) blueChromaticity,
+  (Image<PixelTypes::GrayscaledPixel>) redChromaticity,
+});
+
+/**
+ * A wrapper representation for the ECImage that allows not to store one.
+ * This allows to stream an ECImage only if it is necessary.
+ */
+STREAMABLE(OptionalECImage,
+{,
+  (std::optional<ECImage>) image,
 });

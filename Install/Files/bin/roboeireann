@@ -1,10 +1,13 @@
 #!/bin/bash
 
-BINARY="/home/nao/Config/roboeireann"
-LOGDIR="/home/nao/logging"
-DUMPFILE="/home/nao/redump.trace"
+ROBOT=$(whoami)
+BINARY="/home/${ROBOT}/Config/roboeireann"
+LOGDIR="/home/${ROBOT}/logging"
+DUMPFILE="/home/${ROBOT}/redump.trace"
 BACKGROUND=false
 DEBUG=false
+ARGS=
+ROBOTS="/home/${ROBOT}/Config/Robots/robots.cfg"
 
 usage()
 {
@@ -14,8 +17,8 @@ usage()
   exit 1
 }
 
-if [ $(whoami) != nao ]; then
-  echo "roboeireann can only be started by user 'nao'."
+if [ ${ROBOT} != nao -a ${ROBOT} != booster ]; then
+  echo "roboeireann can only be started by user 'nao' or 'booster'."
   exit 1
 fi
 
@@ -35,61 +38,186 @@ elif [ $# -ne 0 ]; then
   usage
 fi
 
-if [ -f "${DUMPFILE}" ]; then
-  TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-  mv "${DUMPFILE}" "${DUMPFILE}.${TIMESTAMP}"
+if [ -f /home/${ROBOT}/touchfiles ]; then
+  touch /home/${ROBOT}/Config/Robots/*/*/cameraCalibration.cfg \
+    /home/${ROBOT}/Config/Robots/*/Body/footSoleRotationCalibration.cfg \
+    /home/${ROBOT}/Config/Robots/*/Body/imuCalibration.cfg 2>/dev/null
+  sleep 0.1
+  touch /home/${ROBOT}/Config/settings.cfg
+  rm /home/${ROBOT}/touchfiles
 fi
 
-# This should fix a freaky cygwin bug.
-if [ ! -x "${BINARY}" ]; then
-  chmod u+x "${BINARY}" || exit 1
-fi
+# Remove assertion dumps from previous runs.
+rm -f "${DUMPFILE}"
 
 # Ignore SIGINT and SIGTERM. This inherits to child processes,
 # but roboeireann installs its own handlers, so this script will come to an end, too.
 trap "" 2 15
 
+# Select USB sound card as default
+if [ "${ROBOT}" == booster ]; then
+  USB_AUDIO="$(pactl list sinks short | grep USB | sed -e 's%[^	]*.%%' -e 's%	.*%%')"
+  pactl set-default-sink "${USB_AUDIO}" >/dev/null 2>&1
+fi
+
 # Mount USB drive. In some contexts in which a USB drive is required (e.g. remote events), we refuse to continue without a USB drive.
-if [ -e /home/nao/.config/require-usb ]; then
-  while ! ( mount /media/usb 2>/dev/null && /home/nao/bin/chmod-usb && mkdir -p /media/usb/logs ); do
+if [ -e /home/${ROBOT}/.config/requireUSB ]; then
+  while ! ( mount /media/usb 2>/dev/null && /home/${ROBOT}/bin/chmod-usb && mkdir -p /media/usb/logs ); do
     trap - 2 15
-    aplay -q /home/nao/Config/Sounds/insertUSBDrive.wav
+    aplay -q /home/${ROBOT}/Config/Sounds/insertUSBDrive.wav
     sleep 10
     trap "" 2 15
   done
 else
-  mount /media/usb 2>/dev/null && /home/nao/bin/chmod-usb && mkdir -p /media/usb/logs
+  mount /media/usb 2>/dev/null && /home/${ROBOT}/bin/chmod-usb && mkdir -p /media/usb/logs
 fi
 
+if [ -f /media/usb/config.json ]; then
+  settingsReplacements()
+  {
+    local SEDFLAGS=""
+    [ ! -z ${FIELDPLAYERCOLOR} ] && SEDFLAGS="${SEDFLAGS} -e 's/fieldPlayerColor =.*/fieldPlayerColor = ${FIELDPLAYERCOLOR};/'"
+    [ ! -z ${GOALKEEPERCOLOR} ] && SEDFLAGS="${SEDFLAGS} -e 's/goalkeeperColor =.*/goalkeeperColor = ${GOALKEEPERCOLOR};/'"
+    [ ! -z ${PLAYER} ] && SEDFLAGS="${SEDFLAGS} -e 's/playerNumber =.*/playerNumber = ${PLAYER};/'"
+    [ ! -z ${TEAM} ] && SEDFLAGS="${SEDFLAGS} -e 's/teamNumber =.*/teamNumber = ${TEAM};/'"
+    [ ! -z ${MAGICNUMBER} ] && SEDFLAGS="${SEDFLAGS} -e 's/magicNumber =.*/magicNumber = ${MAGICNUMBER};/'"
+    echo "${SEDFLAGS}"
+  }
+
+  PLAYER=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['settings']['playerNumber'])" 2>/dev/null)
+  if [ -z ${PLAYER} ]; then
+    PLAYER=$(lsblk -ndo label $(mount | grep -o ".* on /media/usb " | tr " " "\n" | head -1) | grep -Eo "[0-9]+$")
+  fi
+  FIELDPLAYERCOLOR=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['settings']['fieldPlayerColor'])" 2>/dev/null)
+  GOALKEEPERCOLOR=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['settings']['goalkeeperColor'])" 2>/dev/null)
+  TEAM=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['settings']['teamNumber'])" 2>/dev/null)
+  MAGICNUMBER=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['settings']['magicNumber'])" 2>/dev/null)
+  SEDFLAGS="$(settingsReplacements)"
+  if [ ! -z "${SEDFLAGS}" ]; then
+    touch -r /home/${ROBOT}/Config/settings.cfg /home/${ROBOT}/Config/teams.cfg
+    bash -c "sed ${SEDFLAGS} -i /home/${ROBOT}/Config/settings.cfg"
+    touch -r /home/${ROBOT}/Config/teams.cfg /home/${ROBOT}/Config/settings.cfg
+  fi
+
+  IP=$(eval echo $(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['wifi']['ipAddress'])" 2>/dev/null))
+  SSID=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['wifi']['ssid'])" 2>/dev/null)
+  PASSWORD=$(python3 -c "import json; config = json.load(open('/media/usb/config.json', 'r')); print(config['wifi']['password'])" 2>/dev/null)
+  if [ ! -z "${SSID}" -a ! -z "${IP}" ]; then
+    echo "\"${SSID}\":" >/home/${ROBOT}/Profiles/fromUSB
+    echo "  password: \"${PASSWORD}\"" >>/home/${ROBOT}/Profiles/fromUSB
+    /home/${ROBOT}/bin/setprofile fromUSB ${IP}
+  fi
+fi
+
+# set up the logging director to point to usb or on-robot logs dir
 if [ -d /media/usb/logs ]; then
   ln -sfT /media/usb/logs "${LOGDIR}"
 else
-  ln -sfT /home/nao/logs "${LOGDIR}"
+  ln -sfT /home/${ROBOT}/logs "${LOGDIR}"
 fi
+
+if [ ! -L "${LOGDIR}" ] || [ ! -d "${LOGDIR}" ]; then
+  echo "Error: ${LOGDIR} is either missing, not a symlink, or a broken symlink." >&2
+fi
+
+# rename old B-Human style logfile names first
+# Loop through all files matching the exact old pattern
+for old_file in "${LOGDIR}"/roboeireannd_*.log; do
+  # Check if the loop actually matched files (prevents running if none exist)
+  [ -e "${old_file}" ] || break
+
+  # Extract just the digits - sed will return nothing if pattern doesn't match
+  num=$(basename "${old_file}" | sed -nE "s/^roboeireannd_\(([0-9]+)\)\.log$/\1/p")
+  
+  # Skip if sed returned nothing (file didn't match old naming pattern)
+  [ -z "${num}" ] && continue
+
+  # Format the number to 3 digits (e.g., "1" becomes "001")
+  printf -v formatted_num "%03d" "$num"
+  
+  # Rename to the new scheme
+  mv "${old_file}" "${LOGDIR}/roboeireannd_${formatted_num}.tlog"
+done
 
 # Make log-names unique by numbering them.
-# RV: only support new form logfile names
+#COUNTER=$(ls "${LOGDIR}" | sed -nE "s/^roboeireannd_\(([0-9]+)\).log$/\1/p" | sort -n | tail -n1)
+#COUNTER=$(expr ${COUNTER} + 1)
+#LOGFILE="${LOGDIR}/roboeireannd_(${COUNTER}).log"
 COUNTER=$(ls "${LOGDIR}" | sed -nE "s/^roboeireannd_([0-9]+).tlog$/\1/p" | sort -n | tail -n1)
 
-if [ -z $COUNTER ]; then
-  COUNTER="000"
+if [ -z "${COUNTER}" ]; then
+  COUNTER="001"
 else
-  printf -v COUNTER "%03d" $(expr ${COUNTER} + 1)  
+  printf -v COUNTER "%03d" $(( 10#${COUNTER} + 1 ))  
+fi
+LOGFILE="${LOGDIR}/roboeireannd_${COUNTER}.tlog"
+
+
+# Support running an executable from the USB drive.
+if [ -f /media/usb/Config/roboeireann ]; then
+  cp /media/usb/Config/roboeireann /home/${ROBOT}/roboeireann
+  BINARY="/home/${ROBOT}/roboeireann"
+  ARGS="-c /media/usb"
+  ROBOTS="/media/usb/Config/Robots/robots.cfg"
 fi
 
-LOGFILE="${LOGDIR}/roboeireannd_${COUNTER}.tlog"
+# Check whether the binary actually exists
+if [ ! -f "${BINARY}" ]; then
+  echo "${BINARY} does not exist."
+  exit 1
+fi
+
+# This should fix a freaky cygwin bug.
+# ^- This comment is really old.
+if [ ! -x "${BINARY}" ]; then
+  chmod u+x "${BINARY}" || exit 1
+fi
+
+# On Booster, activate second IP and wait for Motion PC to be available
+# This seems redundant for K1, so commenting out for now
+# if [ "${ROBOT}" == booster ]; then
+#   #LAN="$(nmcli device show | tr '\n' '|' | sed 's%||%!%g' | tr '!' '\n' | grep 192.168.10.102 | tr '|' '\n' | grep GENERAL.CONNECTION | sed 's%.* %%')"
+# 	LAN=$(nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS device show | awk -F: '
+#     $1 == "GENERAL.CONNECTION" { con = $2 }
+#     $1 ~ /^IP4.ADDRESS/ && $2 ~ /^192.168.10.102/ { print con }
+#   ')
+#   sudo nmcli connection up "${LAN}"
+#   if [ ! -z "$(grep "\"${ROBOT}\"" "${ROBOTS}" | grep -E "robotType *= *t1 *;")" ]; then
+#     while [ "$(ping -w 1 -c 1 192.168.10.101 >/dev/null && echo 1 || echo 0)" = "0" ]; do
+#       sleep 1
+#     done
+#   fi
+# fi
+
+echo BACKGROUND=${BACKGROUND}
+
+export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/booster/BoosterRos2/fastdds_profile.xml
 
 # Actually execute roboeireann.
 if ${DEBUG}; then
-  gdb "${BINARY}"
+  gdb --args "${BINARY}" ${ARGS}
 elif ${BACKGROUND}; then
-  # "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' >"${LOGFILE}"
-  "${BINARY}" -w 2>&1 >"${LOGFILE}"
-else
-  # "${BINARY}" -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' | tee "${LOGFILE}"
-  "${BINARY}" -w 2>&1 | tee "${LOGFILE}"
+  echo "starting in background"
+  # "${BINARY}" ${ARGS} -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' >"${LOGFILE}"
+  "${BINARY}" ${ARGS} -w >"${LOGFILE}" 2>&1 
+else # foreground
+  # "${BINARY}" ${ARGS} -w 2>&1 | mawk -W interactive -F '\n' '{print strftime("%H:%M:%S", systime()) " " $0}' | tee "${LOGFILE}"
+  "${BINARY}" ${ARGS} -w 2>&1 | tee "${LOGFILE}"
+fi
+RESULT=${PIPESTATUS[0]}
+
+
+# If the binary crashed, copy the dump file to a numbered copy alongside redump.trace
+# so that it can be correlated with the tlog file.
+# we leave the original redump.trace in place for deployDialog tool
+if [ -f "${DUMPFILE}" ]; then
+  cp "${DUMPFILE}" "/home/${ROBOT}/redump_${COUNTER}.trace"
 fi
 
 # Remove leftovers.
 rm -f "${LOGDIR}"
+rm -f /home/${ROBOT}/roboeireann
 umount /media/usb 2>/dev/null
+
+# Exit with result of ${BINARY}.
+exit ${RESULT}

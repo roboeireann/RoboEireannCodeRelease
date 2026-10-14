@@ -1,0 +1,699 @@
+<Simulation>
+
+  <!-- 
+    coord system: positive-x points towards left of 3D field, 
+    positive-y points down/towards right side of field from perspective
+    of player playing left-to-right 
+  -->
+
+  <Compound name="field">
+    <!-- physics geometry (normally invisible) - what the robot walks on -->
+    <!-- Note: BoxGeometry uses the following unintuitive scheme: depth=x, width=y, height=z -->
+    <!-- Note: BoxGeometry color is visible only when SimRobot physics drawing is shaded -->
+    <BoxGeometry depth="17.0m" width="11.0m" height="0.2m" color="rgb(60, 60, 60)">
+      <Translation z="-0.1m"/>
+      <Material name="fieldCarpet"/>
+    </BoxGeometry>
+
+    <!-- field edge geometry - maybe for leaving the field penalties? -->
+    <BoxGeometry depth="17.2m" width="0.1m" height="0.3m" color="rgb(40, 40, 40)">
+      <Translation y="-5.55m" z="0.15m"/>
+    </BoxGeometry>
+
+    <BoxGeometry depth="17.2m" width="0.1m" height="0.3m" color="rgb(40, 40, 40)">
+      <Translation y="5.55m" z="0.15m"/>
+    </BoxGeometry>
+
+    <BoxGeometry depth="0.1m" width="11.0m" height="0.3m" color="rgb(50, 50, 50)">
+      <Translation x="-8.55m" z="0.15m"/>
+    </BoxGeometry>
+
+    <BoxGeometry depth="0.1m" width="11.0m" height="0.3m" color="rgb(50, 50, 50)">
+      <Translation x="8.55m" z="0.15m"/>
+    </BoxGeometry>
+
+    <!-- <ComplexAppearance ref="fieldCross"/> -->
+
+    <ComplexAppearance ref="fieldGrass">
+      <Translation z="-0.002"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="fieldPatches">
+      <Translation z="-0.001"/>
+    </ComplexAppearance>
+
+    <Compound ref="paintedLines"/>
+
+    <Compound ref="fieldCornerArcs"/>
+
+    <Compound ref="fieldGoal" name="Goal1">
+      <Translation x="7.025m"/>
+    </Compound>
+    <Compound ref="fieldGoal" name="Goal2">
+      <Translation x="-7.025m"/>
+      <Rotation z="180degree"/>
+    </Compound>
+
+  </Compound>
+
+  <!-- ==================================================================== -->
+  <!-- fieldGrass -->
+  <ComplexAppearance name="fieldGrass">
+    <Surface diffuseColor="rgba(100%, 100%, 100%, 1.0)" diffuseTexture="../Textures/grass_seamless_256.png"/>
+    <Vertices>
+-8.5 -5.5 0
+8.5 -5.5 0
+8.5 5.5 0
+-8.5 5.5 0
+    </Vertices>
+    <TexCoords>
+0 0
+0 22
+34 22
+34 0
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- ==================================================================== -->
+  <!-- fieldPatches -->
+  <ComplexAppearance name="fieldPatches">
+    <Surface diffuseColor="rgba(100%, 100%, 100%, 0.5)" diffuseTexture="../Textures/field_patch1.png"/>
+    <Vertices>
+-8.5 -5.5 0
+8.5 -5.5 0
+8.5 5.5 0
+-8.5 5.5 0
+    </Vertices>
+    <TexCoords>
+0 0
+0 1
+2 1
+2 0
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- ==================================================================== -->
+  <!-- paintedLines -->
+  <!-- Note: the length of the individual lines needs to be adjusted below in 
+       addition to their positioning here if the field size changes -->
+  <Compound name="paintedLines">
+    <ComplexAppearance ref="touchLine">
+      <Translation y="4.5"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="touchLine">
+      <Translation y="-4.5"/>
+    </ComplexAppearance>
+
+    <ComplexAppearance ref="midOrEndLine"/>
+    <ComplexAppearance ref="midOrEndLine">
+      <Translation x="7"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="midOrEndLine">
+      <Translation x="-7"/>
+    </ComplexAppearance>
+
+    <ComplexAppearance ref="fieldSpot"> <!-- center spot -->
+      <Translation z="0.0001"/>
+    </ComplexAppearance>
+
+    <Compound ref="linesNearGoal"/>
+    <Compound ref="linesNearGoal">
+      <Rotation z="180degree"/>
+    </Compound>
+
+    <ComplexAppearance ref="fieldCenterCircleHalf">
+      <Translation z="0.0001"/>
+    </ComplexAppearance>
+
+    <ComplexAppearance ref="fieldCenterCircleHalf">
+      <Translation z="0.0001"/>
+      <Rotation z="180degree"/>
+    </ComplexAppearance>
+
+
+    <Translation z="-0.0005"/>
+  </Compound>
+
+  <Compound name="linesNearGoal">
+    <ComplexAppearance ref="penaltyAreaLine">
+      <Translation x="-4"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="penaltyAreaSideLine">
+      <Translation x="-7" y="3" z="0.0001"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="penaltyAreaSideLine">
+      <Translation x="-7" y="-3" z="0.0001"/>
+    </ComplexAppearance>
+
+    <ComplexAppearance ref="goalAreaLine">
+      <Translation x="-6"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="goalAreaSideLine">
+      <Translation x="-7" y="2" z="0.0001"/>
+    </ComplexAppearance>
+    <ComplexAppearance ref="goalAreaSideLine">
+      <Translation x="-7" y="-2" z="0.0001"/>
+    </ComplexAppearance>
+
+    <ComplexAppearance ref="fieldSpot"> <!-- penalty spot -->
+      <Translation x="-5"/>
+    </ComplexAppearance>
+
+  </Compound>
+
+
+  <!-- ==================================================================== -->
+  <!-- touchLine -->
+  <Surface name="lineColor" diffuseColor="rgba(100%, 100%, 100%, 1.0)" diffuseTexture="../Textures/painted_line_1024x128.png"/>
+
+  <ComplexAppearance name="touchLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+-7.025 -0.025 0 # bottom left
+7.025 -0.025 0  # bottom right
+7.025 0.025 0   # top right
+-7.025 0.025 0  # top left
+    </Vertices>
+    <TexCoords>
+0 0 # bottom left
+7 0 # bottom right
+7 1 # top right
+0 1 # top left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- ==================================================================== -->
+  <!-- midOrEndLine -->
+  <ComplexAppearance name="midOrEndLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+-0.025 -4.475 0 # bottom left
+0.025 -4.475 0  # bottom right
+0.025 4.475 0   # top right
+-0.025 4.475 0  # top left
+    </Vertices>
+    <TexCoords>
+4.5 0    # bottom left - tex bottom right
+4.5 1  # bottom right - tex top right
+0 1  # top right - tex top left
+0 0    # top left - tex bottom left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- ==================================================================== -->
+  <!-- penaltyAreaLine -->
+  <ComplexAppearance name="penaltyAreaLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+-0.025 -2.975 0 # bottom left
+0.025 -2.975 0  # bottom right
+0.025 2.975 0   # top right
+-0.025 2.975 0  # top left
+    </Vertices>
+    <TexCoords>
+3 0    # bottom left - tex bottom right
+3 1  # bottom right - tex top right
+0 1  # top right - tex top left
+0 0    # top left - tex bottom left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- penaltyAreaSideLine (left aligned to origin)-->
+  <ComplexAppearance name="penaltyAreaSideLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+0.020 -0.025 0 # bottom left - 0.020 allows 5 mm overlap of end line
+3.025 -0.025 0  # bottom right
+3.025 0.025 0   # top right
+0.020 0.025 0  # top left
+    </Vertices>
+    <TexCoords>
+0 0 # bottom left
+1.5 0 # bottom right
+1.5 1 # top right
+0 1 # top left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- ==================================================================== -->
+  <!-- goalAreaLine -->
+  <ComplexAppearance name="goalAreaLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+-0.025 -1.975 0 # bottom left
+0.025 -1.975 0  # bottom right
+0.025 1.975 0   # top right
+-0.025 1.975 0  # top left
+    </Vertices>
+    <TexCoords>
+2 0    # bottom left - tex bottom right
+2 1  # bottom right - tex top right
+0 1  # top right - tex top left
+0 0    # top left - tex bottom left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+  <!-- goalAreaSideLine (left aligned to origin)-->
+  <ComplexAppearance name="goalAreaSideLine">
+    <Surface ref="lineColor"/>
+    <Vertices>
+0.020 -0.025 0 # bottom left - 0.020 allows 5 mm overlap of end line
+1.025 -0.025 0  # bottom right
+1.025 0.025 0   # top right
+0.020 0.025 0  # top left
+    </Vertices>
+    <TexCoords>
+0.1 0 # bottom left - slightly offset the texture start for variety
+0.6 0 # bottom right
+0.6 1 # top right
+0.1 1 # top left
+    </TexCoords>
+    <Quads>
+0 1 2 3
+    </Quads>
+  </ComplexAppearance>
+
+
+
+  <!-- ==================================================================== -->
+  <!-- goalAreaLine -->
+  <ComplexAppearance name="fieldSpot">
+    <Surface ref="lineColor"/>
+    
+    <Vertices>
+      # Center Point (Index 0)
+      0 0 0
+      
+      # 16 Circumference Points (Radius 0.05m)
+      # Calculated as: x = 0.05 * cos(theta), y = 0.05 * sin(theta)
+      0.0500  0.0000 0  # 1
+      0.0462  0.0191 0  # 2
+      0.0354  0.0354 0  # 3
+      0.0191  0.0462 0  # 4
+      0.0000  0.0500 0  # 5
+     -0.0191  0.0462 0  # 6
+     -0.0354  0.0354 0  # 7
+     -0.0462  0.0191 0  # 8
+     -0.0500  0.0000 0  # 9
+     -0.0462 -0.0191 0  # 10
+     -0.0354 -0.0354 0  # 11
+     -0.0191 -0.0462 0  # 12
+      0.0000 -0.0500 0  # 13
+      0.0191 -0.0462 0  # 14
+      0.0354 -0.0354 0  # 15
+      0.0462 -0.0191 0  # 16
+    </Vertices>
+
+    <TexCoords>
+      # Center (Index 0) - Middle of the first 128x128 square
+      0.0625 0.5
+      
+      # Outer Points (Mapping to U:[0, 0.125] and V:[0, 1])
+      # u = 0.0625 + 0.0625 * cos(theta)
+      # v = 0.5 + 0.5 * sin(theta)
+      0.1250 0.5000  # 1
+      0.1202 0.6913  # 2
+      0.1067 0.8536  # 3
+      0.0864 0.9619  # 4
+      0.0625 1.0000  # 5
+      0.0386 0.9619  # 6
+      0.0183 0.8536  # 7
+      0.0048 0.6913  # 8
+      0.0000 0.5000  # 9
+      0.0048 0.3087  # 10
+      0.0183 0.1464  # 11
+      0.0386 0.0381  # 12
+      0.0625 0.0000  # 13
+      0.0864 0.0381  # 14
+      0.1067 0.1464  # 15
+      0.1202 0.3087  # 16
+    </TexCoords>
+
+    <Triangles>
+      0 1 2    0 2 3    0 3 4    0 4 5
+      0 5 6    0 6 7    0 7 8    0 8 9
+      0 9 10   0 10 11  0 11 12  0 12 13
+      0 13 14  0 14 15  0 15 16  0 16 1
+    </Triangles>
+  </ComplexAppearance>
+
+
+
+
+  <!-- ==================================================================== -->
+  <!-- fieldGoal -->
+  <Compound name="fieldGoal">
+
+    <!-- TODO: unclear - assuming goal post centers are 2400mm apart -->
+    <!-- goal post physics geometry -->
+    <CylinderGeometry height="1.6m" radius="0.05m" name="postL">
+      <Translation y="-1.2" z="0.8m"/>
+    </CylinderGeometry>
+    <CylinderGeometry height="1.6m" radius="0.05m" name="postR">
+      <Translation y="1.2" z="0.8m"/>
+    </CylinderGeometry>
+
+    <!-- goal post and crossbar appearance -->
+    <CylinderAppearance height="1.6m" radius="0.05m" name="postL">
+      <Translation y="-1.2" z="0.8m"/>
+      <Surface ref="goalColor"/>
+    </CylinderAppearance>
+    <CylinderAppearance height="1.6m" radius="0.05m" name="postR">
+      <Translation y="1.2" z="0.8m"/>
+      <Surface ref="goalColor"/>
+    </CylinderAppearance>
+    <CapsuleAppearance height="2.5000000000000003m" radius="0.05m" name="crossbar">
+      <Rotation x="90degree"/>
+      <Translation z="1.6m"/>
+      <Surface ref="goalColor"/>
+    </CapsuleAppearance>
+
+    <!-- net support uprights -->
+    <!--
+      If you want to tilt the uprights, aim for the top support to be half the
+      depth of the base. Required angle is arctan(halfDepth / heightOfTiltedSection)
+      Multiply height of upright by 1/cos(angle), rotate it by angle, and translate
+      (depthOfBase + depthOfTop)/2
+    -->
+    <BoxAppearance depth="0.02m" width="0.02m" height="1.6m" name="netUprightR">
+      <Surface ref="goalColor"/>
+      <Translation x="0.7m" y="1.2m" z="0.8m"/>
+    </BoxAppearance>
+    <BoxAppearance depth="0.02m" width="0.02m" height="1.6m" name="netUprightL">
+      <Surface ref="goalColor"/>
+      <Translation x="0.7m" y="-1.2m" z="0.8m"/>
+    </BoxAppearance>
+
+    <!-- net support base -->
+    <BoxAppearance depth="0.7m" width="0.02m" height="0.04m" name="netBaseR">
+      <Surface ref="goalNetBaseColor"/>
+      <Translation x="0.34m" y="1.2m" z="0.02m"/>
+    </BoxAppearance>
+    <BoxAppearance depth="0.7m" width="0.02m" height="0.04m" name="netBaseL">
+      <Surface ref="goalNetBaseColor"/>
+      <Translation x="0.34m" y="-1.2m" z="0.02m"/>
+    </BoxAppearance>
+    <BoxAppearance depth="0.02m" width="2.38m" height="0.04m" name="netBaseBack">
+      <Surface ref="goalNetBaseColor"/>
+      <Translation x="0.7m" z="0.02m"/>
+    </BoxAppearance>
+
+    <!-- net support top -->
+    <BoxAppearance depth="0.7m" width="0.02m" height="0.02m" name="netTopR">
+      <Surface ref="goalColor"/>
+      <Translation x="0.35m" y="1.2m" z="1.59m"/>
+    </BoxAppearance>
+    <BoxAppearance depth="0.7m" width="0.02m" height="0.02m" name="netTopL">
+      <Surface ref="goalColor"/>
+      <Translation x="0.35m" y="-1.2m" z="1.59m"/>
+    </BoxAppearance>
+    <BoxAppearance depth="0.02m" width="2.38m" height="0.02m" name="netTopBack">
+      <Surface ref="goalColor"/>
+      <Translation x="0.7m" z="1.59m"/>
+    </BoxAppearance>
+
+    <!-- the net itself -->
+    <ComplexAppearance ref="fieldNet"/>
+  </Compound>
+
+
+  <ComplexAppearance name="fieldNet">
+    <Surface diffuseColor="rgb(5%, 5%, 5%)" diffuseTexture="../Textures/net.png"/>
+    <Vertices>
+0.05 -1.2 0
+0.05 -1.2 1.6
+0.7 -1.2 1.6
+0.7 -1.2 0
+
+0.05 1.2 0
+0.05 1.2 1.6
+0.7 1.2 1.6
+0.7 1.2 0
+
+0.7 -1.2 0
+0.7 1.2 0
+0.7 1.2 1.6
+0.7 -1.2 1.6
+    </Vertices>
+    <TexCoords>
+10.0 36.0
+10.0 0
+0 0
+0 36.0
+
+10.0 36.0
+10.0 0
+0 0
+0 36.0
+
+0 0
+54.0 0
+54.0 36.0
+0 36.0
+    </TexCoords>
+    <Quads>
+0 1 2 3
+3 2 1 0
+4 5 6 7
+7 6 5 4
+8 9 10 11
+11 10 9 8
+    </Quads>
+  </ComplexAppearance>
+
+
+
+<!-- Semi-Circle (1.5m radius, Left Half, towards +X) -->
+<ComplexAppearance name="fieldCenterCircleHalf">
+  <Surface ref="lineColor"/>
+  
+  <Vertices>
+    0.0000  -1.4750 0      0.0000  -1.5250 0
+    0.1446  -1.4679 0      0.1495  -1.5177 0
+    0.2878  -1.4467 0      0.2975  -1.4957 0
+    0.4282  -1.4115 0      0.4427  -1.4593 0
+    0.5645  -1.3627 0      0.5836  -1.4089 0
+    0.6953  -1.3008 0      0.7189  -1.3449 0
+    0.8195  -1.2264 0      0.8472  -1.2680 0
+    0.9357  -1.1402 0      0.9674  -1.1788 0
+    1.0430  -1.0430 0      1.0783  -1.0783 0
+    1.1402  -0.9357 0      1.1788  -0.9674 0
+    1.2264  -0.8195 0      1.2680  -0.8472 0
+    1.3008  -0.6953 0      1.3449  -0.7189 0
+    1.3627  -0.5645 0      1.4089  -0.5836 0
+    1.4115  -0.4282 0      1.4593  -0.4427 0
+    1.4467  -0.2878 0      1.4957  -0.2975 0
+    1.4679  -0.1446 0      1.5177  -0.1495 0
+    1.4750   0.0000 0      1.5250   0.0000 0
+    1.4679   0.1446 0      1.5177   0.1495 0
+    1.4467   0.2878 0      1.4957   0.2975 0
+    1.4115   0.4282 0      1.4593   0.4427 0
+    1.3627   0.5645 0      1.4089   0.5836 0
+    1.3008   0.6953 0      1.3449   0.7189 0
+    1.2264   0.8195 0      1.2680   0.8472 0
+    1.1402   0.9357 0      1.1788   0.9674 0
+    1.0430   1.0430 0      1.0783   1.0783 0
+    0.9357   1.1402 0      0.9674   1.1788 0
+    0.8195   1.2264 0      0.8472   1.2680 0
+    0.6953   1.3008 0      0.7189   1.3449 0
+    0.5645   1.3627 0      0.5836   1.4089 0
+    0.4282   1.4115 0      0.4427   1.4593 0
+    0.2878   1.4467 0      0.2975   1.4957 0
+    0.1446   1.4679 0      0.1495   1.5177 0
+    0.0000   1.4750 0      0.0000   1.5250 0
+  </Vertices>
+  <TexCoords>
+    0.0000 0      0.0000 1
+    0.0736 0      0.0736 1
+    0.1473 0      0.1473 1
+    0.2209 0      0.2209 1
+    0.2945 0      0.2945 1
+    0.3682 0      0.3682 1
+    0.4418 0      0.4418 1
+    0.5154 0      0.5154 1
+    0.5890 0      0.5890 1
+    0.6627 0      0.6627 1
+    0.7363 0      0.7363 1
+    0.8099 0      0.8099 1
+    0.8836 0      0.8836 1
+    0.9572 0      0.9572 1
+    1.0308 0      1.0308 1
+    1.1045 0      1.1045 1
+    1.1781 0      1.1781 1
+    1.2517 0      1.2517 1
+    1.3254 0      1.3254 1
+    1.3990 0      1.3990 1
+    1.4726 0      1.4726 1
+    1.5462 0      1.5462 1
+    1.6199 0      1.6199 1
+    1.6935 0      1.6935 1
+    1.7671 0      1.7671 1
+    1.8408 0      1.8408 1
+    1.9144 0      1.9144 1
+    1.9880 0      1.9880 1
+    2.0617 0      2.0617 1
+    2.1353 0      2.1353 1
+    2.2089 0      2.2089 1
+    2.2826 0      2.2826 1
+    2.3562 0      2.3562 1
+  </TexCoords>
+
+  <Quads>
+    0 1 3 2    2 3 5 4    4 5 7 6    6 7 9 8
+    8 9 11 10  10 11 13 12  12 13 15 14  14 15 17 16
+    16 17 19 18  18 19 21 20  20 21 23 22  22 23 25 24
+    24 25 27 26  26 27 29 28  28 29 31 30  30 31 33 32
+    32 33 35 34  34 35 37 36  36 37 39 38  38 39 41 40
+    40 41 43 42  42 43 45 44  44 45 47 46  46 47 49 48
+    48 49 51 50  50 51 53 52  52 53 55 54  54 55 57 56
+    56 57 59 58  58 59 61 60  60 61 63 62  62 63 65 64
+  </Quads>
+</ComplexAppearance>
+
+
+
+  <!-- 1. Define the Arc Mesh (Paste script output here) -->
+  <ComplexAppearance name="fieldCornerArc">
+    <Surface ref="lineColor"/>
+    <Vertices>
+        0.4750   0.0000 0      0.5250   0.0000 0
+        0.4727   0.0466 0      0.5225   0.0515 0
+        0.4659   0.0927 0      0.5149   0.1024 0
+        0.4545   0.1379 0      0.5024   0.1524 0
+        0.4388   0.1818 0      0.4850   0.2009 0
+        0.4189   0.2239 0      0.4630   0.2475 0
+        0.3949   0.2639 0      0.4365   0.2917 0
+        0.3672   0.3013 0      0.4058   0.3331 0
+        0.3359   0.3359 0      0.3712   0.3712 0
+        0.3013   0.3672 0      0.3331   0.4058 0
+        0.2639   0.3949 0      0.2917   0.4365 0
+        0.2239   0.4189 0      0.2475   0.4630 0
+        0.1818   0.4388 0      0.2009   0.4850 0
+        0.1379   0.4545 0      0.1524   0.5024 0
+        0.0927   0.4659 0      0.1024   0.5149 0
+        0.0466   0.4727 0      0.0515   0.5225 0
+        0.0000   0.4750 0      0.0000   0.5250 0
+    </Vertices>
+    <TexCoords>
+        0.0000 0      0.0000 1
+        0.0245 0      0.0245 1
+        0.0491 0      0.0491 1
+        0.0736 0      0.0736 1
+        0.0982 0      0.0982 1
+        0.1227 0      0.1227 1
+        0.1473 0      0.1473 1
+        0.1718 0      0.1718 1
+        0.1963 0      0.1963 1
+        0.2209 0      0.2209 1
+        0.2454 0      0.2454 1
+        0.2700 0      0.2700 1
+        0.2945 0      0.2945 1
+        0.3191 0      0.3191 1
+        0.3436 0      0.3436 1
+        0.3682 0      0.3682 1
+        0.3927 0      0.3927 1
+    </TexCoords>
+    <Quads>
+      0 1 3 2  2 3 5 4  4 5 7 6  6 7 9 8  
+      8 9 11 10  10 11 13 12  12 13 15 14  14 15 17 16  
+      16 17 19 18  18 19 21 20  20 21 23 22  22 23 25 24  
+      24 25 27 26  26 27 29 28  28 29 31 30  30 31 33 32
+    </Quads>
+  </ComplexAppearance>
+
+  <Compound name="fieldCornerArcs">
+    <!-- Left-End, Right-Side -->
+    <Compound>
+      <Translation x="7.0m" y="4.5m" z="0.002m"/>
+      <Rotation z="180degree"/>
+      <ComplexAppearance ref="fieldCornerArc"/>
+    </Compound>
+
+    <!-- Left-End, Left-Side -->
+    <Compound>
+      <Translation x="7.0m" y="-4.5m" z="0.002m"/>
+      <Rotation z="90degree"/>
+      <ComplexAppearance ref="fieldCornerArc"/>
+    </Compound>
+
+    <!-- Right-End, Right-Side -->
+    <Compound>
+      <Translation x="-7.0m" y="4.5m" z="0.002m"/>
+      <Rotation z="270degree"/>
+      <ComplexAppearance ref="fieldCornerArc"/>
+    </Compound>
+
+    <!-- Right-End, Left-Side -->
+    <Compound>
+      <Translation x="-7.0m" y="-4.5m" z="0.002m"/>
+      <ComplexAppearance ref="fieldCornerArc"/>
+    </Compound>
+  </Compound>
+
+
+
+  <!-- fieldCross is available if needed but for now we use circular marks -->
+  <Vertices name="fieldCross">
+# cross center line
+0.05 0.025 0
+0.05 -0.025 0
+-0.05 0.025 0
+-0.05 -0.025 0
+
+# left cross
+0.025 0.05 0
+0.025 0.025 0
+-0.025 0.05 0
+-0.025 0.025 0
+
+# right cross
+0.025 -0.05 0
+0.025 -0.025 0
+-0.025 -0.05 0
+-0.025 -0.025 0
+  </Vertices>
+
+
+  <ComplexAppearance name="fieldCross">
+    <Surface ref="fieldWhite"/>
+    <Vertices ref="fieldCross"/>
+    <Quads>
+2 3 1 0
+6 7 5 4
+8 9 11 10
+    </Quads>
+  </ComplexAppearance>
+
+
+
+  <Surface name="fieldWhite" diffuseColor="rgb(100%, 100%, 100%)" specularColor="rgb(80%, 80%, 80%)" 
+           shininess="10" diffuseTexture="../Textures/shadow_frizzle.png"/>
+  <Surface name="goalWhite" diffuseColor="rgb(70%, 70%, 70%)" ambientColor="rgb(45%, 45%, 45%)" 
+           specularColor="rgb(40%, 40%, 40%)" shininess="30"/>
+  <Surface name="goalBlack" diffuseColor="rgb(5%, 5%, 5%)" ambientColor="rgb(10%, 10%, 10%)" 
+           specularColor="rgb(60%, 60%, 60%)" shininess="60"/>
+  <!-- aliases -->
+  <Surface name="goalColor" ref="goalWhite"/>
+  <Surface name="goalNetBaseColor" ref="goalBlack"/>
+
+</Simulation>

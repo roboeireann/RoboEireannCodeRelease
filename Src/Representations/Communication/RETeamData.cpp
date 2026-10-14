@@ -1,0 +1,130 @@
+/**
+ * @file RETeamData.cpp
+ */
+
+#include "RETeamData.h"
+#include "Representations/Infrastructure/FrameInfo.h"
+#include "Framework/Blackboard.h"
+#include "Debugging/DebugDrawings3D.h"
+#include <algorithm>
+
+// #define HANDLE_PARTICLE(particle) case id##particle: return the##particle.handleArbitraryMessage(message, [this](unsigned u){return this->toLocalTimestamp(u);})
+// bool RETeammate::handleMessage(InMessage& message)
+// {
+//   (void)message; // force use
+//   return false;
+//   // switch(message.getMessageID())
+//   // {
+//   //     HANDLE_PARTICLE(FieldCoverage);
+//   //     HANDLE_PARTICLE(RobotHealth);
+//   //   default:
+//   //     return false;
+//   // }
+// }
+
+Vector2f RETeammate::getEstimatedPosition(unsigned time) const
+{
+  const float secsSinceLastPacket = std::max(0, static_cast<int>(time - timeWhenLastPacketReceived)) / 1000.f;
+  const float distanceToTarget = theBehaviorStatus.walkingTo.norm(); // Do not overshoot the target.
+  const float correctionFactor = 0.5f;
+  const Vector2f walkDirection = ((theRobotPose * theBehaviorStatus.walkingTo) - theRobotPose.translation).normalized();
+  return theRobotPose.translation +
+         std::min(distanceToTarget, secsSinceLastPacket * correctionFactor * theBehaviorStatus.speed) * walkDirection;
+};
+
+
+
+int RETeamData::countActiveTeammatesKickedSinceRestart() const
+{
+  int count = 0;
+  for (RETeammate* pTeammate : activeTeammates)
+  {
+    if (pTeammate->kickedSinceRestart)
+      count++;
+  }
+
+  return count;
+}
+
+void RETeamData::onRead()
+{
+  activeTeammates.clear();
+
+  teammatesByNumber.assign(Settings::highestValidPlayerNumber + 1, nullptr);
+
+  for (RETeammate& t : teammates)
+  {
+    if (!t.isPenalized)
+      activeTeammates.push_back(&t);
+
+    teammatesByNumber[t.number] = &t;
+  }
+}
+
+
+
+void RETeamData::draw() const
+{
+  DECLARE_DEBUG_DRAWING("representation:RETeamData", "drawingOnField");
+  DECLARE_DEBUG_DRAWING3D("representation:RETeamData:3d", "field");
+  for(auto const& teammate : teammates)
+  {
+    ColorRGBA posCol;
+    if(teammate.status == RETeammate::PLAYING)
+      posCol = ColorRGBA::green;
+    else if(teammate.status == RETeammate::FALLEN)
+      posCol = ColorRGBA::yellow;
+    else
+      posCol = ColorRGBA::red;
+
+    const Vector2f& rPos = teammate.theRobotPose.translation;
+    const float radius = std::max(50.f, teammate.theRobotPose.getTranslationalStandardDeviation());
+    Vector2f dirPos = teammate.theRobotPose * Vector2f(radius, 0.f);
+
+    // Current estimated position
+    if(Blackboard::getInstance().exists("FrameInfo"))
+    {
+      const FrameInfo& theFrameInfo = static_cast<const FrameInfo&>(Blackboard::getInstance()["FrameInfo"]);
+      const Vector2f estimatedPosition = teammate.getEstimatedPosition(theFrameInfo.time);
+      CIRCLE("representation:RETeamData", estimatedPosition.x(), estimatedPosition.y(), 100, 30, Drawings::solidPen, ColorRGBA::yellow, Drawings::solidBrush, ColorRGBA::red);
+      SPHERE3D("representation:RETeamData:3d", estimatedPosition.x(), estimatedPosition.y(), 35, 35, ColorRGBA::yellow);
+    }
+
+    // Circle around Player
+    CIRCLE("representation:RETeamData", rPos.x(), rPos.y(), radius, 20, Drawings::solidPen,
+           posCol, Drawings::noBrush, ColorRGBA::white);
+    // Direction of the Robot
+    LINE("representation:RETeamData", rPos.x(), rPos.y(), dirPos.x(), dirPos.y(), 20,
+         Drawings::solidPen, posCol);
+    // Player number
+    DRAW_TEXT("representation:RETeamData", rPos.x() + 100, rPos.y(), 100, ColorRGBA::black, teammate.number);
+
+    if (teammate.kickedSinceRestart)
+      CIRCLE("representation:RETeamData", rPos.x(), rPos.y(), 70.f, 20, Drawings::dashedPen,
+           ColorRGBA::white, Drawings::noBrush, ColorRGBA::white);
+
+    // Role
+    DRAW_TEXT("representation:RETeamData", rPos.x() + 100, rPos.y() - 150, 100,
+             ColorRGBA::black, TypeRegistry::getEnumName(teammate.theTeamBehaviorStatus.role.role));
+
+    // Time to reach ball
+    int ttrb = teammate.theTeamBehaviorStatus.role.isBallPlayer()
+               ? static_cast<int>(teammate.theTeamBehaviorStatus.timeToReachBall.timeWhenReachBallStriker)
+               : static_cast<int>(teammate.theTeamBehaviorStatus.timeToReachBall.timeWhenReachBall);
+    if(Blackboard::getInstance().exists("FrameInfo"))
+    {
+      const FrameInfo& theFrameInfo = static_cast<const FrameInfo&>(Blackboard::getInstance()["FrameInfo"]);
+      ttrb = theFrameInfo.getTimeSince(ttrb);
+    }
+    DRAW_TEXT("representation:RETeamData", rPos.x() + 100, rPos.y() - 300, 100, ColorRGBA::black, "TTRB: " << ttrb);
+
+    // Line from Robot to WalkTarget
+    const Vector2f target = teammate.theRobotPose * teammate.theBehaviorStatus.walkingTo;
+    LINE("representation:RETeamData", rPos.x(), rPos.y(), target.x(), target.y(),
+         10, Drawings::dashedPen, ColorRGBA::magenta);
+
+    // Ball position
+    const Vector2f ballPos = teammate.theRobotPose * teammate.theBallModel.estimate.position;
+    CIRCLE("representation:RETeamData", ballPos.x(), ballPos.y(), 50, 20, Drawings::solidPen, ColorRGBA::yellow, Drawings::solidBrush, ColorRGBA::yellow);
+  }
+}

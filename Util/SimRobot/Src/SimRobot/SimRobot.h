@@ -6,8 +6,9 @@
 
 #pragma once
 
+#include <QVector>
+
 class QString;
-template<typename T> class QVector;
 class QIcon;
 class QMenu;
 class QSettings;
@@ -68,8 +69,8 @@ namespace SimRobot
   };
 
   /**
-    * Flags that can be used for registering modules and objects
-    */
+   * Flags that can be used for registering modules and objects
+   */
   class Flag
   {
   public:
@@ -81,9 +82,7 @@ namespace SimRobot
     static const int copy = 0x0008; /**< The object's widget has a "copy" entry in its edit menu that can be used to copy a screenshot of the widget to the clipboard */
     static const int exportAsImage = 0x0010; /**< The object's widget  has an "Export Image" entry in its edit menu that can be used to create a svg using the \c paint method of the widget */
     static const int showParent = 0x0020; /**< When added, the parent will be made visible if hidden */
-
-    // flags for registerModule
-    static const int ignoreReset = 0x1000; /**< The module keeps being loaded on scene resets */
+    static const int sorted = 0x0040; /**< When added, the parent will be made visible if hidden */
   };
 
   /**
@@ -145,7 +144,7 @@ namespace SimRobot
     virtual int getObjectChildCount(const Object& object) = 0;
     virtual Object* getObjectChild(const Object& object, int index) = 0;
     virtual bool addStatusLabel(const Module& module, StatusLabel* statusLabel) = 0;
-    virtual bool registerModule(const Module& module, const QString& displayName, const QString& name, int flags = 0) = 0;
+    virtual bool registerModule(const Module& module, const QString& displayName, const QString& name) = 0;
     virtual bool loadModule(const QString& name) = 0;
     virtual bool openObject(const Object& object) = 0;
     virtual bool closeObject(const Object& object) = 0;
@@ -157,10 +156,12 @@ namespace SimRobot
     virtual QSettings& getSettings() = 0;
     virtual QSettings& getLayoutSettings() = 0;
     virtual bool isSimRunning() = 0;
+    virtual bool isSimResetting() = 0;
     virtual void simReset() = 0;
     virtual void simStart() = 0;
     virtual void simStep() = 0;
     virtual void simStop() = 0;
+    virtual void openFile(const QString& fileName) = 0;
   };
 }
 

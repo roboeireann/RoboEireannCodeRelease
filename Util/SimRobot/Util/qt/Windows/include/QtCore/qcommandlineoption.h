@@ -1,5 +1,6 @@
 /****************************************************************************
 **
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Copyright (C) 2013 Laszlo Papp <lpapp@kde.org>
 ** Contact: https://www.qt.io/licensing/
 **
@@ -71,12 +72,10 @@ public:
     ~QCommandLineOption();
 
     QCommandLineOption &operator=(const QCommandLineOption &other);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QCommandLineOption &operator=(QCommandLineOption &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QCommandLineOption)
 
-    void swap(QCommandLineOption &other) Q_DECL_NOTHROW
-    { qSwap(d, other.d); }
+    void swap(QCommandLineOption &other) noexcept
+    { d.swap(other.d); }
 
     QStringList names() const;
 
@@ -92,14 +91,6 @@ public:
 
     Flags flags() const;
     void setFlags(Flags aflags);
-
-#if QT_DEPRECATED_SINCE(5, 8)
-    QT_DEPRECATED_X("Use setFlags() with HiddenFromHelp")
-    void setHidden(bool hidden);
-    QT_DEPRECATED_X("Use flags() and HiddenFromHelp")
-    bool isHidden() const;
-#endif
-
 
 private:
     QSharedDataPointer<QCommandLineOptionPrivate> d;

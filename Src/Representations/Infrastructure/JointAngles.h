@@ -1,16 +1,16 @@
 #pragma once
 
 #include "Tools/Motion/SensorData.h"
-#include "Tools/Math/Angle.h"
-#include "Tools/RobotParts/Joints.h"
-#include "Tools/Streams/EnumIndexedArray.h"
+#include "Math/Angle.h"
+#include "RobotParts/Joints.h"
+#include "Streaming/EnumIndexedArray.h"
 #include "Platform/BHAssert.h"
 
 STREAMABLE(JointAngles,
 {
 public:
   static constexpr Angle off = SensorData::off; /**< Special value that indicates that the joint is turned off. */
-  static constexpr Angle ignore = 20000.f; /**< Special angle for not overwriting the previous setting. */
+  static constexpr Angle ignore = SensorData::ignore; /**< Special angle for not overwriting the previous setting. */
 
   JointAngles();
 
@@ -19,12 +19,13 @@ public:
   /**
    * The method returns the angle of the mirror (left/right) of the given joint.
    * @param joint The joint the mirror of which is returned.
+   * @param hasSeparateHipYawJoints Does the robot have two separate hip yaw joints?
    * @return The angle of the mirrored joint.
    */
-  Angle mirror(Joints::Joint joint) const;
+  Angle mirror(Joints::Joint joint, bool hasSeparateHipYawJoints) const;
 
   /** Initializes this instance with the mirrored angles of other. */
-  void mirror(const JointAngles& other);
+  void mirror(const JointAngles& other, bool hasSeparateHipYawJoints);
 
 private:
   /**
@@ -37,19 +38,23 @@ private:
 public:
   ,
   (ENUM_INDEXED_ARRAY(Angle, Joints::Joint)) angles, /**< The angles of all joints. */
-  (unsigned)(0) timestamp, /**< The time when the jointangles were received*/
+  (ENUM_INDEXED_ARRAY(Angle, Joints::Joint)) variance, /**< The variance of all joints in squared rad. */
+  (ENUM_INDEXED_ARRAY(Angle, Joints::Joint)) velocity,
+  (unsigned)(0) timestamp, /**< The time when the joint angles were received*/
 });
 
 inline JointAngles::JointAngles()
 {
   angles.fill(0.f);
+  variance.fill(0.f);
+  velocity.fill(0.f);
 }
 
-inline void JointAngles::mirror(const JointAngles& other)
+inline void JointAngles::mirror(const JointAngles& other, bool hasSeparateHipYawJoints)
 {
   ASSERT(this != &other);
   for(int i = 0; i < Joints::numOfJoints; ++i)
-    angles[i] = other.mirror(static_cast<Joints::Joint>(i));
+    angles[i] = other.mirror(static_cast<Joints::Joint>(i), hasSeparateHipYawJoints);
   timestamp = other.timestamp;
 }
 

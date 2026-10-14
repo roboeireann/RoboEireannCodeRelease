@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 #include "Representations/Configuration/BallSpecification.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
@@ -44,15 +44,14 @@ MODULE(BallSpotsProvider,
     (float) scanLengthRadiusFactor, //< The factor to determine the maximum scan length
     (unsigned) maxNumberOfSkippablePixel, //< The maximum number of pixels that are allowed to be skipped while scanBallSpotOneDirection(..)
     (float) minAllowedDistanceRadiusRelation, //< The factor to determine the minimum distance between two ball spots
-    (float) minFoundDiameterPercentage, //< The minimum ratio of the messured width compared to the calculated width
+    (float) minFoundDiameterPercentage, //< The minimum ratio of the measured width compared to the calculated width
     (float) noiseThreshold, //< The maximum ratio of non-good pixels
-    (float) minGoodNeutralRatio, //< The minimum ratio of good pixels compared to non-bad pixels
 
     (int) additionalRadiusForGreenCheck, //< the distance between the ball spot and the green scan areas
     (float) greenPercent, //< the minimum ratio of detected green compared to all considered pixels in the green check
 
     (bool) allowScanLineTopSpotFitting, // Is it allowed to find a spot on top of a scanLine?
-    (bool) lessStrictChecks, // Allow more Ballspots?
+    (bool) lessStrictChecks, // Allow more ball spots?
   }),
 });
 

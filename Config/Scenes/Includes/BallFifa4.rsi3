@@ -1,0 +1,21 @@
+<Simulation>
+
+  <!-- Ball texture drived from About PES (https://sketchfab.com/3d-models/fifa-trionda-ball-world-cup-2026-4c577717c59f44a882c48c5d8b5e41f8) -->
+  <Surface name="ballTexture" diffuseColor="rgb(100%, 100%, 100%)" specularColor="rgb(60%, 60%, 60%)" shininess="30" diffuseTexture="../Textures/ball2026_300x150.png"/>
+
+  <Material name="ballPlastic">
+    <Friction material="fieldCarpet" value="0.3"/>
+    <RollingFriction material="fieldCarpet" value="0.3"/>
+  </Material>
+
+  <Body name="ball">
+    <SphereAppearance radius="0.103">
+      <Surface ref="ballTexture"/>
+    </SphereAppearance>
+    <SphereGeometry radius="0.103">
+      <Material ref="ballPlastic"/>
+    </SphereGeometry>
+    <SphereMass value="0.37" radius="0.0103"/>
+  </Body>
+
+</Simulation>

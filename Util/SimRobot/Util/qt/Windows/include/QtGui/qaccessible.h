@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtGui module of the Qt Toolkit.
@@ -46,10 +46,10 @@
 #include <QtCore/qcoreapplication.h>
 #include <QtCore/qdebug.h>
 #include <QtCore/qglobal.h>
+#include <QtCore/qlist.h>
 #include <QtCore/qobject.h>
 #include <QtCore/qrect.h>
 #include <QtCore/qset.h>
-#include <QtCore/qvector.h>
 #include <QtCore/qvariant.h>
 #include <QtGui/qcolor.h>
 #include <QtGui/qevent.h>
@@ -217,6 +217,10 @@ public:
         State() {
             memset(this, 0, sizeof(State));
         }
+        friend inline bool operator==(const QAccessible::State &first, const QAccessible::State &second)
+        {
+            return memcmp(&first, &second, sizeof(QAccessible::State)) == 0;
+        }
     };
 
 
@@ -280,7 +284,7 @@ public:
         HotkeyField    = 0x00000032,
         Slider         = 0x00000033,
         SpinBox        = 0x00000034,
-        Canvas         = 0x00000035, // Diagram for MSAA
+        Canvas         = 0x00000035, // MSAA: ROLE_SYSTEM_DIAGRAM - The object represents a graphical image that is used to diagram data.
         Animation      = 0x00000036,
         Equation       = 0x00000037,
         ButtonDropDown = 0x00000038, // The object represents a button that expands a grid.
@@ -299,9 +303,10 @@ public:
         Paragraph      = 0x00000083,
         WebDocument    = 0x00000084,
         Section        = 0x00000085,
+        Notification   = 0x00000086,
 
         // IAccessible2 roles
-        // IA2_ROLE_CANVAS = 0x401, ### Qt 6 use this one instead of Canvas above
+        // IA2_ROLE_CANVAS = 0x401, // An object that can be drawn into and to manage events from the objects drawn into it
         // IA2_ROLE_CAPTION = 0x402,
         // IA2_ROLE_CHECK_MENU_ITEM = 0x403,
         ColorChooser = 0x404,
@@ -379,7 +384,8 @@ public:
         ActionInterface,
         ImageInterface,
         TableInterface,
-        TableCellInterface
+        TableCellInterface,
+        HyperlinkInterface
     };
 
     enum TextBoundaryType {
@@ -417,10 +423,6 @@ public:
     static Id registerAccessibleInterface(QAccessibleInterface *iface);
     static void deleteAccessibleInterface(Id uniqueId);
 
-
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED static inline void updateAccessibility(QObject *object, int child, Event reason);
-#endif
     static void updateAccessibility(QAccessibleEvent *event);
 
     static bool isActive();
@@ -440,8 +442,6 @@ private:
     friend class QAccessibleCache;
 };
 
-Q_GUI_EXPORT bool operator==(const QAccessible::State &first, const QAccessible::State &second);
-
 Q_DECLARE_OPERATORS_FOR_FLAGS(QAccessible::Relation)
 
 class QAccessible2Interface;
@@ -452,6 +452,7 @@ class QAccessibleActionInterface;
 class QAccessibleImageInterface;
 class QAccessibleTableInterface;
 class QAccessibleTableCellInterface;
+class QAccessibleHyperlinkInterface;
 class QAccessibleTableModelChangeEvent;
 
 class Q_GUI_EXPORT QAccessibleInterface
@@ -466,7 +467,8 @@ public:
     virtual QWindow *window() const;
 
     // relations
-    virtual QVector<QPair<QAccessibleInterface*, QAccessible::Relation> > relations(QAccessible::Relation match = QAccessible::AllRelations) const;
+    virtual QList<QPair<QAccessibleInterface *, QAccessible::Relation>>
+    relations(QAccessible::Relation match = QAccessible::AllRelations) const;
     virtual QAccessibleInterface *focusChild() const;
 
     virtual QAccessibleInterface *childAt(int x, int y) const = 0;
@@ -508,10 +510,13 @@ public:
     inline QAccessibleTableCellInterface *tableCellInterface()
     { return reinterpret_cast<QAccessibleTableCellInterface *>(interface_cast(QAccessible::TableCellInterface)); }
 
+    inline QAccessibleHyperlinkInterface *hyperlinkInterface()
+    { return reinterpret_cast<QAccessibleHyperlinkInterface *>(interface_cast(QAccessible::HyperlinkInterface)); }
+
     virtual void virtual_hook(int id, void *data);
 
     virtual void *interface_cast(QAccessible::InterfaceType)
-    { return Q_NULLPTR; }
+    { return nullptr; }
 
 protected:
     friend class QAccessibleCache;
@@ -659,6 +664,17 @@ public:
     virtual QPoint imagePosition() const = 0;
 };
 
+class Q_GUI_EXPORT QAccessibleHyperlinkInterface
+{
+public:
+    virtual ~QAccessibleHyperlinkInterface();
+
+    virtual QString anchor() const = 0;
+    virtual QString anchorTarget() const = 0;
+    virtual int startIndex() const = 0;
+    virtual int endIndex() const = 0;
+    virtual bool isValid() const = 0;
+};
 
 class Q_GUI_EXPORT QAccessibleEvent
 {
@@ -682,7 +698,7 @@ public:
     }
 
     inline QAccessibleEvent(QAccessibleInterface *iface, QAccessible::Event typ)
-        : m_type(typ), m_object(Q_NULLPTR)
+        : m_type(typ), m_object(nullptr)
     {
         Q_ASSERT(iface);
         Q_ASSERT(m_type != QAccessible::ValueChanged);
@@ -715,6 +731,7 @@ protected:
         QAccessible::Id m_uniqueId;
     };
 
+    friend class QTestAccessibility;
 };
 
 class Q_GUI_EXPORT QAccessibleStateChangeEvent :public QAccessibleEvent
@@ -802,13 +819,13 @@ class Q_GUI_EXPORT QAccessibleTextInsertEvent : public QAccessibleTextCursorEven
 {
 public:
     inline QAccessibleTextInsertEvent(QObject *obj, int position, const QString &text)
-        : QAccessibleTextCursorEvent(obj, position + text.length())
+        : QAccessibleTextCursorEvent(obj, position + int(text.length()))
         , m_position(position), m_text(text)
     {
         m_type = QAccessible::TextInserted;
     }
     inline QAccessibleTextInsertEvent(QAccessibleInterface *iface, int position, const QString &text)
-        : QAccessibleTextCursorEvent(iface, position + text.length())
+        : QAccessibleTextCursorEvent(iface, position + int(text.length()))
         , m_position(position), m_text(text)
     {
         m_type = QAccessible::TextInserted;
@@ -862,13 +879,13 @@ class Q_GUI_EXPORT QAccessibleTextUpdateEvent : public QAccessibleTextCursorEven
 {
 public:
     inline QAccessibleTextUpdateEvent(QObject *obj, int position, const QString &oldText, const QString &text)
-        : QAccessibleTextCursorEvent(obj, position + text.length())
+        : QAccessibleTextCursorEvent(obj, position + int(text.length()))
         , m_position(position), m_oldText(oldText), m_text(text)
     {
         m_type = QAccessible::TextUpdated;
     }
     inline QAccessibleTextUpdateEvent(QAccessibleInterface *iface, int position, const QString &oldText, const QString &text)
-        : QAccessibleTextCursorEvent(iface, position + text.length())
+        : QAccessibleTextCursorEvent(iface, position + int(text.length()))
         , m_position(position), m_oldText(oldText), m_text(text)
     {
         m_type = QAccessible::TextUpdated;
@@ -966,8 +983,10 @@ protected:
     int m_lastColumn;
 };
 
+#ifndef Q_CLANG_QDOC
 #define QAccessibleInterface_iid "org.qt-project.Qt.QAccessibleInterface"
 Q_DECLARE_INTERFACE(QAccessibleInterface, QAccessibleInterface_iid)
+#endif
 
 Q_GUI_EXPORT const char *qAccessibleRoleString(QAccessible::Role role);
 Q_GUI_EXPORT const char *qAccessibleEventString(QAccessible::Event event);
@@ -976,17 +995,6 @@ Q_GUI_EXPORT QString qAccessibleLocalizedActionDescription(const QString &action
 #ifndef QT_NO_DEBUG_STREAM
 Q_GUI_EXPORT QDebug operator<<(QDebug d, const QAccessibleInterface *iface);
 Q_GUI_EXPORT QDebug operator<<(QDebug d, const QAccessibleEvent &ev);
-#endif
-
-#if QT_DEPRECATED_SINCE(5, 0)
-inline void QAccessible::updateAccessibility(QObject *object, int child, Event reason)
-{
-    Q_ASSERT(object);
-
-    QAccessibleEvent ev(object, reason);
-    ev.setChild(child);
-    updateAccessibility(&ev);
-}
 #endif
 
 QT_END_NAMESPACE

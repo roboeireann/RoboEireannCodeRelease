@@ -7,9 +7,9 @@
  */
 
 #include "RobotModelProvider.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Debugging/DebugDrawings3D.h"
 
-MAKE_MODULE(RobotModelProvider, sensing);
+MAKE_MODULE(RobotModelProvider);
 
 void RobotModelProvider::update(RobotModel& robotModel)
 {

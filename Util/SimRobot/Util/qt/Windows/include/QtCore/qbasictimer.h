@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -51,18 +51,30 @@ class QObject;
 class Q_CORE_EXPORT QBasicTimer
 {
     int id;
+    Q_DISABLE_COPY(QBasicTimer)
+
 public:
-    inline QBasicTimer() : id(0) {}
+    constexpr QBasicTimer() noexcept : id{0} {}
     inline ~QBasicTimer() { if (id) stop(); }
 
-    inline bool isActive() const { return id != 0; }
-    inline int timerId() const { return id; }
+    QBasicTimer(QBasicTimer &&other) noexcept
+        : id{qExchange(other.id, 0)}
+    {}
+
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_MOVE_AND_SWAP(QBasicTimer)
+
+    void swap(QBasicTimer &other) noexcept { std::swap(id, other.id); }
+
+    bool isActive() const noexcept { return id != 0; }
+    int timerId() const noexcept { return id; }
 
     void start(int msec, QObject *obj);
     void start(int msec, Qt::TimerType timerType, QObject *obj);
     void stop();
 };
-Q_DECLARE_TYPEINFO(QBasicTimer, Q_MOVABLE_TYPE);
+Q_DECLARE_TYPEINFO(QBasicTimer, Q_RELOCATABLE_TYPE);
+
+inline void swap(QBasicTimer &lhs, QBasicTimer &rhs) noexcept { lhs.swap(rhs); }
 
 QT_END_NAMESPACE
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -45,10 +45,7 @@
 #include <QtCore/qstring.h>
 #include <QtCore/qscopedpointer.h>
 
-QT_BEGIN_NAMESPACE
-QT_END_NAMESPACE
-
-#ifndef QT_NO_SETTINGS
+QT_REQUIRE_CONFIG(settings);
 
 #include <ctype.h>
 
@@ -88,7 +85,7 @@ public:
         NativeFormat,
         IniFormat,
 
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) || defined(Q_CLANG_QDOC)
         Registry32Format,
         Registry64Format,
 #endif
@@ -125,13 +122,14 @@ public:
 
 #ifndef QT_NO_QOBJECT
     explicit QSettings(const QString &organization,
-                       const QString &application = QString(), QObject *parent = Q_NULLPTR);
+                       const QString &application = QString(), QObject *parent = nullptr);
     QSettings(Scope scope, const QString &organization,
-              const QString &application = QString(), QObject *parent = Q_NULLPTR);
+              const QString &application = QString(), QObject *parent = nullptr);
     QSettings(Format format, Scope scope, const QString &organization,
-              const QString &application = QString(), QObject *parent = Q_NULLPTR);
-    QSettings(const QString &fileName, Format format, QObject *parent = Q_NULLPTR);
-    explicit QSettings(QObject *parent = Q_NULLPTR);
+              const QString &application = QString(), QObject *parent = nullptr);
+    QSettings(const QString &fileName, Format format, QObject *parent = nullptr);
+    explicit QSettings(QObject *parent = nullptr);
+    explicit QSettings(Scope scope, QObject *parent = nullptr);
 #else
     explicit QSettings(const QString &organization,
                        const QString &application = QString());
@@ -140,12 +138,15 @@ public:
     QSettings(Format format, Scope scope, const QString &organization,
               const QString &application = QString());
     QSettings(const QString &fileName, Format format);
+    explicit QSettings(Scope scope = UserScope);
 #endif
     ~QSettings();
 
     void clear();
     void sync();
     Status status() const;
+    bool isAtomicSyncRequired() const;
+    void setAtomicSyncRequired(bool enable);
 
     void beginGroup(const QString &prefix);
     void endGroup();
@@ -162,7 +163,8 @@ public:
     bool isWritable() const;
 
     void setValue(const QString &key, const QVariant &value);
-    QVariant value(const QString &key, const QVariant &defaultValue = QVariant()) const;
+    QVariant value(const QString &key, const QVariant &defaultValue) const;
+    QVariant value(const QString &key) const;
 
     void remove(const QString &key);
     bool contains(const QString &key) const;
@@ -176,16 +178,8 @@ public:
     QString organizationName() const;
     QString applicationName() const;
 
-#ifndef QT_NO_TEXTCODEC
-    void setIniCodec(QTextCodec *codec);
-    void setIniCodec(const char *codecName);
-    QTextCodec *iniCodec() const;
-#endif
-
     static void setDefaultFormat(Format format);
     static Format defaultFormat();
-    static void setSystemIniPath(const QString &dir); // ### Qt 6: remove (use setPath() instead)
-    static void setUserIniPath(const QString &dir);   // ### Qt 6: remove (use setPath() instead)
     static void setPath(Format format, Scope scope, const QString &path);
 
     typedef QMap<QString, QVariant> SettingsMap;
@@ -197,7 +191,7 @@ public:
 
 protected:
 #ifndef QT_NO_QOBJECT
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
 #endif
 
 private:
@@ -205,7 +199,5 @@ private:
 };
 
 QT_END_NAMESPACE
-
-#endif // QT_NO_SETTINGS
 
 #endif // QSETTINGS_H

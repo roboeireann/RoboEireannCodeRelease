@@ -44,6 +44,7 @@
 #include <QtGui/qwindowdefs.h>
 #include <QtCore/qobject.h>
 #include <QtCore/qmargins.h>
+#include <QtGui/qaction.h>
 #include <QtGui/qpaintdevice.h>
 #include <QtGui/qpalette.h>
 #include <QtGui/qfont.h>
@@ -53,7 +54,9 @@
 #include <QtGui/qregion.h>
 #include <QtGui/qbrush.h>
 #include <QtGui/qcursor.h>
-#include <QtGui/qkeysequence.h>
+#if QT_CONFIG(shortcut)
+#  include <QtGui/qkeysequence.h>
+#endif
 
 #ifdef QT_INCLUDE_COMPAT
 #include <QtGui/qevent.h>
@@ -63,7 +66,6 @@ QT_BEGIN_NAMESPACE
 
 
 class QLayout;
-class QWSRegionManager;
 class QStyle;
 class QAction;
 class QVariant;
@@ -73,6 +75,7 @@ class QMouseEvent;
 class QWheelEvent;
 class QHoverEvent;
 class QKeyEvent;
+class QEnterEvent;
 class QFocusEvent;
 class QPaintEvent;
 class QMoveEvent;
@@ -85,6 +88,7 @@ class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
 class QDropEvent;
+class QScreen;
 class QShowEvent;
 class QHideEvent;
 class QIcon;
@@ -149,10 +153,14 @@ class Q_WIDGETS_EXPORT QWidget : public QObject, public QPaintDevice
     Q_PROPERTY(QSizePolicy sizePolicy READ sizePolicy WRITE setSizePolicy)
     Q_PROPERTY(QSize minimumSize READ minimumSize WRITE setMinimumSize)
     Q_PROPERTY(QSize maximumSize READ maximumSize WRITE setMaximumSize)
-    Q_PROPERTY(int minimumWidth READ minimumWidth WRITE setMinimumWidth STORED false DESIGNABLE false)
-    Q_PROPERTY(int minimumHeight READ minimumHeight WRITE setMinimumHeight STORED false DESIGNABLE false)
-    Q_PROPERTY(int maximumWidth READ maximumWidth WRITE setMaximumWidth STORED false DESIGNABLE false)
-    Q_PROPERTY(int maximumHeight READ maximumHeight WRITE setMaximumHeight STORED false DESIGNABLE false)
+    Q_PROPERTY(int minimumWidth READ minimumWidth WRITE setMinimumWidth STORED false
+               DESIGNABLE false)
+    Q_PROPERTY(int minimumHeight READ minimumHeight WRITE setMinimumHeight STORED false
+               DESIGNABLE false)
+    Q_PROPERTY(int maximumWidth READ maximumWidth WRITE setMaximumWidth STORED false
+               DESIGNABLE false)
+    Q_PROPERTY(int maximumHeight READ maximumHeight WRITE setMaximumHeight STORED false
+               DESIGNABLE false)
     Q_PROPERTY(QSize sizeIncrement READ sizeIncrement WRITE setSizeIncrement)
     Q_PROPERTY(QSize baseSize READ baseSize WRITE setBaseSize)
     Q_PROPERTY(QPalette palette READ palette WRITE setPalette)
@@ -174,19 +182,19 @@ class Q_WIDGETS_EXPORT QWidget : public QObject, public QPaintDevice
     Q_PROPERTY(QSize sizeHint READ sizeHint)
     Q_PROPERTY(QSize minimumSizeHint READ minimumSizeHint)
     Q_PROPERTY(bool acceptDrops READ acceptDrops WRITE setAcceptDrops)
-    Q_PROPERTY(QString windowTitle READ windowTitle WRITE setWindowTitle NOTIFY windowTitleChanged DESIGNABLE isWindow)
-    Q_PROPERTY(QIcon windowIcon READ windowIcon WRITE setWindowIcon NOTIFY windowIconChanged DESIGNABLE isWindow)
-    Q_PROPERTY(QString windowIconText READ windowIconText WRITE setWindowIconText NOTIFY windowIconTextChanged DESIGNABLE isWindow) // deprecated
-    Q_PROPERTY(double windowOpacity READ windowOpacity WRITE setWindowOpacity DESIGNABLE isWindow)
-    Q_PROPERTY(bool windowModified READ isWindowModified WRITE setWindowModified DESIGNABLE isWindow)
-#ifndef QT_NO_TOOLTIP
+    Q_PROPERTY(QString windowTitle READ windowTitle WRITE setWindowTitle NOTIFY windowTitleChanged)
+    Q_PROPERTY(QIcon windowIcon READ windowIcon WRITE setWindowIcon NOTIFY windowIconChanged)
+    Q_PROPERTY(QString windowIconText READ windowIconText WRITE setWindowIconText NOTIFY windowIconTextChanged) // deprecated
+    Q_PROPERTY(double windowOpacity READ windowOpacity WRITE setWindowOpacity)
+    Q_PROPERTY(bool windowModified READ isWindowModified WRITE setWindowModified)
+#if QT_CONFIG(tooltip)
     Q_PROPERTY(QString toolTip READ toolTip WRITE setToolTip)
     Q_PROPERTY(int toolTipDuration READ toolTipDuration WRITE setToolTipDuration)
 #endif
-#ifndef QT_NO_STATUSTIP
+#if QT_CONFIG(statustip)
     Q_PROPERTY(QString statusTip READ statusTip WRITE setStatusTip)
 #endif
-#ifndef QT_NO_WHATSTHIS
+#if QT_CONFIG(whatsthis)
     Q_PROPERTY(QString whatsThis READ whatsThis WRITE setWhatsThis)
 #endif
 #ifndef QT_NO_ACCESSIBILITY
@@ -200,9 +208,31 @@ class Q_WIDGETS_EXPORT QWidget : public QObject, public QPaintDevice
     Q_PROPERTY(QString styleSheet READ styleSheet WRITE setStyleSheet)
 #endif
     Q_PROPERTY(QLocale locale READ locale WRITE setLocale RESET unsetLocale)
-    Q_PROPERTY(QString windowFilePath READ windowFilePath WRITE setWindowFilePath DESIGNABLE isWindow)
+    Q_PROPERTY(QString windowFilePath READ windowFilePath WRITE setWindowFilePath)
     Q_PROPERTY(Qt::InputMethodHints inputMethodHints READ inputMethodHints WRITE setInputMethodHints)
 
+#if 0
+    // ### TODO: make this work (requires SFINAE-friendly connect())
+    template <typename...Args>
+    using compatible_action_slot_args = std::void_t<
+        decltype(QObject::connect(std::declval<QAction*>(), &QAction::triggered,
+                                  std::declval<Args>()...))
+    >;
+#else
+    // good-enough compromise for now
+    template <typename...Args>
+    using compatible_action_slot_args = std::enable_if_t<std::conjunction_v<
+#if QT_CONFIG(shortcut)
+            std::disjunction<
+                std::is_same<Args, Qt::ConnectionType>,
+                std::negation<std::is_convertible<Args, QKeySequence>>
+            >...,
+#endif
+            std::negation<std::is_convertible<Args, QIcon>>...,
+            std::negation<std::is_convertible<Args, const char*>>...,
+            std::negation<std::is_convertible<Args, QString>>...
+        >>;
+#endif
 public:
     enum RenderFlag {
         DrawWindowBackground = 0x1,
@@ -211,10 +241,10 @@ public:
     };
     Q_DECLARE_FLAGS(RenderFlags, RenderFlag)
 
-    explicit QWidget(QWidget* parent = Q_NULLPTR, Qt::WindowFlags f = Qt::WindowFlags());
+    explicit QWidget(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
     ~QWidget();
 
-    int devType() const Q_DECL_OVERRIDE;
+    int devType() const override;
 
     WId winId() const;
     void createWinId(); // internal, going away
@@ -226,7 +256,10 @@ public:
     void setStyle(QStyle *);
     // Widget types and states
 
+#if QT_DEPRECATED_SINCE(6, 1)
+    QT_DEPRECATED_VERSION_X_6_1("Use isWindow()")
     bool isTopLevel() const;
+#endif
     bool isWindow() const;
 
     bool isModal() const;
@@ -235,7 +268,6 @@ public:
 
     bool isEnabled() const;
     bool isEnabledTo(const QWidget *) const;
-    bool isEnabledToTLW() const;
 
 public Q_SLOTS:
     void setEnabled(bool);
@@ -293,11 +325,17 @@ public:
 
     // Widget coordinate mapping
 
+    QPointF mapToGlobal(const QPointF &) const;
     QPoint mapToGlobal(const QPoint &) const;
+    QPointF mapFromGlobal(const QPointF &) const;
     QPoint mapFromGlobal(const QPoint &) const;
+    QPointF mapToParent(const QPointF &) const;
     QPoint mapToParent(const QPoint &) const;
+    QPointF mapFromParent(const QPointF &) const;
     QPoint mapFromParent(const QPoint &) const;
+    QPointF mapTo(const QWidget *, const QPointF &) const;
     QPoint mapTo(const QWidget *, const QPoint &) const;
+    QPointF mapFrom(const QWidget *, const QPointF &) const;
     QPoint mapFrom(const QWidget *, const QPoint &) const;
 
     QWidget *window() const;
@@ -347,10 +385,10 @@ public:
 
     Q_INVOKABLE QPixmap grab(const QRect &rectangle = QRect(QPoint(0, 0), QSize(-1, -1)));
 
-#ifndef QT_NO_GRAPHICSEFFECT
+#if QT_CONFIG(graphicseffect)
     QGraphicsEffect *graphicsEffect() const;
     void setGraphicsEffect(QGraphicsEffect *effect);
-#endif //QT_NO_GRAPHICSEFFECT
+#endif // QT_CONFIG(graphicseffect)
 
 #ifndef QT_NO_GESTURES
     void grabGesture(Qt::GestureType type, Qt::GestureFlags flags = Qt::GestureFlags());
@@ -380,17 +418,17 @@ public:
     qreal windowOpacity() const;
 
     bool isWindowModified() const;
-#ifndef QT_NO_TOOLTIP
+#if QT_CONFIG(tooltip)
     void setToolTip(const QString &);
     QString toolTip() const;
     void setToolTipDuration(int msec);
     int toolTipDuration() const;
 #endif
-#ifndef QT_NO_STATUSTIP
+#if QT_CONFIG(statustip)
     void setStatusTip(const QString &);
     QString statusTip() const;
 #endif
-#ifndef QT_NO_WHATSTHIS
+#if QT_CONFIG(whatsthis)
     void setWhatsThis(const QString &);
     QString whatsThis() const;
 #endif
@@ -451,7 +489,7 @@ public:
     inline bool updatesEnabled() const;
     void setUpdatesEnabled(bool enable);
 
-#ifndef QT_NO_GRAPHICSVIEW
+#if QT_CONFIG(graphicsview)
     QGraphicsProxyWidget *graphicsProxyWidget() const;
 #endif
 
@@ -521,7 +559,6 @@ public:
 
     void setContentsMargins(int left, int top, int right, int bottom);
     void setContentsMargins(const QMargins &margins);
-    void getContentsMargins(int *left, int *top, int *right, int *bottom) const;
     QMargins contentsMargins() const;
 
     QRect contentsRect() const;
@@ -550,17 +587,60 @@ public:
 #ifndef QT_NO_ACTION
     //actions
     void addAction(QAction *action);
-#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
     void addActions(const QList<QAction*> &actions);
-    void insertActions(const QAction *before, const QList<QAction*> &actions);
-#else
-    void addActions(QList<QAction*> actions);
-    void insertActions(QAction *before, QList<QAction*> actions);
-#endif
+    void insertActions(QAction *before, const QList<QAction*> &actions);
     void insertAction(QAction *before, QAction *action);
     void removeAction(QAction *action);
     QList<QAction*> actions() const;
-#endif
+
+    // convenience action factories
+    QAction *addAction(const QString &text);
+    QAction *addAction(const QIcon &icon, const QString &text);
+    QAction *addAction(const QString &text, const QObject *receiver,
+                       const char *member, Qt::ConnectionType type = Qt::AutoConnection);
+    QAction *addAction(const QIcon &icon, const QString &text, const QObject *receiver,
+                       const char *member, Qt::ConnectionType type = Qt::AutoConnection);
+    template <typename...Args, typename = compatible_action_slot_args<Args...>>
+    QAction *addAction(const QString &text, Args&&...args)
+    {
+        QAction *result = addAction(text);
+        connect(result, &QAction::triggered, std::forward<Args>(args)...);
+        return result;
+    }
+    template <typename...Args, typename = compatible_action_slot_args<Args...>>
+    QAction *addAction(const QIcon &icon, const QString &text, Args&&...args)
+    {
+        QAction *result = addAction(icon, text);
+        connect(result, &QAction::triggered, std::forward<Args>(args)...);
+        return result;
+    }
+
+#if QT_CONFIG(shortcut)
+    QAction *addAction(const QString &text, const QKeySequence &shortcut);
+    QAction *addAction(const QIcon &icon, const QString &text, const QKeySequence &shortcut);
+    QAction *addAction(const QString &text, const QKeySequence &shortcut,
+                       const QObject *receiver, const char *member,
+                       Qt::ConnectionType type = Qt::AutoConnection);
+    QAction *addAction(const QIcon &icon, const QString &text, const QKeySequence &shortcut,
+                       const QObject *receiver, const char *member,
+                       Qt::ConnectionType type = Qt::AutoConnection);
+
+    template <typename...Args, typename = compatible_action_slot_args<Args...>>
+    QAction *addAction(const QString &text, const QKeySequence &shortcut, Args&&...args)
+    {
+        QAction *result = addAction(text, shortcut);
+        connect(result, &QAction::triggered, std::forward<Args>(args)...);
+        return result;
+    }
+    template <typename...Args, typename = compatible_action_slot_args<Args...>>
+    QAction *addAction(const QIcon &icon, const QString &text, const QKeySequence &shortcut, Args&&...args)
+    {
+        QAction *result = addAction(icon, text, shortcut);
+        connect(result, &QAction::triggered, std::forward<Args>(args)...);
+        return result;
+    }
+#endif // QT_CONFIG(shortcut)
+#endif // QT_NO_ACTION
 
     QWidget *parentWidget() const;
 
@@ -578,7 +658,7 @@ public:
     void setAttribute(Qt::WidgetAttribute, bool on = true);
     inline bool testAttribute(Qt::WidgetAttribute) const;
 
-    QPaintEngine *paintEngine() const Q_DECL_OVERRIDE;
+    QPaintEngine *paintEngine() const override;
 
     void ensurePolished() const;
 
@@ -595,10 +675,10 @@ public:
     QBackingStore *backingStore() const;
 
     QWindow *windowHandle() const;
+    QScreen *screen() const;
+    void setScreen(QScreen *);
 
-    static QWidget *createWindowContainer(QWindow *window, QWidget *parent=Q_NULLPTR, Qt::WindowFlags flags=Qt::WindowFlags());
-
-    friend class QDesktopScreenWidget;
+    static QWidget *createWindowContainer(QWindow *window, QWidget *parent=nullptr, Qt::WindowFlags flags=Qt::WindowFlags());
 
 Q_SIGNALS:
     void windowTitleChanged(const QString &title);
@@ -608,19 +688,19 @@ Q_SIGNALS:
 
 protected:
     // Event handlers
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
     virtual void mousePressEvent(QMouseEvent *event);
     virtual void mouseReleaseEvent(QMouseEvent *event);
     virtual void mouseDoubleClickEvent(QMouseEvent *event);
     virtual void mouseMoveEvent(QMouseEvent *event);
-#ifndef QT_NO_WHEELEVENT
+#if QT_CONFIG(wheelevent)
     virtual void wheelEvent(QWheelEvent *event);
 #endif
     virtual void keyPressEvent(QKeyEvent *event);
     virtual void keyReleaseEvent(QKeyEvent *event);
     virtual void focusInEvent(QFocusEvent *event);
     virtual void focusOutEvent(QFocusEvent *event);
-    virtual void enterEvent(QEvent *event);
+    virtual void enterEvent(QEnterEvent *event);
     virtual void leaveEvent(QEvent *event);
     virtual void paintEvent(QPaintEvent *event);
     virtual void moveEvent(QMoveEvent *event);
@@ -629,14 +709,14 @@ protected:
 #ifndef QT_NO_CONTEXTMENU
     virtual void contextMenuEvent(QContextMenuEvent *event);
 #endif
-#ifndef QT_NO_TABLETEVENT
+#if QT_CONFIG(tabletevent)
     virtual void tabletEvent(QTabletEvent *event);
 #endif
 #ifndef QT_NO_ACTION
     virtual void actionEvent(QActionEvent *event);
 #endif
 
-#ifndef QT_NO_DRAGANDDROP
+#if QT_CONFIG(draganddrop)
     virtual void dragEnterEvent(QDragEnterEvent *event);
     virtual void dragMoveEvent(QDragMoveEvent *event);
     virtual void dragLeaveEvent(QDragLeaveEvent *event);
@@ -645,15 +725,16 @@ protected:
 
     virtual void showEvent(QShowEvent *event);
     virtual void hideEvent(QHideEvent *event);
-    virtual bool nativeEvent(const QByteArray &eventType, void *message, long *result);
+
+    virtual bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result);
 
     // Misc. protected functions
     virtual void changeEvent(QEvent *);
 
-    int metric(PaintDeviceMetric) const Q_DECL_OVERRIDE;
-    void initPainter(QPainter *painter) const Q_DECL_OVERRIDE;
-    QPaintDevice *redirected(QPoint *offset) const Q_DECL_OVERRIDE;
-    QPainter *sharedPainter() const Q_DECL_OVERRIDE;
+    int metric(PaintDeviceMetric) const override;
+    void initPainter(QPainter *painter) const override;
+    QPaintDevice *redirected(QPoint *offset) const override;
+    QPainter *sharedPainter() const override;
 
     virtual void inputMethodEvent(QInputMethodEvent *);
 public:
@@ -663,7 +744,7 @@ public:
     void setInputMethodHints(Qt::InputMethodHints hints);
 
 protected Q_SLOTS:
-    void updateMicroFocus();
+    void updateMicroFocus(Qt::InputMethodQuery query = Qt::ImQueryAll);
 protected:
 
     void create(WId = 0, bool initializeWindow = true,
@@ -686,7 +767,7 @@ private:
     QLayout *takeLayout();
 
     friend class QBackingStoreDevice;
-    friend class QWidgetBackingStore;
+    friend class QWidgetRepaintManager;
     friend class QApplication;
     friend class QApplicationPrivate;
     friend class QGuiApplication;
@@ -700,9 +781,6 @@ private:
     friend class QLayout;
     friend class QWidgetItem;
     friend class QWidgetItemV2;
-    friend class QGLContext;
-    friend class QGLWidget;
-    friend class QGLWindowSurface;
     friend class QX11PaintEngine;
     friend class QWin32PaintEngine;
     friend class QShortcutPrivate;
@@ -714,6 +792,7 @@ private:
     friend class QWidgetWindow;
     friend class QAccessibleWidget;
     friend class QAccessibleTable;
+    friend class QAccessibleTabButton;
 #ifndef QT_NO_GESTURES
     friend class QGestureManager;
     friend class QWinNativePanGestureRecognizer;
@@ -729,6 +808,7 @@ private:
 private:
     Q_DISABLE_COPY(QWidget)
     Q_PRIVATE_SLOT(d_func(), void _q_showIfNotHidden())
+    Q_PRIVATE_SLOT(d_func(), QWindow *_q_closestWindowHandle())
 
     QWidgetData *data;
 };
@@ -738,12 +818,12 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(QWidget::RenderFlags)
 #ifndef Q_QDOC
 template <> inline QWidget *qobject_cast<QWidget*>(QObject *o)
 {
-    if (!o || !o->isWidgetType()) return Q_NULLPTR;
+    if (!o || !o->isWidgetType()) return nullptr;
     return static_cast<QWidget*>(o);
 }
 template <> inline const QWidget *qobject_cast<const QWidget*>(const QObject *o)
 {
-    if (!o || !o->isWidgetType()) return Q_NULLPTR;
+    if (!o || !o->isWidgetType()) return nullptr;
     return static_cast<const QWidget*>(o);
 }
 #endif // !Q_QDOC
@@ -756,8 +836,10 @@ inline Qt::WindowType QWidget::windowType() const
 inline Qt::WindowFlags QWidget::windowFlags() const
 { return data->window_flags; }
 
+#if QT_DEPRECATED_SINCE(6, 1)
 inline bool QWidget::isTopLevel() const
 { return (windowType() & Qt::Window); }
+#endif
 
 inline bool QWidget::isWindow() const
 { return (windowType() & Qt::Window); }
@@ -767,9 +849,6 @@ inline bool QWidget::isEnabled() const
 
 inline bool QWidget::isModal() const
 { return data->window_modality != Qt::NonModal; }
-
-inline bool QWidget::isEnabledToTLW() const
-{ return isEnabled(); }
 
 inline int QWidget::minimumWidth() const
 { return minimumSize().width(); }

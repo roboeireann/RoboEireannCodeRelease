@@ -59,6 +59,14 @@ class QTimeZonePrivate;
 class Q_CORE_EXPORT QTimeZone
 {
 public:
+    // Sane UTC offsets range from -14 to +14 hours:
+    enum {
+        // No known zone > 12 hrs West of Greenwich (Baker Island, USA)
+        MinUtcOffsetSecs = -14 * 3600,
+        // No known zone > 14 hrs East of Greenwich (Kiritimati, Christmas Island, Kiribati)
+        MaxUtcOffsetSecs = +14 * 3600
+    };
+
     enum TimeType {
         StandardTime = 0,
         DaylightTime = 1,
@@ -79,23 +87,21 @@ public:
         int standardTimeOffset;
         int daylightTimeOffset;
     };
-    typedef QVector<OffsetData> OffsetDataList;
+    typedef QList<OffsetData> OffsetDataList;
 
-    QTimeZone() Q_DECL_NOTHROW;
+    QTimeZone() noexcept;
     explicit QTimeZone(const QByteArray &ianaId);
     explicit QTimeZone(int offsetSeconds);
-    /*implicit*/ QTimeZone(const QByteArray &zoneId, int offsetSeconds, const QString &name,
-              const QString &abbreviation, QLocale::Country country = QLocale::AnyCountry,
+    QTimeZone(const QByteArray &zoneId, int offsetSeconds, const QString &name,
+              const QString &abbreviation, QLocale::Territory territory = QLocale::AnyTerritory,
               const QString &comment = QString());
     QTimeZone(const QTimeZone &other);
     ~QTimeZone();
 
     QTimeZone &operator=(const QTimeZone &other);
- #ifdef Q_COMPILER_RVALUE_REFS
-    QTimeZone &operator=(QTimeZone &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QTimeZone)
 
-    void swap(QTimeZone &other) Q_DECL_NOTHROW
+    void swap(QTimeZone &other) noexcept
     { d.swap(other.d); }
 
     bool operator==(const QTimeZone &other) const;
@@ -104,7 +110,11 @@ public:
     bool isValid() const;
 
     QByteArray id() const;
+    QLocale::Territory territory() const;
+#if QT_DEPRECATED_SINCE(6, 6)
+    QT_DEPRECATED_VERSION_X_6_6("Use territory() instead")
     QLocale::Country country() const;
+#endif
     QString comment() const;
 
     QString displayName(const QDateTime &atDateTime,
@@ -136,16 +146,16 @@ public:
     static bool isTimeZoneIdAvailable(const QByteArray &ianaId);
 
     static QList<QByteArray> availableTimeZoneIds();
-    static QList<QByteArray> availableTimeZoneIds(QLocale::Country country);
+    static QList<QByteArray> availableTimeZoneIds(QLocale::Territory territory);
     static QList<QByteArray> availableTimeZoneIds(int offsetSeconds);
 
     static QByteArray ianaIdToWindowsId(const QByteArray &ianaId);
     static QByteArray windowsIdToDefaultIanaId(const QByteArray &windowsId);
     static QByteArray windowsIdToDefaultIanaId(const QByteArray &windowsId,
-                                                QLocale::Country country);
+                                               QLocale::Territory territory);
     static QList<QByteArray> windowsIdToIanaIds(const QByteArray &windowsId);
     static QList<QByteArray> windowsIdToIanaIds(const QByteArray &windowsId,
-                                                 QLocale::Country country);
+                                                QLocale::Territory territory);
 
 #if (defined(Q_OS_DARWIN) || defined(Q_QDOC)) && !defined(QT_NO_SYSTEMLOCALE)
     static QTimeZone fromCFTimeZone(CFTimeZoneRef timeZone);
@@ -165,7 +175,7 @@ private:
     QSharedDataPointer<QTimeZonePrivate> d;
 };
 
-Q_DECLARE_TYPEINFO(QTimeZone::OffsetData, Q_MOVABLE_TYPE);
+Q_DECLARE_TYPEINFO(QTimeZone::OffsetData, Q_RELOCATABLE_TYPE);
 Q_DECLARE_SHARED(QTimeZone)
 
 #ifndef QT_NO_DATASTREAM

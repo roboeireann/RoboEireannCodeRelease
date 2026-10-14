@@ -1,51 +1,37 @@
 #pragma once
 
-#include "Representations/Configuration/IMUCalibration.h"
-#include "Representations/Configuration/FootOffset.h"
-#include "Representations/Configuration/FootSoleRotationCalibration.h"
-#include "Representations/Infrastructure/FrameInfo.h"
+#include "Representations/Configuration/CalibrationRequest.h"
+#include "Representations/Infrastructure/RobotHealth.h"
+#include "Representations/Infrastructure/SensorData/RawInertialSensorData.h"
 #include "Representations/MotionControl/MotionInfo.h"
-#include "Representations/MotionControl/MotionRequest.h"
-#include "Representations/Sensing/FootSupport.h"
 #include "Representations/Sensing/GroundContactState.h"
-#include "Representations/Sensing/GyroState.h"
 #include "Representations/Sensing/GyroOffset.h"
+#include "Representations/Sensing/IMUValueState.h"
 #include "Representations/Sensing/InertialData.h"
-#include "Representations/Sensing/RobotModel.h"
-#include "Tools/Math/UnscentedKalmanFilter.h"
-#include "Tools/Module/Module.h"
-#include "Tools/RingBufferWithSum.h"
+#include "Math/UnscentedKalmanFilter.h"
+#include "Framework/Module.h"
+#include "Math/RingBufferWithSum.h"
 
 MODULE(InertialDataProvider,
 {,
-  USES(GyroOffset),
-  USES(MotionInfo),
-  USES(FootOffset),
-  REQUIRES(FootSupport),
-  REQUIRES(FootSoleRotationCalibration),
-  REQUIRES(FrameInfo),
+  REQUIRES(CalibrationRequest),
   REQUIRES(GroundContactState),
-  REQUIRES(GyroState),
+  REQUIRES(GyroOffset),
+  REQUIRES(IMUValueState),
   REQUIRES(InertialSensorData),
-  REQUIRES(IMUCalibration),
-  REQUIRES(MotionRequest),
-  REQUIRES(RobotModel),
+  USES(MotionInfo),
+  REQUIRES(MotionRobotHealth),
+  REQUIRES(RawInertialSensorData),
   PROVIDES(InertialData),
   LOADS_PARAMETERS(
   {,
-    (Vector3a) gyroDeviation, // Noise of the gyro in °/s / sqrt(Hz). Needs to be multiplicated with the square root of the frequency the imu provides new data.
-    (Vector3f) accDeviation,
-    (Vector3f) accDeviationWhileWalking,
-    (Vector3f) accDeviationWhileStanding,
-    (Vector3f) accDeviationFactor,
-    (float) maxMeanSquaredDeviation,
-
-    // Parameters for the filter stabilization with the foot plane
-    (int) maxTimeSinceForwardAndBackwardPressure,
-    (unsigned) minTimeForLastSupportSwitch,
-    (unsigned) maxTimeForLastSupportSwitch,
-    (float) minGroundContactPointsDistance,
-    (Angle) maxAllowedFeetPlaneXRotation,
+    (Vector3a) gyroVariance, /**< Noise of the gyro in (° / s)² / sqrt(Hz). Needs to be multiplied with the square root of the frequency the imu provides new data. */
+    (Vector3f) accVariance, /**< Base acc variance */
+    (Vector3f) accVarianceWhileWalking, /**< Acc variance while walking */
+    (Vector3f) accVarianceWhileStanding, /**< Acc variance while standing */
+    (Vector3f) accVarianceFactor, /**< Acc variance factor */
+    (float) fakeMeasurementVariance, /**< Variance of the fake measurement. */
+    (bool) copyRawData, /**< If true, just copy the raw measurements. */
   }),
 });
 
@@ -66,19 +52,18 @@ private:
     Vectorf operator-(const State& other) const;
   };
 
+  RingBufferWithSum<float, 10> deviation10;
+  RingBufferWithSum<float, 50> deviation50;
+
   UKFM<State> ukf = UKFM<State>(State());
 
   Vector2a lastRawAngle = Vector2a::Zero();
-  Vector3f lastAccelerometerMeasurement = Vector3f::Zero();
-  bool hadAccelerometerMeasurement = false;
-
-  RingBufferWithSum<float, 50> accelerometerLengths;
-  float gravity = Constants::g_1000;
-  bool hadXAccUpdate = false;
 
   void update(InertialData& inertialData) override;
 
-  void processAccelerometer(const Vector3f& acc, const bool isAccBasedOnGroundContactPoints, const bool isAccXMeasured);
+  void processAccelerometer(const Vector3f& acc);
 
   void processGyroscope(const Vector3a& gyro);
+
+  unsigned framesSinceStart = 0;
 };

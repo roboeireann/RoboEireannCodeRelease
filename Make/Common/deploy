@@ -3,34 +3,28 @@
 
 usage()
 {
-  echo "usage: deploy [Release|Develop|Debug] [<address>|(-r <playernumber> <address>)*] {options}"
+  echo "usage: deploy [Release|Develop|Debug] [<ipaddress>|(-r <playernumber> <ipaddress>)*] {options}"
   echo "  options:"
-  echo "    -b                     restart roboeireann"
-  echo "    -cf <field player color>  set jersey color for field players to blue, red, yellow, black, white, "
-  echo "                           orange, purple, brown, or gray"
-  echo "    -cg <goalkeeper color>  set jersey color for the goalkeeper to blue, red, yellow, black, white, "
-  echo "                           orange, purple, brown, or gray"
-  echo "    -d                     delete logs or add timestamp to image"
-  echo "    -h | --help | /h | /?  print this text"
-  echo "    -i                     create image instead of deploying"
-  echo "    -l <location>          set location"
-  echo "    -m <magic number>      set magic number for teamcomm (0-255). Set -1 for random."
-  echo "    -nc                    never compile"
-  echo "    -nr                    do not check whether target is reachable"
-  echo "    -o <team port>         overwrite team port"
-  echo "    -p <player number>     set player number"
-  echo "    -r <num> <address>     copy to <address> and set playernumber to <num> (one -r per robot)"
-  echo "    -s <scenario>          set scenario"
-  echo "    -t <team number>       set team number"
-  echo "    -u                     check for a USB drive before starting roboeireann (only when creating an image)"
-  echo "    -v <volume percent>    set NAO's volume"
-  echo "    -w <wireless profile>  set wireless profile"
-  echo "  NOTE: <address> is either a numeric IP address, a robot name (resolves to the robot\'s LAN IP address),"
-  echo "        or a robot name with a .wifi or .wlan suffix (resolves to the robot\'s WLAN IP address)"
+  echo "    -b                       restart roboeireann"
+  echo "    -c <field player color>  set field player color to blue, red, yellow, black, white, orange, purple, brown, or gray"
+  echo "    -d                       delete logs or add timestamp to image"
+  echo "    -g <goalkeeper color>    set goalkeeper color to blue, red, yellow, black, white, orange, purple, brown, or gray"
+  echo "    -h | --help | /h | /?    print this text"
+  echo "    -i                       create image instead of deploying"
+  echo "    -k                       keep ip address for remote connection"
+  echo "    -l <location>            set location"
+  echo "    -m <magic number>        set magic number for teamcomm (0-255). Set -1 for random."
+  echo "    -nc                      never compile"
+  echo "    -nr                      do not check whether target is reachable"
+  echo "    -p <player number>       set player number"
+  echo "    -r <n> <ip>              copy to <ip> and set playernumber to <n> (one -r per robot)"
+  echo "    -s <scenario>            set scenario"
+  echo "    -t <team number>         set team number"
+  echo "    -u                       check for USB drive before starting (only when creating an image)"
+  echo "    -v <volume percent>      set NAO's volume"
+  echo "    -w <wireless profile>    set wireless profile"
   echo "  examples:"
   echo "    ./deploy Develop 192.168.5.14 -p 1"
-  echo "    ./deploy Develop robby -p 1"
-  echo "    ./deploy Develop robby.wifi -p 1"
   echo "    ./deploy Release -r 1 10.0.5.14 -r 3 10.0.0.2"
   echo "    ./deploy Release -i -nc -v 50 -w SPL_A"
   exit 1
@@ -41,85 +35,108 @@ settingsReplacements()
   local SEDFLAGS=""
   [ ! -z $SCENARIO ] && SEDFLAGS="$SEDFLAGS -e 's/scenario =.*/scenario = $SCENARIO;/'"
   [ ! -z $LOCATION ] && SEDFLAGS="$SEDFLAGS -e 's/location =.*/location = $LOCATION;/'"
-  # [ ! -z $TEAM ] && SEDFLAGS="$SEDFLAGS -e 's/teamColor =.*/teamColor = $TEAM;/'"
   [ ! -z $FIELDPLAYERCOLOR ] && SEDFLAGS="$SEDFLAGS -e 's/fieldPlayerColor =.*/fieldPlayerColor = $FIELDPLAYERCOLOR;/'"
   [ ! -z $GOALKEEPERCOLOR ] && SEDFLAGS="$SEDFLAGS -e 's/goalkeeperColor =.*/goalkeeperColor = $GOALKEEPERCOLOR;/'"
   [ ! -z $PLAYER ] && SEDFLAGS="$SEDFLAGS -e 's/playerNumber =.*/playerNumber = $PLAYER;/'"
-  [ ! -z $TEAMNUMBER ] && SEDFLAGS="$SEDFLAGS -e 's/teamNumber =.*/teamNumber = $TEAMNUMBER;/'"
-  [ ! -z $PORT ] && SEDFLAGS="$SEDFLAGS -e 's/teamPort =.*/teamPort = $PORT;/'"
+  [ ! -z $TEAM ] && SEDFLAGS="$SEDFLAGS -e 's/teamNumber =.*/teamNumber = $TEAM;/'"
   [ ! -z $MAGICNUMBER ] && SEDFLAGS="$SEDFLAGS -e 's/magicNumber =.*/magicNumber = $MAGICNUMBER;/'"
   echo "$SEDFLAGS"
 }
 
 copy()
 {
-  # REMOTE=`$RESOLVE <<<"$1"`
-  REMOTE=`../Common/resolveIp $1`
+  REMOTE=$1
   PLAYER=$2
 
-  # FIXME num players
-  if [ ! -z $PLAYER ] && ( (( $PLAYER < 1 )) || (( $PLAYER > 8 )) ); then
+  # this sets up TARGET_NAME, TARGET_USER etc.
+  source ../Common/setupTarget "$REMOTE"
+
+  if [ ! -z $PLAYER ] && ( (( $PLAYER < 1 )) || (( $PLAYER > 20 )) ); then
     echo "error: player number is $PLAYER!" >&2
     exit 1
   fi
 
   if [ ! -z $CHECK ]; then
-    if [ `ping ${pingoptions} $REMOTE >/dev/null && echo 1 || echo 0` = "0" ]; then
+    if [ `ping ${PINGOPTIONS} $REMOTE >/dev/null && echo 1 || echo 0` = "0" ]; then
       echo "$REMOTE not reachable" >&2
       exit 1
     fi
   fi
 
+	echo "connecting to $TARGET_USER@$REMOTE:"
   echo "stopping roboeireann"
-  ssh $sshoptions nao@$REMOTE "systemctl --user stop roboeireann.service > /dev/null"
+  ssh $SSHOPTIONS $TARGET_USER@$REMOTE "systemctl --user stop roboeireann.service > /dev/null"
 
   if [ ! -z $DELETELOGS ]; then
     echo "removing log files"
-    ssh $sshoptions nao@$REMOTE "rm -f /home/nao/logs/* > /dev/null"
+    ssh $SSHOPTIONS $TARGET_USER@$REMOTE "rm -f /home/$TARGET_USER/logs/* > /dev/null"
   fi
 
   echo "updating wireless profiles"
-  rsync --del --exclude=.* --exclude=default --chmod=u+rw,go+r,Dugo+x -zrce "ssh $sshoptions" ../../Install/Profiles/. nao@$REMOTE:/home/nao/Profiles
+  rsync --del --exclude=.* --exclude=default --chmod=u+rw,go+r,Dugo+x -zrce "ssh $SSHOPTIONS" ../../Install/Profiles/. $TARGET_USER@$REMOTE:/home/$TARGET_USER/Profiles
+
   #check if PROFILE is existent
-  if [ -n "$PROFILE" ]; then
-    if [ ! -r "../../Install/Profiles/$PROFILE" ]; then
-      echo "wireless profile \"$PROFILE\" is not existent, that profile is not activated" >&2
-    else
-      RESULT=`ssh $sshoptions nao@$REMOTE "/home/nao/bin/setprofile $PROFILE"`
-      if [ -n "$RESULT" ]; then
-        if [ "$PROFILE" == "NONE" ] || [ `echo $RESULT | grep -i -c 'no process found'` -eq "1" ]; then
-          RESULT=""
-        fi
+  if [ ! -r "../../Install/Profiles/$PROFILE" ]; then
+    echo "wireless profile \"$PROFILE\" is not existent, that profile is not activated" >&2
+  else
+    RESULT=`ssh $SSHOPTIONS $TARGET_USER@$REMOTE "/home/$TARGET_USER/bin/setprofile $PROFILE"`
+    if [ -n "$RESULT" ]; then
+      if [ "$PROFILE" == "NONE" ] || [ `echo $RESULT | grep -i -c 'no process found'` -eq "1" ]; then
+        RESULT=""
       fi
-      if [ ! -z "$RESULT" ]; then
-        echo "$RESULT" | grep -v usage >&2
-        exit 1
-      fi
+    fi
+    if [ ! -z "$RESULT" ]; then
+      echo "$RESULT" | grep -v usage >&2
+      exit 1
     fi
   fi
 
-  echo "updating roboeireann"
-  rsync --del --exclude=.* --exclude=/Images --exclude=/Keys --exclude=/Logs --exclude=/Scenes --chmod=u+rw,go+r,Dugo+x -rzce "ssh $sshoptions" ../../Build/Linux/Nao/$CONFIG/roboeireann ../../Config/. nao@$REMOTE:/home/nao/Config
+  echo "updating roboeireann with $CONFIG version"
+	rsync --del --exclude=.* --exclude=/Images --exclude=/Logs --exclude=/Scenes --chmod=u+rw,go+r,Dugo+x -rzce \
+					"ssh $SSHOPTIONS" ../../Build/Linux/$TARGET_NAME/$CONFIG/roboeireann \
+					../../Util/onnxruntime/lib/Linux$TARGET_ARCH/libonnxruntime.so.1.10.0 \
+					../../Util/WakeupAPI/lib/libduerwen_wakeup_DOA.so \
+					../../Util/WakeupAPI/lib/libduerwen_wakeup_DOA_v1.1.0_20251113.so \
+					../../Config/. $TARGET_USER@$REMOTE:/home/$TARGET_USER/Config
 
-  # update scripts that are changed infrequently, but are sometimes changed
-  rsync -p -rce "ssh $sshoptions" ../../Install/Files/bin/roboeireann nao@$REMOTE:/home/nao/bin
+  # Define optional binaries to deploy alongside roboeireann
+  # These must be located in Build/Linux/<appname>/<config>/<appname>
+  OPTIONAL_TOOLS=("CatchTests${TARGET_NAME}" "BenchmarkTextLogging${TARGET_NAME}")
 
-  # set playback volume and reset capture value to 75%
+  for TOOL in "${OPTIONAL_TOOLS[@]}"; do
+    # Corrected path logic for isolated directories:
+    # e.g., ../../Build/Linux/CatchTestsNao/Develop/CatchTestsNao
+    LOCAL_PATH="../../Build/Linux/$TOOL/$CONFIG/$TOOL"
+    
+    if [ -f "$LOCAL_PATH" ]; then
+      echo "deploying auxiliary tool: $TOOL"
+      # Deploy to the ~/bin/ directory on the robot
+      rsync --chmod=u+rw,go+r,Dugo+x -zce "ssh $SSHOPTIONS" "$LOCAL_PATH" "$TARGET_USER@$REMOTE:/home/$TARGET_USER/bin/"
+    fi
+  done
+
+
+  # set playback volume
   echo "setting volume to $VOLUME%"
-  CAPTURE_VOLUME=75
-  echo "setting capture volume to $CAPTURE_VOLUME%"
-  ssh $sshoptions nao@$REMOTE "/home/nao/bin/setvolume $VOLUME $CAPTURE_VOLUME"
+  ssh $SSHOPTIONS $TARGET_USER@$REMOTE "/home/$TARGET_USER/bin/setvolume $VOLUME"
+
+  # Modify timestamp of all configuration files
+  if [ "$TARGET_NAME" == "Booster" ]; then
+    ssh $SSHOPTIONS $TARGET_USER@$REMOTE "touch /home/$TARGET_USER/Config/Robots/*/*/cameraCalibration.cfg /home/$TARGET_USER/Config/Robots/*/Body/imuCalibration.cfg"
+  fi
 
   # set settings on robot
   SEDFLAGS="$(settingsReplacements)"
   if [ ! -z "$SEDFLAGS" ]; then
     echo "updating settings"
-    ssh $sshoptions nao@$REMOTE "sed $SEDFLAGS < /home/nao/Config/settings.cfg > /home/nao/Config/settingsTEMP.cfg && mv /home/nao/Config/settingsTEMP.cfg /home/nao/Config/settings.cfg"
+    ssh $SSHOPTIONS $TARGET_USER@$REMOTE "sed $SEDFLAGS -i /home/$TARGET_USER/Config/settings.cfg"
+  else
+    ssh $SSHOPTIONS $TARGET_USER@$REMOTE "touch /home/$TARGET_USER/Config/settings.cfg"
   fi
 
   if [ ! -z $RESTART ]; then
     echo "starting roboeireann"
-    ssh $sshoptions nao@$REMOTE "systemctl --user start roboeireann.service > /dev/null"
+    ssh $SSHOPTIONS $TARGET_USER@$REMOTE "systemctl --user start roboeireann.service > /dev/null"
   fi
 
   true
@@ -127,45 +144,49 @@ copy()
 
 set -e
 
-keySource=../../Install/Keys/id_rsa_nao
-keyFile=/tmp/id_rsa_nao
 if [ $(uname) == "Darwin" ]; then
-  pingoptions="-t 1 -c 1"
+  PINGOPTIONS="-t 1 -c 1"
 else
-  pingoptions="-w 1 -c 1"
+  PINGOPTIONS="-w 1 -c 1"
 fi
 
 cd "$(dirname "$(which "$0")")"
-cp -n $keySource $keyFile || true
+
+# capture the cmd line args before parsing and shifting
+ORIGINAL_ARGS="$@"
+
+source ../Common/setupSSH
 
 # init variables
-[ -z $CONFIG ] && CONFIG="Develop"
+SHOWCMD=
+CONFIG="Develop"
 PLAYER=
-# TEAM=
 FIELDPLAYERCOLOR=
 GOALKEEPERCOLOR=
-NUMBER=
+TEAM=
 SCENARIO=
 LOCATION=
 REMOTE=
 COMPILE=1
 CHECK=1
+KEEPIP=
 NUMMULTIPLE=0
 RESTART=
 MULTIPLEDATA=
 DELETELOGS=
 VOLUME=100
 PROFILE=
-PORT=
 MAGICNUMBER=
 REQUIREUSB=
 IMAGE=
-# if [ -z "$(ls 2>/dev/null ../../Config/Robots/*/network.cfg)" ]; then
-#   RESOLVE=cat
-# else
-#   RESOLVE=`echo "sed"; ls ../../Config/Robots/*/network.cfg | xargs grep -H "^lan" | sed "s%.*/\(.*\)/.*\"\(.*\)\";.*%-e s/\1/\2/%"; ls ../../Config/Robots/*/network.cfg | xargs grep -H "^wlan" | sed "s%.*/\(.*\)/.*\"\(.*\)\";.*%-e s/\1/\2/%" | tr '[:upper:]' '[:lower:]'`
-#   RESOLVE=`tr '\n' ' ' <<<"$RESOLVE"`
-# fi
+TARGET_Nao=
+TARGET_Booster=
+if [ -z "$(ls 2>/dev/null ../../Config/Robots/*/network.cfg)" ]; then
+  RESOLVE=cat
+else
+  RESOLVE=`echo "sed"; ls ../../Config/Robots/*/network.cfg | xargs grep -H "^lan" | sed "s%.*/\(.*\)/.*\"\(.*\)\";.*%-e s/\1/\2/%"; ls ../../Config/Robots/*/network.cfg | xargs grep -H "^wlan" | sed "s%.*/\(.*\)/.*\"\(.*\)\";.*%-e s/\1/\2/%" | tr '[:upper:]' '[:lower:]'`
+  RESOLVE=`tr '\n' ' ' <<<"$RESOLVE"`
+fi
 
 # parse options
 [[ $# -eq 0 ]] && usage
@@ -182,32 +203,24 @@ while true; do
       shift
       SCENARIO=$1
       ;;
+    "-k" | "/k")
+      KEEPIP=1
+      ;;
     "-l" | "/l")
       shift
       LOCATION=$1
       ;;
-    # "-c" | "/c")
-    #   shift
-    #   TEAM=$1
-    #   ;;
-    "-cf" | "/cf")
+    "-c" | "/c")
       shift
       FIELDPLAYERCOLOR=$1
       ;;
-    "-cg" | "/cg")
+    "-g" | "/g")
       shift
       GOALKEEPERCOLOR=$1
       ;;
     "-t" | "/t")
       shift
-      TEAMNUMBER=$1
-      if [ -z $PORT ]; then
-        PORT=`printf "100%02d" $TEAMNUMBER`
-      fi
-      ;;
-    "-o" | "/o")
-      shift
-      PORT=$1
+      TEAM=$1
       ;;
     "-nc" | "/nc")
       COMPILE=
@@ -228,7 +241,9 @@ while true; do
       shift
       MULTIPLEDATA[$NUMMULTIPLE]=$1
       shift
-      MULTIPLEDATA[$NUMMULTIPLE + 1]=$1
+      MULTIPLEDATA[$NUMMULTIPLE + 1]=`$RESOLVE <<<"$1"`
+      source ../Common/setupTarget "$MULTIPLEDATA[$NUMMULTIPLE + 1]"
+      declare TARGET_$TARGET_NAME=$TARGET_NAME
       let "NUMMULTIPLE+=2"
       ;;
     "-u" | "/u")
@@ -249,6 +264,9 @@ while true; do
     "-i" | "/i")
       IMAGE=1
       ;;
+    "--showcmd")
+      SHOWCMD=1
+      ;;
     "Release")
       CONFIG="Release"
       ;;
@@ -263,11 +281,17 @@ while true; do
       usage
       ;;
     *)
-      REMOTE=$1
+      REMOTE=`$RESOLVE <<<"$1"`
+      source ../Common/setupTarget "$REMOTE"
+      declare TARGET_$TARGET_NAME=$TARGET_NAME
       ;;
   esac
   shift
 done
+
+if [ ! -z $SHOWCMD ]; then
+  echo "$0 $ORIGINAL_ARGS"
+fi
 
 if [ ! -z "$IMAGE" -a \( ! -z "$REMOTE$MULTIPLEDATA" -o -z "$CHECK" \) ]; then
   echo >&2 "Option -i cannot be combined with a remote ip or -r or -nr."
@@ -276,8 +300,6 @@ elif [ -z "$IMAGE" -a ! -z "$REQUIREUSB" ]; then
   echo >&2 "Option -u can only be combined with -i."
   exit 1
 fi
-
-sshoptions="-c aes128-ctr -i $keyFile -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
 
 if [ ! -z $SCENARIO ]; then
   if [ "$(ls ../../Config/Scenarios/ | grep ${SCENARIO})" == "" ]; then
@@ -314,10 +336,21 @@ if [ ! -z $MAGICNUMBER ]; then
   fi
   # calculate magic number from ip if -1
   if [ $MAGICNUMBER -le -1 ]; then
-    MAGICNUMBER=$(ifconfig 2>/dev/null \
-                  | grep -e "${REMOTE%.*}" \
-                  | head -n 1 \
-                  | sed "s%.*\.\([0-9]*\)  *netmask.*%\1%")
+    if [ ! -z "$REMOTE" ]; then
+      IP="$REMOTE"
+    elif [ "$NUMMULTIPLE" -ne 0 ]; then
+      IP="${MULTIPLEDATA[1]}"
+    else
+      IP=
+    fi
+    if [ -z "$IP" ]; then
+      MAGICNUMBER=$(awk 'BEGIN{srand();print int(rand()*255) }')
+    else
+      MAGICNUMBER=$(ifconfig 2>/dev/null \
+                    | grep -e "${IP%.*}" \
+                    | head -n 1 \
+                    | sed "s%.*\.\([0-9]*\)  *netmask.*%\1%")
+    fi
     if [ -z "$MAGICNUMBER" ]; then
       echo "error: cannot generate magic number (set one other than -1)."
       exit 1
@@ -330,17 +363,19 @@ fi
 chmod 600 $keyFile
 
 if [ ! -z $COMPILE ]; then
-  if [ "`uname`" = "Darwin" ]; then
-    # macOS
-    ./compile Nao $CONFIG
-    [ $? -ne 0 ] && exit 1
-  else
-    # Linux (either native or WSL)
-    echo "------ Compiling Nao ($CONFIG) ------"
-    cmake --build ../../Build/Linux/CMake/$CONFIG --target Nao --config $CONFIG
-    [ $? -ne 0 ] && exit 1
-    echo "------ Successfully compiled ------"
-  fi
+  for TARGET in $TARGET_Nao $TARGET_Booster; do
+    if [ "`uname`" = "Darwin" ]; then
+      # macOS
+      ../macOS/compile $TARGET $CONFIG
+      [ $? -ne 0 ] && exit 1
+    else
+      # Linux (either native or WSL)
+      echo "------ Compiling $TARGET ($CONFIG) ------"
+      ( cd ../Linux; cmake --build ../../Build/Linux/CMake/$CONFIG --target $TARGET --config $CONFIG )
+      [ $? -ne 0 ] && exit 1
+      echo "------ Successfully compiled ------"
+    fi
+  done
 fi
 
 if [ ! -z $IMAGE ]; then # write an opn image
@@ -378,12 +413,19 @@ if [ ! -z $IMAGE ]; then # write an opn image
     trap - EXIT
   fi
 elif [ ! -z $REMOTE ]; then # deploy to a single robot
+  if [ -z "$KEEPIP" ]; then
+    rm -f ../../Config/Scenes/Includes/connect.con
+  else
+    echo "sc Remote $($RESOLVE <<<"$REMOTE")" >../../Config/Scenes/Includes/connect.con
+  fi
   copy $REMOTE $PLAYER
 else # try to deploy to multiple targets
+  trap "trap - SIGTERM && kill -- -$$ 2>/dev/null" SIGINT SIGTERM
   if [ "$NUMMULTIPLE" -ne 0 ]; then
     for ((i=0; i < NUMMULTIPLE; i+=2))
     do
-      copy ${MULTIPLEDATA[i+1]} ${MULTIPLEDATA[i]} | sed "s%^%[${MULTIPLEDATA[i+1]}] %" &
+      copy ${MULTIPLEDATA[i+1]} ${MULTIPLEDATA[i]} 2> >(sed "s%^%[${MULTIPLEDATA[i+1]}] %" >&2) \
+      | sed "s%^%[${MULTIPLEDATA[i+1]}] %" &
     done
     wait
   else

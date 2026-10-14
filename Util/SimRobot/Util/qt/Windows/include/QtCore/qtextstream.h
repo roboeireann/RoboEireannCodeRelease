@@ -40,11 +40,11 @@
 #ifndef QTEXTSTREAM_H
 #define QTEXTSTREAM_H
 
-#include <QtCore/qiodevice.h>
+#include <QtCore/qiodevicebase.h>
 #include <QtCore/qstring.h>
 #include <QtCore/qchar.h>
-#include <QtCore/qlocale.h>
 #include <QtCore/qscopedpointer.h>
+#include <QtCore/qstringconverter.h>
 
 #include <stdio.h>
 
@@ -54,12 +54,11 @@
 
 QT_BEGIN_NAMESPACE
 
-
-class QTextCodec;
-class QTextDecoder;
+class QIODevice;
+class QLocale;
 
 class QTextStreamPrivate;
-class Q_CORE_EXPORT QTextStream                                // text stream class
+class Q_CORE_EXPORT QTextStream : public QIODeviceBase
 {
     Q_DECLARE_PRIVATE(QTextStream)
 
@@ -92,21 +91,18 @@ public:
 
     QTextStream();
     explicit QTextStream(QIODevice *device);
-    explicit QTextStream(FILE *fileHandle, QIODevice::OpenMode openMode = QIODevice::ReadWrite);
-    explicit QTextStream(QString *string, QIODevice::OpenMode openMode = QIODevice::ReadWrite);
-    explicit QTextStream(QByteArray *array, QIODevice::OpenMode openMode = QIODevice::ReadWrite);
-    explicit QTextStream(const QByteArray &array, QIODevice::OpenMode openMode = QIODevice::ReadOnly);
+    explicit QTextStream(FILE *fileHandle, OpenMode openMode = ReadWrite);
+    explicit QTextStream(QString *string, OpenMode openMode = ReadWrite);
+    explicit QTextStream(QByteArray *array, OpenMode openMode = ReadWrite);
+    explicit QTextStream(const QByteArray &array, OpenMode openMode = ReadOnly);
     virtual ~QTextStream();
 
-#ifndef QT_NO_TEXTCODEC
-    void setCodec(QTextCodec *codec);
-    void setCodec(const char *codecName);
-    QTextCodec *codec() const;
+    void setEncoding(QStringConverter::Encoding encoding);
+    QStringConverter::Encoding encoding() const;
     void setAutoDetectUnicode(bool enabled);
     bool autoDetectUnicode() const;
     void setGenerateByteOrderMark(bool generate);
     bool generateByteOrderMark() const;
-#endif
 
     void setLocale(const QLocale &locale);
     QLocale locale() const;
@@ -114,7 +110,7 @@ public:
     void setDevice(QIODevice *device);
     QIODevice *device() const;
 
-    void setString(QString *string, QIODevice::OpenMode openMode = QIODevice::ReadWrite);
+    void setString(QString *string, OpenMode openMode = ReadWrite);
     QString *string() const;
 
     Status status() const;
@@ -173,6 +169,7 @@ public:
 
     QTextStream &operator<<(QChar ch);
     QTextStream &operator<<(char ch);
+    QTextStream &operator<<(char16_t ch) { return *this << QChar(ch); }
     QTextStream &operator<<(signed short i);
     QTextStream &operator<<(unsigned short i);
     QTextStream &operator<<(signed int i);
@@ -184,8 +181,8 @@ public:
     QTextStream &operator<<(float f);
     QTextStream &operator<<(double f);
     QTextStream &operator<<(const QString &s);
+    QTextStream &operator<<(QStringView s);
     QTextStream &operator<<(QLatin1String s);
-    QTextStream &operator<<(const QStringRef &s);
     QTextStream &operator<<(const QByteArray &array);
     QTextStream &operator<<(const char *c);
     QTextStream &operator<<(const void *ptr);
@@ -212,8 +209,8 @@ typedef void (QTextStream::*QTSMFC)(QChar); // manipulator w/QChar argument
 class Q_CORE_EXPORT QTextStreamManipulator
 {
 public:
-    Q_DECL_CONSTEXPR QTextStreamManipulator(QTSMFI m, int a) Q_DECL_NOTHROW : mf(m), mc(Q_NULLPTR), arg(a), ch() {}
-    Q_DECL_CONSTEXPR QTextStreamManipulator(QTSMFC m, QChar c) Q_DECL_NOTHROW : mf(Q_NULLPTR), mc(m), arg(-1), ch(c) {}
+    constexpr QTextStreamManipulator(QTSMFI m, int a) noexcept : mf(m), mc(nullptr), arg(a), ch() {}
+    constexpr QTextStreamManipulator(QTSMFC m, QChar c) noexcept : mf(nullptr), mc(m), arg(-1), ch(c) {}
     void exec(QTextStream &s) { if (mf) { (s.*mf)(arg); } else { (s.*mc)(ch); } }
 
 private:
@@ -232,6 +229,7 @@ inline QTextStream &operator<<(QTextStream &s, QTextStreamFunction f)
 inline QTextStream &operator<<(QTextStream &s, QTextStreamManipulator m)
 { m.exec(s); return s; }
 
+namespace Qt {
 Q_CORE_EXPORT QTextStream &bin(QTextStream &s);
 Q_CORE_EXPORT QTextStream &oct(QTextStream &s);
 Q_CORE_EXPORT QTextStream &dec(QTextStream &s);
@@ -263,6 +261,8 @@ Q_CORE_EXPORT QTextStream &reset(QTextStream &s);
 Q_CORE_EXPORT QTextStream &bom(QTextStream &s);
 
 Q_CORE_EXPORT QTextStream &ws(QTextStream &s);
+
+} // namespace Qt
 
 inline QTextStreamManipulator qSetFieldWidth(int width)
 {

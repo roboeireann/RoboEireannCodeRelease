@@ -49,24 +49,22 @@ class Q_CORE_EXPORT QLoggingCategory
 {
     Q_DISABLE_COPY(QLoggingCategory)
 public:
-    // ### Qt 6: Merge constructors
-    explicit QLoggingCategory(const char *category);
-    QLoggingCategory(const char *category, QtMsgType severityLevel);
+    explicit QLoggingCategory(const char *category, QtMsgType severityLevel = QtDebugMsg);
     ~QLoggingCategory();
 
     bool isEnabled(QtMsgType type) const;
     void setEnabled(QtMsgType type, bool enable);
 
 #ifdef Q_ATOMIC_INT8_IS_SUPPORTED
-    bool isDebugEnabled() const { return bools.enabledDebug.load(); }
-    bool isInfoEnabled() const { return bools.enabledInfo.load(); }
-    bool isWarningEnabled() const { return bools.enabledWarning.load(); }
-    bool isCriticalEnabled() const { return bools.enabledCritical.load(); }
+    bool isDebugEnabled() const { return bools.enabledDebug.loadRelaxed(); }
+    bool isInfoEnabled() const { return bools.enabledInfo.loadRelaxed(); }
+    bool isWarningEnabled() const { return bools.enabledWarning.loadRelaxed(); }
+    bool isCriticalEnabled() const { return bools.enabledCritical.loadRelaxed(); }
 #else
-    bool isDebugEnabled() const { return enabled.load() >> DebugShift & 1; }
-    bool isInfoEnabled() const { return enabled.load() >> InfoShift & 1; }
-    bool isWarningEnabled() const { return enabled.load() >> WarningShift & 1; }
-    bool isCriticalEnabled() const { return enabled.load() >> CriticalShift & 1; }
+    bool isDebugEnabled() const { return enabled.loadRelaxed() >> DebugShift & 1; }
+    bool isInfoEnabled() const { return enabled.loadRelaxed() >> InfoShift & 1; }
+    bool isWarningEnabled() const { return enabled.loadRelaxed() >> WarningShift & 1; }
+    bool isCriticalEnabled() const { return enabled.loadRelaxed() >> CriticalShift & 1; }
 #endif
     const char *categoryName() const { return name; }
 
@@ -108,10 +106,56 @@ private:
     Q_DECL_UNUSED_MEMBER bool placeholder[4]; // reserved for future use
 };
 
+namespace { // allow different TUs to have different QT_NO_xxx_OUTPUT
+template <QtMsgType Which> struct QLoggingCategoryMacroHolder
+{
+    static const bool IsOutputEnabled;
+    const QLoggingCategory *category = nullptr;
+    bool control = false;
+    QLoggingCategoryMacroHolder(const QLoggingCategory &cat)
+    {
+        if (IsOutputEnabled)
+            init(cat);
+    }
+    QLoggingCategoryMacroHolder(QMessageLogger::CategoryFunction catfunc)
+    {
+        if (IsOutputEnabled)
+            init(catfunc());
+    }
+    void init(const QLoggingCategory &cat) noexcept
+    {
+        category = &cat;
+        // same as:
+        //  control = cat.isEnabled(Which);
+        // but without an out-of-line call
+        if constexpr (Which == QtDebugMsg) {
+            control = cat.isDebugEnabled();
+        } else if constexpr (Which == QtInfoMsg) {
+            control = cat.isInfoEnabled();
+        } else if constexpr (Which == QtWarningMsg) {
+            control = cat.isWarningEnabled();
+        } else {
+            control = cat.isCriticalEnabled();
+        }
+    }
+    operator const char *() const { return category->categoryName(); }
+    operator bool() const { return Q_UNLIKELY(control); }
+};
+
+template <QtMsgType Which> const bool QLoggingCategoryMacroHolder<Which>::IsOutputEnabled = true;
+#if defined(QT_NO_DEBUG_OUTPUT)
+template <> const bool QLoggingCategoryMacroHolder<QtDebugMsg>::IsOutputEnabled = false;
+#endif
+#if defined(QT_NO_INFO_OUTPUT)
+template <> const bool QLoggingCategoryMacroHolder<QtInfoMsg>::IsOutputEnabled = false;
+#endif
+#if defined(QT_NO_WARNING_OUTPUT)
+template <> const bool QLoggingCategoryMacroHolder<QtWarningMsg>::IsOutputEnabled = false;
+#endif
+} // unnamed namespace
+
 #define Q_DECLARE_LOGGING_CATEGORY(name) \
     extern const QLoggingCategory &name();
-
-#if defined(Q_COMPILER_VARIADIC_MACROS) || defined(Q_MOC_RUN)
 
 #define Q_LOGGING_CATEGORY(name, ...) \
     const QLoggingCategory &name() \
@@ -120,49 +164,14 @@ private:
         return category; \
     }
 
-#define qCDebug(category, ...) \
-    for (bool qt_category_enabled = category().isDebugEnabled(); qt_category_enabled; qt_category_enabled = false) \
-        QMessageLogger(QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC, category().categoryName()).debug(__VA_ARGS__)
-#define qCInfo(category, ...) \
-    for (bool qt_category_enabled = category().isInfoEnabled(); qt_category_enabled; qt_category_enabled = false) \
-        QMessageLogger(QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC, category().categoryName()).info(__VA_ARGS__)
-#define qCWarning(category, ...) \
-    for (bool qt_category_enabled = category().isWarningEnabled(); qt_category_enabled; qt_category_enabled = false) \
-        QMessageLogger(QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC, category().categoryName()).warning(__VA_ARGS__)
-#define qCCritical(category, ...) \
-    for (bool qt_category_enabled = category().isCriticalEnabled(); qt_category_enabled; qt_category_enabled = false) \
-        QMessageLogger(QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC, category().categoryName()).critical(__VA_ARGS__)
+#define QT_MESSAGE_LOGGER_COMMON(category, level) \
+    for (QLoggingCategoryMacroHolder<level> qt_category(category); qt_category; qt_category.control = false) \
+        QMessageLogger(QT_MESSAGELOG_FILE, QT_MESSAGELOG_LINE, QT_MESSAGELOG_FUNC, qt_category)
 
-#else // defined(Q_COMPILER_VARIADIC_MACROS) || defined(Q_MOC_RUN)
-
-// Optional msgType argument not supported
-#define Q_LOGGING_CATEGORY(name, string) \
-    const QLoggingCategory &name() \
-    { \
-        static const QLoggingCategory category(string); \
-        return category; \
-    }
-
-// check for enabled category inside QMessageLogger.
-#define qCDebug qDebug
-#define qCInfo qInfo
-#define qCWarning qWarning
-#define qCCritical qCritical
-
-#endif // Q_COMPILER_VARIADIC_MACROS || defined(Q_MOC_RUN)
-
-#if defined(QT_NO_DEBUG_OUTPUT)
-#  undef qCDebug
-#  define qCDebug(category) QT_NO_QDEBUG_MACRO()
-#endif
-#if defined(QT_NO_INFO_OUTPUT)
-#  undef qCInfo
-#  define qCInfo(category) QT_NO_QDEBUG_MACRO()
-#endif
-#if defined(QT_NO_WARNING_OUTPUT)
-#  undef qCWarning
-#  define qCWarning(category) QT_NO_QDEBUG_MACRO()
-#endif
+#define qCDebug(category, ...) QT_MESSAGE_LOGGER_COMMON(category, QtDebugMsg).debug(__VA_ARGS__)
+#define qCInfo(category, ...) QT_MESSAGE_LOGGER_COMMON(category, QtInfoMsg).info(__VA_ARGS__)
+#define qCWarning(category, ...) QT_MESSAGE_LOGGER_COMMON(category, QtWarningMsg).warning(__VA_ARGS__)
+#define qCCritical(category, ...) QT_MESSAGE_LOGGER_COMMON(category, QtCriticalMsg).critical(__VA_ARGS__)
 
 QT_END_NAMESPACE
 

@@ -9,7 +9,7 @@
 
 #include "TeamBehaviorStatus.h"
 
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Debugging/DebugDrawings3D.h"
 
 void TeamBehaviorStatus::draw() const
 {

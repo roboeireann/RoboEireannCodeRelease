@@ -1,0 +1,7 @@
+#!/bin/bash
+# Run ssh command on robot
+
+basePath=$(cd "$(dirname "$(which "$0")")"; pwd)
+source "${basePath}/setupSSH"
+source "${basePath}/setupTarget" "$1"
+ssh ${SSHOPTIONS} $TARGET_USER@$(sed <<<"$*" "s%TARGET_USER%$TARGET_USER%g")

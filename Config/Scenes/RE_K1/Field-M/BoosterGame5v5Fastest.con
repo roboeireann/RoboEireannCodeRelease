@@ -1,0 +1,9 @@
+call ../../Includes/BoosterFast
+call ../../Includes/5vs5
+
+# without this, the simulated GC defaults to 3 active players per team (competitionTypeMiddleFoundation)
+# and players 4/5 end up penalised/substitute
+gc competitionTypeMiddleAdvanced
+
+dr representation:SetupPoses:place
+dr debugDrawing3d:representation:GameState:playerNumber

@@ -57,6 +57,7 @@ class QImageReader;
 class QColor;
 class QVariant;
 class QPlatformPixmap;
+QT_DECLARE_QESDP_SPECIALIZATION_DTOR_WITH_EXPORT(QPlatformPixmap, Q_GUI_EXPORT)
 
 class Q_GUI_EXPORT QPixmap : public QPaintDevice
 {
@@ -65,25 +66,25 @@ public:
     explicit QPixmap(QPlatformPixmap *data);
     QPixmap(int w, int h);
     explicit QPixmap(const QSize &);
-    QPixmap(const QString& fileName, const char *format = Q_NULLPTR, Qt::ImageConversionFlags flags = Qt::AutoColor);
+    QPixmap(const QString& fileName, const char *format = nullptr, Qt::ImageConversionFlags flags = Qt::AutoColor);
 #ifndef QT_NO_IMAGEFORMAT_XPM
     explicit QPixmap(const char * const xpm[]);
 #endif
     QPixmap(const QPixmap &);
+    QPixmap(QPixmap &&other) noexcept : QPaintDevice(), data(std::move(other.data)) {}
     ~QPixmap();
 
     QPixmap &operator=(const QPixmap &);
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QPixmap &operator=(QPixmap &&other) Q_DECL_NOEXCEPT
-    { qSwap(data, other.data); return *this; }
-#endif
-    inline void swap(QPixmap &other) Q_DECL_NOEXCEPT
-    { qSwap(data, other.data); }
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_MOVE_AND_SWAP(QPixmap)
+    inline void swap(QPixmap &other) noexcept
+    { data.swap(other.data); }
+    bool operator==(const QPixmap &) const = delete;
+    bool operator!=(const QPixmap &) const = delete;
 
     operator QVariant() const;
 
     bool isNull() const;
-    int devType() const Q_DECL_OVERRIDE;
+    int devType() const override;
 
     int width() const;
     int height() const;
@@ -94,14 +95,13 @@ public:
     static int defaultDepth();
 
     void fill(const QColor &fillColor = Qt::white);
-    void fill(const QPaintDevice *device, const QPoint &ofs);
-    inline void fill(const QPaintDevice *device, int xofs, int yofs) { fill(device, QPoint(xofs, yofs)); }
 
     QBitmap mask() const;
     void setMask(const QBitmap &);
 
     qreal devicePixelRatio() const;
     void setDevicePixelRatio(qreal scaleFactor);
+    QSizeF deviceIndependentSize() const;
 
     bool hasAlpha() const;
     bool hasAlphaChannel() const;
@@ -111,11 +111,6 @@ public:
 #endif
     QBitmap createMaskFromColor(const QColor &maskColor, Qt::MaskMode mode = Qt::MaskInColor) const;
 
-    static QPixmap grabWindow(WId, int x=0, int y=0, int w=-1, int h=-1);
-    static QPixmap grabWidget(QObject *widget, const QRect &rect);
-    static inline QPixmap grabWidget(QObject *widget, int x=0, int y=0, int w=-1, int h=-1)
-    { return grabWidget(widget, QRect(x, y, w, h)); }
-
     inline QPixmap scaled(int w, int h, Qt::AspectRatioMode aspectMode = Qt::IgnoreAspectRatio,
                           Qt::TransformationMode mode = Qt::FastTransformation) const
         { return scaled(QSize(w, h), aspectMode, mode); }
@@ -123,38 +118,31 @@ public:
                    Qt::TransformationMode mode = Qt::FastTransformation) const;
     QPixmap scaledToWidth(int w, Qt::TransformationMode mode = Qt::FastTransformation) const;
     QPixmap scaledToHeight(int h, Qt::TransformationMode mode = Qt::FastTransformation) const;
-    QPixmap transformed(const QMatrix &, Qt::TransformationMode mode = Qt::FastTransformation) const;
-    static QMatrix trueMatrix(const QMatrix &m, int w, int h);
     QPixmap transformed(const QTransform &, Qt::TransformationMode mode = Qt::FastTransformation) const;
     static QTransform trueMatrix(const QTransform &m, int w, int h);
 
     QImage toImage() const;
     static QPixmap fromImage(const QImage &image, Qt::ImageConversionFlags flags = Qt::AutoColor);
     static QPixmap fromImageReader(QImageReader *imageReader, Qt::ImageConversionFlags flags = Qt::AutoColor);
-#ifdef Q_COMPILER_RVALUE_REFS
     static QPixmap fromImage(QImage &&image, Qt::ImageConversionFlags flags = Qt::AutoColor)
     {
         return fromImageInPlace(image, flags);
     }
-#endif
 
-    bool load(const QString& fileName, const char *format = Q_NULLPTR, Qt::ImageConversionFlags flags = Qt::AutoColor);
-    bool loadFromData(const uchar *buf, uint len, const char* format = Q_NULLPTR, Qt::ImageConversionFlags flags = Qt::AutoColor);
-    inline bool loadFromData(const QByteArray &data, const char* format = Q_NULLPTR, Qt::ImageConversionFlags flags = Qt::AutoColor);
-    bool save(const QString& fileName, const char* format = Q_NULLPTR, int quality = -1) const;
-    bool save(QIODevice* device, const char* format = Q_NULLPTR, int quality = -1) const;
+    bool load(const QString& fileName, const char *format = nullptr, Qt::ImageConversionFlags flags = Qt::AutoColor);
+    bool loadFromData(const uchar *buf, uint len, const char* format = nullptr, Qt::ImageConversionFlags flags = Qt::AutoColor);
+    inline bool loadFromData(const QByteArray &data, const char* format = nullptr, Qt::ImageConversionFlags flags = Qt::AutoColor);
+    bool save(const QString& fileName, const char* format = nullptr, int quality = -1) const;
+    bool save(QIODevice* device, const char* format = nullptr, int quality = -1) const;
 
     bool convertFromImage(const QImage &img, Qt::ImageConversionFlags flags = Qt::AutoColor);
 
     inline QPixmap copy(int x, int y, int width, int height) const;
     QPixmap copy(const QRect &rect = QRect()) const;
 
-    inline void scroll(int dx, int dy, int x, int y, int width, int height, QRegion *exposed = Q_NULLPTR);
-    void scroll(int dx, int dy, const QRect &rect, QRegion *exposed = Q_NULLPTR);
+    inline void scroll(int dx, int dy, int x, int y, int width, int height, QRegion *exposed = nullptr);
+    void scroll(int dx, int dy, const QRect &rect, QRegion *exposed = nullptr);
 
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline int serialNumber() const { return cacheKey() >> 32; }
-#endif
     qint64 cacheKey() const;
 
     bool isDetached() const;
@@ -162,17 +150,12 @@ public:
 
     bool isQBitmap() const;
 
-    QPaintEngine *paintEngine() const Q_DECL_OVERRIDE;
+    QPaintEngine *paintEngine() const override;
 
     inline bool operator!() const { return isNull(); }
 
-#if QT_DEPRECATED_SINCE(5, 0)
-    QT_DEPRECATED inline QPixmap alphaChannel() const;
-    QT_DEPRECATED inline void setAlphaChannel(const QPixmap &);
-#endif
-
 protected:
-    int metric(PaintDeviceMetric) const Q_DECL_OVERRIDE;
+    int metric(PaintDeviceMetric) const override;
     static QPixmap fromImageInPlace(QImage &image, Qt::ImageConversionFlags flags = Qt::AutoColor);
 
 private:
@@ -220,20 +203,6 @@ inline bool QPixmap::loadFromData(const QByteArray &buf, const char *format,
     return loadFromData(reinterpret_cast<const uchar *>(buf.constData()), buf.size(), format, flags);
 }
 
-#if QT_DEPRECATED_SINCE(5, 0)
-inline QPixmap QPixmap::alphaChannel() const
-{
-    return QPixmap::fromImage(toImage().alphaChannel());
-}
-
-inline void QPixmap::setAlphaChannel(const QPixmap &p)
-{
-    QImage image = toImage();
-    image.setAlphaChannel(p.toImage());
-    *this = QPixmap::fromImage(image);
-
-}
-#endif
 
 /*****************************************************************************
  QPixmap stream functions

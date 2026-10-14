@@ -8,8 +8,8 @@
  */
 
 #include "SimpleNN.h"
+#include "MathBase/NeumaierSum.h"
 #include "Platform/BHAssert.h"
-#include "Tools/Math/NeumaierSum.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -115,6 +115,47 @@ namespace NeuralNetwork
       void apply(const TensorXf& input, TensorXf& output, const ReshapeLayer&)
       {
         output.copyFrom(input);
+      }
+
+      void apply(const TensorXf& input, TensorXf& output, const Conv1DLayer& layer)
+      {
+        ASSERT(input.rank() == 2);
+        ASSERT(output.rank() == 2);
+
+        const unsigned int paddingTop = layer.padding == PaddingType::valid ? 0 : ((output.dims(0) - 1) * layer.stride + layer.weights.dims(0) - input.dims(0)) / 2;
+
+        unsigned int outputY = 0;
+        for(int y = -static_cast<int>(paddingTop); outputY < output.dims(0); y += layer.stride, outputY++)
+        {
+          std::vector<NeumaierSum<float>> outputChannels(output.dims(1));
+
+          for(unsigned int filterY = 0; filterY < layer.weights.dims(0); filterY++)
+          {
+            const int yIndex = y + filterY;
+
+            if(yIndex >= 0 && static_cast<unsigned int>(yIndex) < input.dims(0))
+            {
+              for(unsigned int inputChannel = 0; inputChannel < input.dims(1); inputChannel++)
+              {
+                const float v = input(yIndex, inputChannel);
+                for(unsigned int outputChannel = 0; outputChannel < output.dims(1); outputChannel++)
+                  outputChannels[outputChannel] += layer.weights(filterY, inputChannel, outputChannel) * v;
+              }
+            }
+          }
+
+          std::vector<NeumaierSum<float>> softmaxSums(output.dims(1));
+          for(unsigned int outputChannel = 0; outputChannel < output.dims(1); outputChannel++)
+          {
+            output(outputY, outputChannel) = applyActivationFunction(layer.hasBiases ? static_cast<float>(outputChannels[outputChannel] += layer.biases[outputChannel])
+                                             : static_cast<float>(outputChannels[outputChannel]), layer.activationId);
+            if(layer.activationId == ActivationFunctionId::softmax)
+              softmaxSums[outputChannel] += output(outputY, outputChannel);
+          }
+          if(layer.activationId == ActivationFunctionId::softmax)
+            for(unsigned int outputChannel = 0; outputChannel < output.dims(1); outputChannel++)
+              output(outputY, outputChannel) /= softmaxSums[outputChannel];
+        }
       }
 
       void apply(const TensorXf& input, TensorXf& output, const Conv2DLayer& layer)
@@ -325,6 +366,30 @@ namespace NeuralNetwork
         }
       }
 
+      void apply(const TensorXf& input, TensorXf& output, const ZeroPadding1DLayer& layer)
+      {
+        ASSERT(input.rank() == 2);
+        ASSERT(output.rank() == 2);
+
+        std::vector<unsigned int> i(2);
+
+        for(i[0] = 0; i[0] < output.dims(0); i[0]++)
+        {
+          if(i[0] < layer.padding[ZeroPadding1DLayer::LEFT] || output.dims(0) - i[0] <= layer.padding[ZeroPadding1DLayer::RIGHT])
+          {
+            for(i[1] = 0; i[1] < output.dims(1); i[1]++)
+              output(i) = 0.f;
+          }
+          else
+          {
+            std::vector<unsigned int> i_ = i;
+            i_[0] = i[0] - layer.padding[ZeroPadding1DLayer::LEFT];
+            for(i_[1] = i[1] = 0; i_[1] < output.dims(1); i_[1]++, i[1]++)
+              output(i) = input(i_);
+          }
+        }
+      }
+
       void apply(const TensorXf& input, TensorXf& output, const ZeroPadding2DLayer& layer)
       {
         ASSERT(input.rank() == 3);
@@ -351,6 +416,58 @@ namespace NeuralNetwork
                 output(i) = input(i_);
             }
           }
+      }
+
+      void apply(const TensorXf& input, TensorXf& output, const Pooling1DLayer& layer)
+      {
+        ASSERT(input.rank() == 2);
+        ASSERT(output.rank() == 2);
+
+        const unsigned int paddingTop = layer.padding == PaddingType::valid ? 0 : ((output.dims(0) - 1) * layer.stride + layer.kernelSize - input.dims(0)) / 2;
+
+        const float filterSize = static_cast<float>(layer.kernelSize);
+
+        unsigned int outputY = 0;
+        for(int y = -static_cast<int>(paddingTop); outputY < output.dims(0); y += layer.stride, outputY++)
+        {
+          if(y >= 0 && static_cast<unsigned int>(y) < input.dims(0) && layer.method == PoolingMethod::max)
+          {
+            for(unsigned int channel = 0; channel < output.dims(1); channel++)
+              output(outputY, channel) = input(y, channel);
+          }
+          else if(layer.method == PoolingMethod::max)
+          {
+            for(unsigned int channel = 0; channel < output.dims(1); channel++)
+              output(outputY, channel) = 0.f;
+          }
+
+          std::vector<NeumaierSum<float>> outputSums(output.dims(1));
+
+          for(unsigned int filterY = 0; filterY < layer.kernelSize; filterY++)
+          {
+            for(unsigned int channel = 0; channel < output.dims(1); channel++)
+            {
+              const int yIndex = y + filterY;
+              if(yIndex >= 0 && static_cast<unsigned int>(yIndex) < input.dims(0))
+              {
+                if(layer.method == PoolingMethod::average)
+                  outputSums[channel] += input(yIndex, channel);
+                else if(layer.method == PoolingMethod::max)
+                  output(outputY, channel) = std::max(output(outputY, channel), input(yIndex, channel));
+                else
+                  ASSERT(false);
+              }
+              else if(layer.method == PoolingMethod::max)
+                output(outputY, channel) = std::max(output(outputY, channel), 0.f);
+            }
+          }
+
+          if(layer.method == PoolingMethod::average)
+          {
+            for(unsigned int outputChannel = 0; outputChannel < output.dims(1); outputChannel++)
+              output(outputY, outputChannel) = static_cast<float>(outputSums[outputChannel]) / filterSize;
+          }
+        }
       }
 
       void apply(const TensorXf& input, TensorXf& output, const Pooling2DLayer& layer)
@@ -690,6 +807,11 @@ namespace NeuralNetwork
           ASSERT(output.size() == 1);
           Impl::apply(*input[0], *output[0], *static_cast<const ReshapeLayer*>(node.layer));
           break;
+        case LayerType::conv1D:
+          ASSERT(input.size() == 1);
+          ASSERT(output.size() == 1);
+          Impl::apply(*input[0], *output[0], *static_cast<const Conv1DLayer*>(node.layer));
+          break;
         case LayerType::conv2D:
           ASSERT(input.size() == 1);
           ASSERT(output.size() == 1);
@@ -715,10 +837,21 @@ namespace NeuralNetwork
           ASSERT(output.size() == 1);
           Impl::apply(*input[0], *output[0], *static_cast<const UpSampling2DLayer*>(node.layer));
           break;
+        case LayerType::zeroPadding1D:
+          ASSERT(input.size() == 1);
+          ASSERT(output.size() == 1);
+          Impl::apply(*input[0], *output[0], *static_cast<const ZeroPadding1DLayer*>(node.layer));
+          break;
         case LayerType::zeroPadding2D:
           ASSERT(input.size() == 1);
           ASSERT(output.size() == 1);
           Impl::apply(*input[0], *output[0], *static_cast<const ZeroPadding2DLayer*>(node.layer));
+          break;
+        case LayerType::maxPooling1D:
+        case LayerType::averagePooling1D:
+          ASSERT(input.size() == 1);
+          ASSERT(output.size() == 1);
+          Impl::apply(*input[0], *output[0], *static_cast<const Pooling1DLayer*>(node.layer));
           break;
         case LayerType::maxPooling2D:
         case LayerType::averagePooling2D:

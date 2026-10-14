@@ -43,23 +43,21 @@
 #include <QtWidgets/qtwidgetsglobal.h>
 #include <QtCore/qobject.h>
 
-#if !defined(QT_NO_GRAPHICSVIEW)
+QT_REQUIRE_CONFIG(graphicsview);
 
 QT_BEGIN_NAMESPACE
 
-
 class QGraphicsItem;
-class QMatrix;
 class QPointF;
 class QTimeLine;
-template <class T1, class T2> struct QPair;
+class QTransform;
 
 class QGraphicsItemAnimationPrivate;
 class Q_WIDGETS_EXPORT QGraphicsItemAnimation : public QObject
 {
     Q_OBJECT
 public:
-    QGraphicsItemAnimation(QObject *parent = Q_NULLPTR);
+    QGraphicsItemAnimation(QObject *parent = nullptr);
     virtual ~QGraphicsItemAnimation();
 
     QGraphicsItem *item() const;
@@ -72,7 +70,7 @@ public:
     QList<QPair<qreal, QPointF> > posList() const;
     void setPosAt(qreal step, const QPointF &pos);
 
-    QMatrix matrixAt(qreal step) const;
+    QTransform transformAt(qreal step) const;
 
     qreal rotationAt(qreal step) const;
     QList<QPair<qreal, qreal> > rotationList() const;
@@ -97,7 +95,6 @@ public:
 
 public Q_SLOTS:
     void setStep(qreal x);
-    void reset();
 
 protected:
     virtual void beforeAnimationStep(qreal step);
@@ -110,5 +107,4 @@ private:
 
 QT_END_NAMESPACE
 
-#endif // QT_NO_GRAPHICSVIEW
 #endif

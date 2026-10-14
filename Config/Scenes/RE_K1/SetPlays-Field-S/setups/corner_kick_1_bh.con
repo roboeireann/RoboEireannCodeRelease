@@ -1,0 +1,45 @@
+# -----------------------------------------------------------------
+# green/white team positions - coords relative to defending half
+
+# robot robot1
+# mvrp 4300 0 525 0 0 180
+
+# robot robot2
+# mvrp 2600 -100 525 0 0 180
+
+robot robot3
+mvrp 600 300 525 0 0 180
+
+robot robot4
+mvrp -3800 2000 525 0 0 -170
+
+robot robot5
+mvrp -2000 -600 525 0 0 120
+
+
+# -----------------------------------------------------------------
+# red/blue team positions
+robot robot21
+mvrp -4300 0 525 0 0 0
+
+robot robot22
+mvrp -4000 1500 525 0 0 110
+
+robot robot23
+mvrp -3600 -500 525 0 0 90
+
+robot robot24
+mvrp -2800 1000 525 0 0 40
+
+# robot robot25
+# mvrp -1000 0 525 0 0 0
+
+# -----------------------------------------------------------------
+# move the ball
+mvb -4500 3000 500
+
+# -----------------------------------------------------------------
+# Set GameState
+robot robot5
+gc playing
+gc cornerKickForFirstTeam

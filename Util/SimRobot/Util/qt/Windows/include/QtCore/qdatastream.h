@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2021 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -41,8 +41,9 @@
 #define QDATASTREAM_H
 
 #include <QtCore/qscopedpointer.h>
-#include <QtCore/qiodevice.h>
-#include <QtCore/qpair.h>
+#include <QtCore/qiodevicebase.h>
+#include <QtCore/qcontainerfwd.h>
+#include <QtCore/qnamespace.h>
 
 #ifdef Status
 #error qdatastream.h must be included before any header file that defines Status
@@ -50,23 +51,18 @@
 
 QT_BEGIN_NAMESPACE
 
+#if QT_CORE_REMOVED_SINCE(6, 3)
 class qfloat16;
+#endif
 class QByteArray;
 class QIODevice;
-
-template <typename T> class QList;
-template <typename T> class QLinkedList;
-template <typename T> class QVector;
-template <typename T> class QSet;
-template <class Key, class T> class QHash;
-template <class Key, class T> class QMap;
 
 #if !defined(QT_NO_DATASTREAM) || defined(QT_BOOTSTRAPPED)
 class QDataStreamPrivate;
 namespace QtPrivate {
 class StreamStateSaver;
 }
-class Q_CORE_EXPORT QDataStream
+class Q_CORE_EXPORT QDataStream : public QIODeviceBase
 {
 public:
     enum Version {
@@ -96,10 +92,20 @@ public:
         Qt_5_7 = Qt_5_6,
         Qt_5_8 = Qt_5_7,
         Qt_5_9 = Qt_5_8,
-#if QT_VERSION >= 0x050a00
+        Qt_5_10 = Qt_5_9,
+        Qt_5_11 = Qt_5_10,
+        Qt_5_12 = 18,
+        Qt_5_13 = 19,
+        Qt_5_14 = Qt_5_13,
+        Qt_5_15 = Qt_5_14,
+        Qt_6_0 = 20,
+        Qt_6_1 = Qt_6_0,
+        Qt_6_2 = Qt_6_0,
+        Qt_6_3 = Qt_6_0,
+        Qt_DefaultCompiledVersion = Qt_6_3
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
 #error Add the datastream version for this Qt version and update Qt_DefaultCompiledVersion
 #endif
-        Qt_DefaultCompiledVersion = Qt_5_9
     };
 
     enum ByteOrder {
@@ -121,13 +127,12 @@ public:
 
     QDataStream();
     explicit QDataStream(QIODevice *);
-    QDataStream(QByteArray *, QIODevice::OpenMode flags);
+    QDataStream(QByteArray *, OpenMode flags);
     QDataStream(const QByteArray &);
     ~QDataStream();
 
     QIODevice *device() const;
     void setDevice(QIODevice *);
-    void unsetDevice();
 
     bool atEnd() const;
 
@@ -144,36 +149,47 @@ public:
     int version() const;
     void setVersion(int);
 
+    QDataStream &operator>>(char &i);
     QDataStream &operator>>(qint8 &i);
     QDataStream &operator>>(quint8 &i);
     QDataStream &operator>>(qint16 &i);
     QDataStream &operator>>(quint16 &i);
     QDataStream &operator>>(qint32 &i);
-    QDataStream &operator>>(quint32 &i);
+    inline QDataStream &operator>>(quint32 &i);
     QDataStream &operator>>(qint64 &i);
     QDataStream &operator>>(quint64 &i);
     QDataStream &operator>>(std::nullptr_t &ptr) { ptr = nullptr; return *this; }
 
     QDataStream &operator>>(bool &i);
+#if QT_CORE_REMOVED_SINCE(6, 3)
     QDataStream &operator>>(qfloat16 &f);
+#endif
     QDataStream &operator>>(float &f);
     QDataStream &operator>>(double &f);
     QDataStream &operator>>(char *&str);
+    QDataStream &operator>>(char16_t &c);
+    QDataStream &operator>>(char32_t &c);
 
+    QDataStream &operator<<(char i);
     QDataStream &operator<<(qint8 i);
     QDataStream &operator<<(quint8 i);
     QDataStream &operator<<(qint16 i);
     QDataStream &operator<<(quint16 i);
     QDataStream &operator<<(qint32 i);
-    QDataStream &operator<<(quint32 i);
+    inline QDataStream &operator<<(quint32 i);
     QDataStream &operator<<(qint64 i);
     QDataStream &operator<<(quint64 i);
     QDataStream &operator<<(std::nullptr_t) { return *this; }
     QDataStream &operator<<(bool i);
+#if QT_CORE_REMOVED_SINCE(6, 3)
     QDataStream &operator<<(qfloat16 f);
+#endif
     QDataStream &operator<<(float f);
     QDataStream &operator<<(double f);
     QDataStream &operator<<(const char *str);
+    QDataStream &operator<<(char16_t c);
+    QDataStream &operator<<(char32_t c);
+
 
     QDataStream &readBytes(char *&, uint &len);
     int readRawData(char *, int len);
@@ -188,6 +204,7 @@ public:
     void rollbackTransaction();
     void abortTransaction();
 
+    bool isDeviceTransactionStarted() const;
 private:
     Q_DISABLE_COPY(QDataStream)
 
@@ -211,7 +228,7 @@ class StreamStateSaver
 public:
     inline StreamStateSaver(QDataStream *s) : stream(s), oldStatus(s->status())
     {
-        if (!stream->dev || !stream->dev->isTransactionStarted())
+        if (!stream->isDeviceTransactionStarted())
             stream->resetStatus();
     }
     inline ~StreamStateSaver()
@@ -286,7 +303,7 @@ QDataStream &readAssociativeContainer(QDataStream &s, Container &c)
             c.clear();
             break;
         }
-        c.insertMulti(k, t);
+        c.insert(k, t);
     }
 
     return s;
@@ -306,20 +323,51 @@ template <typename Container>
 QDataStream &writeAssociativeContainer(QDataStream &s, const Container &c)
 {
     s << quint32(c.size());
-    // Deserialization should occur in the reverse order.
-    // Otherwise, value() will return the least recently inserted
-    // value instead of the most recently inserted one.
-    auto it = c.constEnd();
-    auto begin = c.constBegin();
-    while (it != begin) {
-        --it;
+    auto it = c.constBegin();
+    auto end = c.constEnd();
+    while (it != end) {
         s << it.key() << it.value();
+        ++it;
+    }
+
+    return s;
+}
+
+template <typename Container>
+QDataStream &writeAssociativeMultiContainer(QDataStream &s, const Container &c)
+{
+    s << quint32(c.size());
+    auto it = c.constBegin();
+    auto end = c.constEnd();
+    while (it != end) {
+        const auto rangeStart = it++;
+        while (it != end && rangeStart.key() == it.key())
+            ++it;
+        const qint64 last = std::distance(rangeStart, it) - 1;
+        for (qint64 i = last; i >= 0; --i) {
+            auto next = std::next(rangeStart, i);
+            s << next.key() << next.value();
+        }
     }
 
     return s;
 }
 
 } // QtPrivate namespace
+
+template<typename ...T>
+using QDataStreamIfHasOStreamOperators =
+    std::enable_if_t<std::conjunction_v<QTypeTraits::has_ostream_operator<QDataStream, T>...>, QDataStream &>;
+template<typename Container, typename ...T>
+using QDataStreamIfHasOStreamOperatorsContainer =
+    std::enable_if_t<std::conjunction_v<QTypeTraits::has_ostream_operator_container<QDataStream, Container, T>...>, QDataStream &>;
+
+template<typename ...T>
+using QDataStreamIfHasIStreamOperators =
+    std::enable_if_t<std::conjunction_v<QTypeTraits::has_istream_operator<QDataStream, T>...>, QDataStream &>;
+template<typename Container, typename ...T>
+using QDataStreamIfHasIStreamOperatorsContainer =
+    std::enable_if_t<std::conjunction_v<QTypeTraits::has_istream_operator_container<QDataStream, Container, T>...>, QDataStream &>;
 
 /*****************************************************************************
   QDataStream inline functions
@@ -337,6 +385,9 @@ inline int QDataStream::version() const
 inline void QDataStream::setVersion(int v)
 { ver = v; }
 
+inline QDataStream &QDataStream::operator>>(char &i)
+{ return *this >> reinterpret_cast<qint8&>(i); }
+
 inline QDataStream &QDataStream::operator>>(quint8 &i)
 { return *this >> reinterpret_cast<qint8&>(i); }
 
@@ -348,6 +399,9 @@ inline QDataStream &QDataStream::operator>>(quint32 &i)
 
 inline QDataStream &QDataStream::operator>>(quint64 &i)
 { return *this >> reinterpret_cast<qint64&>(i); }
+
+inline QDataStream &QDataStream::operator<<(char i)
+{ return *this << qint8(i); }
 
 inline QDataStream &QDataStream::operator<<(quint8 i)
 { return *this << qint8(i); }
@@ -363,99 +417,174 @@ inline QDataStream &QDataStream::operator<<(quint64 i)
 
 template <typename Enum>
 inline QDataStream &operator<<(QDataStream &s, QFlags<Enum> e)
-{ return s << e.i; }
+{ return s << typename QFlags<Enum>::Int(e); }
 
 template <typename Enum>
 inline QDataStream &operator>>(QDataStream &s, QFlags<Enum> &e)
-{ return s >> e.i; }
-
-template <typename T>
-inline QDataStream &operator>>(QDataStream &s, QList<T> &l)
 {
-    return QtPrivate::readArrayBasedContainer(s, l);
+    typename QFlags<Enum>::Int i;
+    s >> i;
+    e = QFlag(i);
+    return s;
 }
 
 template <typename T>
-inline QDataStream &operator<<(QDataStream &s, const QList<T> &l)
-{
-    return QtPrivate::writeSequentialContainer(s, l);
-}
+typename std::enable_if_t<std::is_enum<T>::value, QDataStream &>
+operator<<(QDataStream &s, const T &t)
+{ return s << static_cast<typename std::underlying_type<T>::type>(t); }
 
 template <typename T>
-inline QDataStream &operator>>(QDataStream &s, QLinkedList<T> &l)
-{
-    return QtPrivate::readListBasedContainer(s, l);
-}
+typename std::enable_if_t<std::is_enum<T>::value, QDataStream &>
+operator>>(QDataStream &s, T &t)
+{ return s >> reinterpret_cast<typename std::underlying_type<T>::type &>(t); }
 
-template <typename T>
-inline QDataStream &operator<<(QDataStream &s, const QLinkedList<T> &l)
-{
-    return QtPrivate::writeSequentialContainer(s, l);
-}
+#ifndef Q_CLANG_QDOC
 
 template<typename T>
-inline QDataStream &operator>>(QDataStream &s, QVector<T> &v)
+inline QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream &s, QList<T> &v)
 {
     return QtPrivate::readArrayBasedContainer(s, v);
 }
 
 template<typename T>
-inline QDataStream &operator<<(QDataStream &s, const QVector<T> &v)
+inline QDataStreamIfHasOStreamOperatorsContainer<QList<T>, T> operator<<(QDataStream &s, const QList<T> &v)
 {
     return QtPrivate::writeSequentialContainer(s, v);
 }
 
 template <typename T>
-inline QDataStream &operator>>(QDataStream &s, QSet<T> &set)
+inline QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream &s, QSet<T> &set)
 {
     return QtPrivate::readListBasedContainer(s, set);
 }
 
 template <typename T>
-inline QDataStream &operator<<(QDataStream &s, const QSet<T> &set)
+inline QDataStreamIfHasOStreamOperatorsContainer<QSet<T>, T> operator<<(QDataStream &s, const QSet<T> &set)
 {
     return QtPrivate::writeSequentialContainer(s, set);
 }
 
 template <class Key, class T>
-inline QDataStream &operator>>(QDataStream &s, QHash<Key, T> &hash)
+inline QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream &s, QHash<Key, T> &hash)
 {
     return QtPrivate::readAssociativeContainer(s, hash);
 }
 
 template <class Key, class T>
-inline QDataStream &operator<<(QDataStream &s, const QHash<Key, T> &hash)
+
+inline QDataStreamIfHasOStreamOperatorsContainer<QHash<Key, T>, Key, T> operator<<(QDataStream &s, const QHash<Key, T> &hash)
 {
     return QtPrivate::writeAssociativeContainer(s, hash);
 }
 
 template <class Key, class T>
-inline QDataStream &operator>>(QDataStream &s, QMap<Key, T> &map)
+inline QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream &s, QMultiHash<Key, T> &hash)
+{
+    return QtPrivate::readAssociativeContainer(s, hash);
+}
+
+template <class Key, class T>
+inline QDataStreamIfHasOStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator<<(QDataStream &s, const QMultiHash<Key, T> &hash)
+{
+    return QtPrivate::writeAssociativeMultiContainer(s, hash);
+}
+
+template <class Key, class T>
+inline QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream &s, QMap<Key, T> &map)
 {
     return QtPrivate::readAssociativeContainer(s, map);
 }
 
 template <class Key, class T>
-inline QDataStream &operator<<(QDataStream &s, const QMap<Key, T> &map)
+inline QDataStreamIfHasOStreamOperatorsContainer<QMap<Key, T>, Key, T> operator<<(QDataStream &s, const QMap<Key, T> &map)
 {
     return QtPrivate::writeAssociativeContainer(s, map);
 }
 
-#ifndef QT_NO_DATASTREAM
+template <class Key, class T>
+inline QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream &s, QMultiMap<Key, T> &map)
+{
+    return QtPrivate::readAssociativeContainer(s, map);
+}
+
+template <class Key, class T>
+inline QDataStreamIfHasOStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator<<(QDataStream &s, const QMultiMap<Key, T> &map)
+{
+    return QtPrivate::writeAssociativeMultiContainer(s, map);
+}
+
 template <class T1, class T2>
-inline QDataStream& operator>>(QDataStream& s, QPair<T1, T2>& p)
+inline QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream& s, std::pair<T1, T2> &p)
 {
     s >> p.first >> p.second;
     return s;
 }
 
 template <class T1, class T2>
-inline QDataStream& operator<<(QDataStream& s, const QPair<T1, T2>& p)
+inline QDataStreamIfHasOStreamOperators<T1, T2> operator<<(QDataStream& s, const std::pair<T1, T2> &p)
 {
     s << p.first << p.second;
     return s;
 }
-#endif
+
+#else
+
+template <class T>
+QDataStream &operator>>(QDataStream &s, QList<T> &l);
+
+template <class T>
+QDataStream &operator<<(QDataStream &s, const QList<T> &l);
+
+template <class T>
+QDataStream &operator>>(QDataStream &s, QSet<T> &set);
+
+template <class T>
+QDataStream &operator<<(QDataStream &s, const QSet<T> &set);
+
+template <class Key, class T>
+QDataStream &operator>>(QDataStream &s, QHash<Key, T> &hash);
+
+template <class Key, class T>
+QDataStream &operator<<(QDataStream &s, const QHash<Key, T> &hash);
+
+template <class Key, class T>
+QDataStream &operator>>(QDataStream &s, QMultiHash<Key, T> &hash);
+
+template <class Key, class T>
+QDataStream &operator<<(QDataStream &s, const QMultiHash<Key, T> &hash);
+
+template <class Key, class T>
+QDataStream &operator>>(QDataStream &s, QMap<Key, T> &map);
+
+template <class Key, class T>
+QDataStream &operator<<(QDataStream &s, const QMap<Key, T> &map);
+
+template <class Key, class T>
+QDataStream &operator>>(QDataStream &s, QMultiMap<Key, T> &map);
+
+template <class Key, class T>
+QDataStream &operator<<(QDataStream &s, const QMultiMap<Key, T> &map);
+
+template <class T1, class T2>
+QDataStream &operator>>(QDataStream& s, std::pair<T1, T2> &p);
+
+template <class T1, class T2>
+QDataStream &operator<<(QDataStream& s, const std::pair<T1, T2> &p);
+
+#endif // Q_CLANG_QDOC
+
+inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+{
+    int combined;
+    s >> combined;
+    combination = QKeyCombination::fromCombined(combined);
+    return s;
+}
+
+inline QDataStream &operator<<(QDataStream &s, QKeyCombination combination)
+{
+    return s << combination.toCombined();
+}
 
 #endif // QT_NO_DATASTREAM
 

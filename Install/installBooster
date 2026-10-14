@@ -1,0 +1,121 @@
+#!/bin/bash
+
+set -eu
+
+baseDir="$(cd "$(dirname "$(which "$0")")" && pwd)"
+bhDir="$(dirname "${baseDir}")"
+
+UPDATE=false
+
+source "${baseDir}/Include/bhumanBase"
+
+robotName=""
+robotIp=192.168.10.102
+motionIp=192.168.10.101
+
+if [ "$(uname)" = Darwin ]; then
+  rsyncOptions="-qzPha"
+  pingOptions="-t 1 -c 1"
+else
+  rsyncOptions="-qzPEha"
+  pingOptions="-w 1 -c 1"
+fi
+
+usage() {
+  echo "usage:"
+  echo "${0} <name>      : full install, assigns name to robot"
+  echo "${0} -u <name>   : update bin scripts only, no system configuration"
+  echo "${0} -h|--help   : displays this help"
+  exit 1
+}
+
+parseOptions() {
+  if [ $# -eq 2 ] && [ "$1" = "-u" ]; then
+    UPDATE=true
+    robotName=${2}
+  elif [ $# -eq 1 ] && [ "$1" != "-h" ] && [ "$1" != "--help" ]; then
+    robotName=${1}
+  else
+    if [ $# -gt 2 ]; then
+      error "Too many arguments!"
+    fi
+    usage
+  fi
+
+  # Check whether robot name is known
+  if [ ! -f "${bhDir}/Config/Robots/${robotName}/network.cfg" ]; then
+    fatal "There is no network configuration for a robot '${robotName}'!"
+  fi
+
+  # Check whether robots.cfg exists
+  if [ ! -f "${robotsFile}" ]; then
+    fatal "The file ${robotsFile} does not exist!"
+  fi
+
+  # Check whether name belongs to Booster robot
+  if [ -z "$(grep "\"${robotName}\"" "${robotsFile}" | grep -E "robotType *= *[kt]1 *;")" ]; then
+    fatal "'${robotName}' is not a Booster robot!"
+  fi
+
+  # Try to ping robot
+  if [ "$(ping ${pingOptions} ${robotIp} > /dev/null && echo 1 || echo 0)" == "0" ]; then
+    fatal "Robot not reachable at ${robotIp}"
+  fi
+
+	# extract robotIp from network.cfg if needed
+	if [ "$UPDATE" = "true" ]; then
+		robotIp=$(grep '^lan' "${bhDir}/Config/Robots/${robotName}/network.cfg" | sed 's/.*"\(.*\)";.*/\1/')
+	fi
+}
+
+copyFiles() {
+  message "Installing ssh key. If prompted, please enter the robot's password (usually 123456)."
+  key="$(cat "${baseDir}/Keys/id_rsa_nao.pub")"
+  ssh ${SSHOPTIONS} ${2}@${1} "mkdir -p .ssh && chmod 700 .ssh && echo >>.ssh/authorized_keys \"$key\" && sort -u .ssh/authorized_keys -o .ssh/authorized_keys && chmod 600 .ssh/authorized_keys" || fatal "Can't append ssh key to '.ssh/authorized_keys'"
+
+  message "Copying files to ${robotName} at ${robotIp}."
+  copyTo="/tmp/installBooster/"
+  ssh ${SSHOPTIONS} ${2}@${1} "rm -rf ${copyTo}" || fatal "Can't remove '${copyTo}' on robot"
+  ssh ${SSHOPTIONS} ${2}@${1} "mkdir -p ${copyTo}" || fatal "Can't create '${copyTo}' on robot"
+  rsync ${rsyncOptions} -e "ssh ${SSHOPTIONS}" "${baseDir}/BoosterFiles"/* ${2}@${1}:${copyTo} || fatal "Can't copy to '${copyTo}' on robot"
+  rsync ${rsyncOptions} -e "ssh ${SSHOPTIONS}" "${baseDir}/Files/bin/roboeireann" "${baseDir}/Files/bin/chmod-usb" ${2}@${1}:${copyTo}bin/ || fatal "Can't copy to '${copyTo}bin/' on robot"
+  rsync ${rsyncOptions} -e "ssh ${SSHOPTIONS}" "${bhDir}/Config/Robots/${robotName}/network.cfg" ${2}@${1}:${copyTo} || fatal "Can't copy network.cfg to '${copyTo}' on robot"
+}
+
+updateFiles() {
+  message "Updating bin scripts to ${robotName} at ${robotIp}"
+  rsync ${rsyncOptions} -e "ssh ${SSHOPTIONS}" \
+      "${baseDir}/BoosterFiles/bin"/* \
+      "${baseDir}/Files/bin/roboeireann" \
+      "${baseDir}/Files/bin/chmod-usb" \
+      ${2}@${1}:/home/booster/bin/ || fatal "Can't update bin scripts on robot"
+  ssh ${SSHOPTIONS} ${2}@${1} "chmod +x /home/booster/bin/*" || fatal "Can't set permissions"
+}
+
+runInstallation() {
+  message "Launching installation process for robot at ${robotIp}."
+  ssh -t ${SSHOPTIONS} ${2}@${1} "chmod 755 ${copyTo}/install && bash -l -c '${copyTo}/install  ${robotName}'" || fatal "Installation failed"
+}
+
+###############################################################################
+##                                                                           ##
+##  MAIN                                                                     ##
+##                                                                           ##
+###############################################################################
+
+source "${bhDir}/Make/Common/setupSSH"
+
+checkApp "rsync"
+parseOptions "$@"
+if ${UPDATE}; then
+  updateFiles ${robotIp} booster
+	# NOTE: no T1 support for now
+else
+	copyFiles ${robotIp} booster
+	runInstallation ${robotIp} booster
+	if [ ! -z "$(grep "\"${robotName}\"" "${robotsFile}" | grep -E "robotType *= *t1 *;")" ]; then
+		message "Installing Motion PC."
+		copyFiles ${motionIP} master
+		runInstallation ${motionIP} master
+	fi
+fi

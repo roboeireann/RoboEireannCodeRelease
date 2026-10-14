@@ -44,7 +44,6 @@
 
 QT_BEGIN_NAMESPACE
 
-
 class QEventLoopPrivate;
 
 class Q_CORE_EXPORT QEventLoop : public QObject
@@ -53,7 +52,7 @@ class Q_CORE_EXPORT QEventLoop : public QObject
     Q_DECLARE_PRIVATE(QEventLoop)
 
 public:
-    explicit QEventLoop(QObject *parent = Q_NULLPTR);
+    explicit QEventLoop(QObject *parent = nullptr);
     ~QEventLoop();
 
     enum ProcessEventsFlag {
@@ -63,27 +62,28 @@ public:
         WaitForMoreEvents = 0x04,
         X11ExcludeTimers = 0x08,
         EventLoopExec = 0x20,
-        DialogExec = 0x40
+        DialogExec = 0x40,
+        ApplicationExec = 0x80,
     };
     Q_DECLARE_FLAGS(ProcessEventsFlags, ProcessEventsFlag)
+    Q_FLAG(ProcessEventsFlags)
 
     bool processEvents(ProcessEventsFlags flags = AllEvents);
     void processEvents(ProcessEventsFlags flags, int maximumTime);
 
     int exec(ProcessEventsFlags flags = AllEvents);
-    void exit(int returnCode = 0);
     bool isRunning() const;
 
     void wakeUp();
 
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    bool event(QEvent *event) override;
 
 public Q_SLOTS:
+    void exit(int returnCode = 0);
     void quit();
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QEventLoop::ProcessEventsFlags)
-
 
 class QEventLoopLockerPrivate;
 

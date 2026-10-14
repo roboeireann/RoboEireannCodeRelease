@@ -6,72 +6,20 @@
 
 #pragma once
 
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/AutoStreamable.h"
-#include "Tools/Streams/Enum.h"
+#include "Tools/Communication/BHumanMessageParticle.h"
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
 
 /**
  * @struct BehaviorStatus
  * A struct that contains data about the current behavior state.
  */
-STREAMABLE(BehaviorStatus,
-{
-  ENUM(Activity,
-  {,
-    unknown,
-
-    afterInterceptBall,
-    fallen,
-    finished,
-    initial,
-    lookAroundAfterPenalty,
-    set,
-    generalPlay,
-
-    codeReleaseKickAtGoal,
-    codeReleasePositionForKickOff,
-
-    calibrationFinished,
-
-    rePlaceholder,
-    reStandStill,
-    rePositionForKickOff,
-    reKickoff,
-    reKickAtGoal,
-    reSearchForBall,
-
-    reGoalieWaiting,
-    reGoalieSave,
-    reKickBestOption,
-    reGotoPose,
-    rePenaltyShot,
-
-    reStandAndLookActive,
-    reWalkToTacticPose,
-    reStandAtTacticPose,
-
-    reSetPlayBackoffAndStand,
-    reIndirectKick,
-
-    reIntercept,
-    
-    // IMPORTANT - add additional statuses to the end - don't insert in the list above
-  });
-
-  /**
-   * Checks whether the activity indicates that the robot is searching for the ball.
-   * @return Whether the activity indicates that the robot is searching for the ball.
-   */
-  bool searchesForBall() const
-  {
-    return false;
-  },
-
-  (Activity)(unknown) activity, /**< What is the robot doing in general? */
-  (int)(-1) passTarget,
-  (Vector2f)(Vector2f::Zero()) walkingTo, ///< robot relative coordinates
+STREAMABLE(BehaviorStatus, COMMA public BHumanCompressedMessageParticle<BehaviorStatus>
+{,
+  (bool)(false) calibrationFinished, /**< Set when the behavior is done with calibration and wants to transition to the unstiff state. */
+  (int)(-1) passTarget, /**< The number of the passed-to player. */
+  (int)(-1) passOrigin, /**< The number of the player that passes to this one */
+  (Vector2f)(Vector2f::Zero()) walkingTo, /**< The target position the robot is walking to (in robot relative coordinates). */
   (float) speed, /**< The absolute speed in mm/s. */
-  (Vector2f)(Vector2f::Zero()) shootingTo, ///< robot relative coordinates
+  (std::optional<Vector2f>) shootingTo, /**< The target position the robot is kicking the ball to (in robot relative coordinates). */
 });
-
-typedef BehaviorStatus BehaviourStatus; // alias with "correct" spelling

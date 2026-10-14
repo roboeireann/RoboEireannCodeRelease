@@ -6,8 +6,8 @@
 
 #pragma once
 
+#include "Math/Geometry.h"
 #include <vector>
-#include "Tools/Math/Geometry.h"
 
 struct CameraMatrix;
 struct CameraInfo;
@@ -26,7 +26,7 @@ namespace Projection
    * @param robotPose The pose of the robot on the field
    * @param cameraMatrix The position and orientation of the robot's camera.
    * @param cameraInfo The resolution and the opening angle of the robot's camera.
-   * @param fieldDimenstions The specification of the playing field
+   * @param fieldDimensions The specification of the playing field
    * @param p The list of points
    */
   void computeFieldOfViewInFieldCoordinates(const RobotPose& robotPose, const CameraMatrix& cameraMatrix,
@@ -66,11 +66,11 @@ namespace Projection
   /**
    * The function determines how far an object is away depending on its real size and the size in the image
    * along with its center position, using camera intrinsic parameters.
-   * @param cameraInfo Class containing the intrinsic paramaters
+   * @param cameraInfo Class containing the intrinsic parameters
    * @param sizeInReality The real size of the object.
    * @param sizeInPixels The size in the image.
-   * @param centerX X coordinate (in image reference) of object's baricenter.
-   * @param centerY Y coordinate (in image reference) of object's baricenter.
+   * @param centerX X coordinate (in image reference) of object's barycenter.
+   * @param centerY Y coordinate (in image reference) of object's barycenter.
    * @return The distance between camera and object.
    */
   float getDistanceBySize(const CameraInfo& cameraInfo, float sizeInReality, float sizeInPixels, float centerX, float centerY);
@@ -83,6 +83,16 @@ namespace Projection
    * @return The size as it would appear in the image.
    */
   float getSizeByDistance(const CameraInfo& cameraInfo, float sizeInReality, float distance);
+
+  /** Checks, if a point on the field (relative to the robot) is inside the current image
+   * @param cameraMatrix The position and orientation of the robot's camera.
+   * @param cameraInfo   The resolution and the opening angle of the robot's camera.
+   * @param  p           The point
+   * @param  pImg        The point projected to the current image (only valid, if function result is true)
+   * @return             true, if the point can be seen by the robot
+   */
+  [[nodiscard]] bool pointIsInImage(const CameraMatrix& cameraMatrix, const CameraInfo& cameraInfo,
+                                    const Vector2f& p, Vector2f& pImg);
 
   [[nodiscard]] bool calculatePointByAngles(const Vector2f& angles, const CameraMatrix& cameraMatrix, const CameraInfo& cameraInfo, Vector2f& point);
 };

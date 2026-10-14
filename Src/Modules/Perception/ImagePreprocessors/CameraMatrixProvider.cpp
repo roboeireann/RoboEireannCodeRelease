@@ -6,20 +6,24 @@
  */
 
 #include "CameraMatrixProvider.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
-#include "Tools/Math/RotationMatrix.h"
+#include "Debugging/DebugDrawings.h"
+#include "Debugging/DebugDrawings3D.h"
+#include "Math/RotationMatrix.h"
+#include "Platform/SystemCall.h"
 
-MAKE_MODULE(CameraMatrixProvider, perception);
+MAKE_MODULE(CameraMatrixProvider);
 
 void CameraMatrixProvider::update(CameraMatrix& cameraMatrix)
 {
   cameraMatrix.computeCameraMatrix(theTorsoMatrix, theRobotCameraMatrix, theCameraCalibration);
-  cameraMatrix.isValid = theTorsoMatrix.isValid && theMotionInfo.isMotionStable &&
-                         (theFallDownState.state == FallDownState::upright ||
-                          theFallDownState.state == FallDownState::squatting) &&
-                         theFrameInfo.getTimeSince(theJointSensorData.timestamp) < 500 &&
-                         (!theGameInfo.isPenalized() || theGameInfo.isPenalized(PENALTY_SPL_ILLEGAL_MOTION_IN_SET));
+  cameraMatrix.isValid = SystemCall::getMode() == SystemCall::simulatedRobot ||
+                         (theTorsoMatrix.isValid && theMotionInfo.isMotionStable &&
+                          (theFallDownState.state == FallDownState::upright ||
+                           theFallDownState.state == FallDownState::squatting) &&
+                           theFrameInfo.getTimeSince(theJointAngles.timestamp) < 500 &&
+                          (!theGameState.isPenalized() ||
+                           theGameState.playerState == GameState::penalizedMotionInSet)); // ||
+                          // theGameState.playerState == GameState::penalizedIllegalMotionInStandby);
 
   DEBUG_DRAWING("module:CameraMatrixProvider:calibrationHelper", "drawingOnImage") drawFieldLines(cameraMatrix);
   DEBUG_DRAWING3D("module:CameraMatrixProvider:cameraMatrix", "field")
@@ -76,7 +80,7 @@ void CameraMatrixProvider::drawFieldLines(const CameraMatrix& cameraMatrix) cons
   Vector3f start0C, start1C, end0C, end1C;
   Vector2f start0I, start1I, end0I, end1I;
 
-  const Pose2f& robotPoseInv(theRobotPose.inversePose);
+  const Pose2f& robotPoseInv(theRobotPose.inverse());
   const Pose3f& cameraMatrixInv(cameraMatrix.inverse());
   float halfFieldLinesWidth = theFieldDimensions.fieldLinesWidth / 2;
 

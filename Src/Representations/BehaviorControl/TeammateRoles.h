@@ -4,11 +4,12 @@
  * This file declares a representation of a team role assignment in the 2019 behavior.
  *
  * @author Arne Hasselbring
+ * @note BH2021 Code release - only required for RE2025 and older behaviours
  */
 
 #pragma once
 
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/AutoStreamable.h"
 #include <vector>
 
 STREAMABLE(TeammateRoles,

@@ -50,7 +50,6 @@ QT_BEGIN_NAMESPACE
 
 
 class QFontPrivate;                                     /* don't touch */
-class QStringList;
 class QVariant;
 
 class Q_GUI_EXPORT QFont
@@ -68,6 +67,7 @@ public:
         Monospace,
         Fantasy
     };
+    Q_ENUM(StyleHint)
 
     enum StyleStrategy {
         PreferDefault       = 0x0001,
@@ -79,9 +79,8 @@ public:
         PreferQuality       = 0x0040,
         PreferAntialias     = 0x0080,
         NoAntialias         = 0x0100,
-        OpenGLCompatible    = 0x0200,
-        ForceIntegerMetrics = 0x0400,
         NoSubpixelAntialias = 0x0800,
+        PreferNoShaping     = 0x1000,
         NoFontMerging       = 0x8000
     };
     Q_ENUM(StyleStrategy)
@@ -92,25 +91,27 @@ public:
         PreferVerticalHinting       = 2,
         PreferFullHinting           = 3
     };
+    Q_ENUM(HintingPreference)
 
-    // Mapping OpenType weight value.
     enum Weight {
-        Thin     = 0,    // 100
-        ExtraLight = 12, // 200
-        Light    = 25,   // 300
-        Normal   = 50,   // 400
-        Medium   = 57,   // 500
-        DemiBold = 63,   // 600
-        Bold     = 75,   // 700
-        ExtraBold = 81,  // 800
-        Black    = 87    // 900
+        Thin = 100,
+        ExtraLight = 200,
+        Light = 300,
+        Normal = 400,
+        Medium = 500,
+        DemiBold = 600,
+        Bold = 700,
+        ExtraBold = 800,
+        Black = 900
     };
+    Q_ENUM(Weight)
 
     enum Style {
         StyleNormal,
         StyleItalic,
         StyleOblique
     };
+    Q_ENUM(Style)
 
     enum Stretch {
         AnyStretch     =   0,
@@ -124,6 +125,7 @@ public:
         ExtraExpanded  = 150,
         UltraExpanded  = 200
     };
+    Q_ENUM(Stretch)
 
     enum Capitalization {
         MixedCase,
@@ -132,13 +134,16 @@ public:
         SmallCaps,
         Capitalize
     };
+    Q_ENUM(Capitalization)
 
     enum SpacingType {
         PercentageSpacing,
         AbsoluteSpacing
     };
+    Q_ENUM(SpacingType)
 
     enum ResolveProperties {
+        NoPropertiesResolved        = 0x0000,
         FamilyResolved              = 0x0001,
         SizeResolved                = 0x0002,
         StyleHintResolved           = 0x0004,
@@ -156,20 +161,27 @@ public:
         WordSpacingResolved         = 0x4000,
         HintingPreferenceResolved   = 0x8000,
         StyleNameResolved           = 0x10000,
-        AllPropertiesResolved       = 0x1ffff
+        FamiliesResolved            = 0x20000,
+        AllPropertiesResolved       = 0x3ffff
     };
+    Q_ENUM(ResolveProperties)
 
     QFont();
+
     QFont(const QString &family, int pointSize = -1, int weight = -1, bool italic = false);
-    QFont(const QFont &, QPaintDevice *pd);
-    QFont(const QFont &);
+    explicit QFont(const QStringList &families, int pointSize = -1, int weight = -1, bool italic = false);
+    QFont(const QFont &font, const QPaintDevice *pd);
+    QFont(const QFont &font);
     ~QFont();
 
-    void swap(QFont &other)
-    { qSwap(d, other.d); qSwap(resolve_mask, other.resolve_mask); }
+    void swap(QFont &other) noexcept
+    { d.swap(other.d); std::swap(resolve_mask, other.resolve_mask); }
 
     QString family() const;
     void setFamily(const QString &);
+
+    QStringList families() const;
+    void setFamilies(const QStringList &);
 
     QString styleName() const;
     void setStyleName(const QString &);
@@ -182,8 +194,8 @@ public:
     int pixelSize() const;
     void setPixelSize(int);
 
-    int weight() const;
-    void setWeight(int);
+    Weight weight() const;
+    void setWeight(Weight weight);
 
     inline bool bold() const;
     inline void setBold(bool);
@@ -230,11 +242,6 @@ public:
     void setHintingPreference(HintingPreference hintingPreference);
     HintingPreference hintingPreference() const;
 
-#if QT_DEPRECATED_SINCE(5, 5)
-    bool rawMode() const;
-    void setRawMode(bool);
-#endif
-
     // dupicated from QFontInfo
     bool exactMatch() const;
 
@@ -244,16 +251,7 @@ public:
     bool operator<(const QFont &) const;
     operator QVariant() const;
     bool isCopyOf(const QFont &) const;
-#ifdef Q_COMPILER_RVALUE_REFS
-    inline QFont &operator=(QFont &&other) Q_DECL_NOEXCEPT
-    { qSwap(d, other.d); qSwap(resolve_mask, other.resolve_mask);  return *this; }
-#endif
-
-#if QT_DEPRECATED_SINCE(5, 3)
-    // needed for X11
-    QT_DEPRECATED void setRawName(const QString &);
-    QT_DEPRECATED QString rawName() const;
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QFont)
 
     QString key() const;
 
@@ -266,20 +264,20 @@ public:
     static void insertSubstitution(const QString&, const QString &);
     static void insertSubstitutions(const QString&, const QStringList &);
     static void removeSubstitutions(const QString &);
-#if QT_DEPRECATED_SINCE(5, 0)
-    static QT_DEPRECATED void removeSubstitution(const QString &family) { removeSubstitutions(family); }
-#endif
     static void initialize();
     static void cleanup();
     static void cacheStatistics();
 
     QString defaultFamily() const;
-    QString lastResortFamily() const;
-    QString lastResortFont() const;
 
     QFont resolve(const QFont &) const;
-    inline uint resolve() const { return resolve_mask; }
-    inline void resolve(uint mask) { resolve_mask = mask; }
+    inline uint resolveMask() const { return resolve_mask; }
+    inline void setResolveMask(uint mask) { resolve_mask = mask; }
+
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use setWeight() instead") void setLegacyWeight(int legacyWeight);
+    QT_DEPRECATED_VERSION_X_6_0("Use weight() instead") int legacyWeight() const;
+#endif
 
 private:
     explicit QFont(QFontPrivate *);
@@ -318,13 +316,17 @@ private:
     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QFont &);
 #endif
 
+#ifndef QT_NO_DEBUG_STREAM
+    friend Q_GUI_EXPORT QDebug operator<<(QDebug, const QFont &);
+#endif
+
     QExplicitlySharedDataPointer<QFontPrivate> d;
     uint resolve_mask;
 };
 
 Q_DECLARE_SHARED(QFont)
 
-Q_GUI_EXPORT uint qHash(const QFont &font, uint seed = 0) Q_DECL_NOTHROW;
+Q_GUI_EXPORT size_t qHash(const QFont &font, size_t seed = 0) noexcept;
 
 inline bool QFont::bold() const
 { return weight() > Medium; }

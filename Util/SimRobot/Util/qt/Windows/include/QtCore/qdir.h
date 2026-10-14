@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -41,12 +41,12 @@
 #define QDIR_H
 
 #include <QtCore/qstring.h>
+#include <QtCore/qfile.h>
 #include <QtCore/qfileinfo.h>
 #include <QtCore/qstringlist.h>
 #include <QtCore/qshareddata.h>
 
 QT_BEGIN_NAMESPACE
-
 
 class QDirIterator;
 class QDirPrivate;
@@ -102,26 +102,63 @@ public:
     QDir(const QString &path = QString());
     QDir(const QString &path, const QString &nameFilter,
          SortFlags sort = SortFlags(Name | IgnoreCase), Filters filter = AllEntries);
+#ifdef Q_CLANG_QDOC
+    QDir(const std::filesystem::path &path);
+    QDir(const std::filesystem::path &path, const QString &nameFilter,
+         SortFlags sort = SortFlags(Name | IgnoreCase), Filters filter = AllEntries);
+#elif QT_CONFIG(cxx17_filesystem)
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    QDir(const T &path) : QDir(QtPrivate::fromFilesystemPath(path))
+    {
+    }
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    QDir(const T &path, const QString &nameFilter,
+         SortFlags sort = SortFlags(Name | IgnoreCase), Filters filter = AllEntries)
+         : QDir(QtPrivate::fromFilesystemPath(path), nameFilter, sort, filter)
+    {
+    }
+#endif // QT_CONFIG(cxx17_filesystem)
     ~QDir();
 
     QDir &operator=(const QDir &);
-    QDir &operator=(const QString &path);
-#ifdef Q_COMPILER_RVALUE_REFS
-    QDir &operator=(QDir &&other) Q_DECL_NOTHROW { swap(other); return *this; }
-#endif
+    QT_MOVE_ASSIGNMENT_OPERATOR_IMPL_VIA_PURE_SWAP(QDir)
 
-    void swap(QDir &other) Q_DECL_NOTHROW
-    { qSwap(d_ptr, other.d_ptr); }
+    void swap(QDir &other) noexcept
+    { d_ptr.swap(other.d_ptr); }
 
     void setPath(const QString &path);
+#ifdef Q_CLANG_QDOC
+    void setPath(const std::filesystem::path &path);
+#elif QT_CONFIG(cxx17_filesystem)
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    void setPath(const T &path)
+    {
+        setPath(QtPrivate::fromFilesystemPath(path));
+    }
+#endif // QT_CONFIG(cxx17_filesystem)
     QString path() const;
     QString absolutePath() const;
     QString canonicalPath() const;
-
-    static void addResourceSearchPath(const QString &path);
+#if QT_CONFIG(cxx17_filesystem) || defined(Q_CLANG_QDOC)
+    std::filesystem::path filesystemPath() const
+    { return QtPrivate::toFilesystemPath(path()); }
+    std::filesystem::path filesystemAbsolutePath() const
+    { return QtPrivate::toFilesystemPath(absolutePath()); }
+    std::filesystem::path filesystemCanonicalPath() const
+    { return QtPrivate::toFilesystemPath(canonicalPath()); }
+#endif // QT_CONFIG(cxx17_filesystem)
 
     static void setSearchPaths(const QString &prefix, const QStringList &searchPaths);
     static void addSearchPath(const QString &prefix, const QString &path);
+#ifdef Q_CLANG_QDOC
+    static void addSearchPath(const QString &prefix, const std::filesystem::path &path);
+#elif QT_CONFIG(cxx17_filesystem)
+    template<typename T, QtPrivate::ForceFilesystemPath<T> = 0>
+    static void addSearchPath(const QString &prefix, const T &path)
+    {
+        addSearchPath(prefix, QtPrivate::fromFilesystemPath(path));
+    }
+#endif // QT_CONFIG(cxx17_filesystem)
     static QStringList searchPaths(const QString &prefix);
 
     QString dirName() const;
@@ -159,6 +196,7 @@ public:
                                 SortFlags sort = NoSort) const;
 
     bool mkdir(const QString &dirName) const;
+    bool mkdir(const QString &dirName, QFile::Permissions permissions) const;
     bool rmdir(const QString &dirName) const;
     bool mkpath(const QString &dirPath) const;
     bool rmpath(const QString &dirPath) const;
@@ -176,7 +214,7 @@ public:
     bool makeAbsolute();
 
     bool operator==(const QDir &dir) const;
-    inline bool operator!=(const QDir &dir) const {  return !operator==(dir); }
+    inline bool operator!=(const QDir &dir) const { return !operator==(dir); }
 
     bool remove(const QString &fileName);
     bool rename(const QString &oldName, const QString &newName);
@@ -184,7 +222,7 @@ public:
 
     static QFileInfoList drives();
 
-    Q_DECL_CONSTEXPR static inline QChar listSeparator() Q_DECL_NOTHROW
+    constexpr static inline QChar listSeparator() noexcept
     {
 #if defined(Q_OS_WIN)
         return QLatin1Char(';');
@@ -193,7 +231,14 @@ public:
 #endif
     }
 
-    static QChar separator(); // ### Qt6: Make it inline
+    static QChar separator()
+    {
+#if defined(Q_OS_WIN)
+        return QLatin1Char('\\');
+#else
+        return QLatin1Char('/');
+#endif
+    }
 
     static bool setCurrent(const QString &path);
     static inline QDir current() { return QDir(currentPath()); }
@@ -206,7 +251,7 @@ public:
     static inline QDir temp() { return QDir(tempPath()); }
     static QString tempPath();
 
-#ifndef QT_NO_REGEXP
+#if QT_CONFIG(regularexpression)
     static bool match(const QStringList &filters, const QString &fileName);
     static bool match(const QString &filter, const QString &fileName);
 #endif
@@ -222,12 +267,8 @@ protected:
 private:
     friend class QDirIterator;
     // Q_DECLARE_PRIVATE equivalent for shared data pointers
-    QDirPrivate* d_func();
-    inline const QDirPrivate* d_func() const
-    {
-        return d_ptr.constData();
-    }
-
+    QDirPrivate *d_func();
+    const QDirPrivate *d_func() const { return d_ptr.constData(); }
 };
 
 Q_DECLARE_SHARED(QDir)

@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "Tools/Streams/Enum.h"
-#include "Tools/Math/Angle.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/Enum.h"
+#include "Math/Angle.h"
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
 
 /**
  * Information about the camera which provides the images for the robot
@@ -25,12 +25,14 @@ STREAMABLE(CameraInfo,
    */
   ENUM(Camera,
   {,
-    upper,
-    lower,
+    color,
+    upper = color,
+    depth,
+    lower = depth,
   });
 
   /**
-   * Intrinsic camera parameters: axis skew is modelled as 0 (90° perfectly orthogonal XY)
+   * Intrinsic camera parameters: axis skew is modeled as 0 (90° perfectly orthogonal XY)
    * and the same has been modeled for focal axis aspect ratio; distortion is considering
    * only 2nd and 4th order coefficients of radial model, which account for about 95% of total.
    */
@@ -45,6 +47,12 @@ STREAMABLE(CameraInfo,
 
   void updateFocalLength();
 
+  /**
+   * Returns the name of the thread associated with this camera.
+   * @return The name of the thread.
+   */
+  std::string getThreadName() const;
+
   void draw() const;
 
   void onRead() { updateFocalLength(); },
@@ -52,6 +60,7 @@ STREAMABLE(CameraInfo,
   (Camera) camera,
   (int)(0) width,
   (int)(0) height,
+  (int)(30) frameRate,
   (Angle) openingAngleWidth,
   (Angle) openingAngleHeight,
   (Vector2f) opticalCenter,

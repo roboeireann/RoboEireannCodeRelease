@@ -13,27 +13,26 @@
  * The module declared in this file is based on the implementation that has been used by
  * B-Human for multiple years: estimating the ball position and velocity by maintaining
  * a set of normal Kalman filters.
- * It is a reimplementation of the module used during RoboCup 2018.
+ * It is a re-implementation of the module used during RoboCup 2018.
  *
  * @author Tim Laue
  */
 
 #include "BallStateEstimator.h"
+#include "Debugging/Plot.h"
+#include "Math/Random.h"
 #include "Platform/SystemCall.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Math/Random.h"
-#include "Tools/Math/Transformation.h"
 #include <algorithm>
 
-MAKE_MODULE(BallStateEstimator, modeling);
+MAKE_MODULE(BallStateEstimator);
 
 bool compareHypothesesWeightings(BallStateEstimate& a, BallStateEstimate& b)
 {
-  return  a.weighting > b.weighting;
+  return a.nllWeighting < b.nllWeighting;
 }
 
 BallStateEstimator::BallStateEstimator(): timeWhenBallFirstDisappeared(0),
-  ballDisappeared(false),
+  ballNotSeenButShouldBeSeenCounter(0),
   penaltyBallModelingStartTime(0),
   averagePenaltyBallPosition(Vector2f::Zero()),
   useAveragePenaltyBallPosition(false)
@@ -54,10 +53,12 @@ void BallStateEstimator::reset()
   stationaryBalls.reserve(maxNumberOfHypotheses * 2);
   rollingBalls.reserve(maxNumberOfHypotheses * 2);
   bestState = nullptr;
+  bestMovingState = nullptr;
 }
 
 void BallStateEstimator::update(BallModel& ballModel)
 {
+  DECLARE_DEBUG_DRAWING("module:BallStateEstimator:drawHypotheses", "drawingOnField");
   // *** initial check: if a log file is played and the user steps back: reset the state estimation process
   if(SystemCall::getMode() == SystemCall::logFileReplay &&
      theFrameInfo.time <= lastFrameTime)
@@ -68,11 +69,12 @@ void BallStateEstimator::update(BallModel& ballModel)
       return;
   }
   // *** Shortcut for a a very fast reaction in a penalty shootout!
-  if((theGameInfo.gamePhase == GAME_PHASE_PENALTYSHOOT ||
-    (theGameInfo.setPlay == SET_PLAY_PENALTY_KICK && theGameInfo.isGoalkeeper())) &&
-    !theGameInfo.isOurKick())
+  if((theGameState.isPenaltyShootout() ||
+    (theGameState.isPenaltyKick() && theGameState.isGoalkeeper())) &&
+    theGameState.isForOpponentTeam())
   {
-    if(theGameInfo.state == STATE_PLAYING && !theGameInfo.isPenalized() && (theExtendedGameInfo.timeSincePlayingStarted < 2000.f || theExtendedGameInfo.timeSinceLastPenaltyEnded < 2000.f))
+    if(theGameState.isPlaying() && theGameState.playerState == GameState::active &&
+       theFrameInfo.getTimeSince(std::max(theExtendedGameState.timeWhenStateStarted[theGameState.state], theExtendedGameState.timeWhenPlayerStateStarted[GameState::active])) < 2000)
       return; // Nothing to do at this point of time
     if(computeBallModelForPenaltyShootout(ballModel))
     {
@@ -166,7 +168,7 @@ void BallStateEstimator::motionUpdate(BallModel& ballModel)
   const Matrix2f fixedOdometryRotationTransposed = fixedOdometryRotation.transpose();
   Matrix2f fixedOdometryRotationDeviationRotation;
   fixedOdometryRotationDeviationRotation << odometryDeviationCos, odometryDeviationSin, -odometryDeviationSin, odometryDeviationCos;
-  const Vector2f fixedOdometryTranslation = - fixedOdometryRotation * odometryOffset.translation; // u
+  const Vector2f fixedOdometryTranslation = -fixedOdometryRotation * odometryOffset.translation; // u
 
   // prepare process noise
   const Vector4f squaredProcessCov = processDeviation.cwiseAbs2(); //square every element
@@ -217,11 +219,10 @@ void BallStateEstimator::motionUpdate(BallModel& ballModel)
   if(theFrameInfo.getTimeSince(lastBallPercept.timeWhenSeen) < lastBallPerceptTimeout)
   {
     lastBallPercept.positionOnField = fixedOdometryRotation * lastBallPercept.positionOnField + fixedOdometryTranslation;
-    lastBallPercept.covOnField(0, 0) += odometryTranslationCov[0];
-    lastBallPercept.covOnField(1, 1) += odometryTranslationCov[1];
-    Vector2f squaredOdometryRotationDeviationTranslation = (fixedOdometryRotationDeviationRotation * lastBallPercept.positionOnField - lastBallPercept.positionOnField).cwiseAbs2();
-    lastBallPercept.covOnField(0, 0) += squaredOdometryRotationDeviationTranslation.x();
-    lastBallPercept.covOnField(1, 1) += squaredOdometryRotationDeviationTranslation.y();
+    lastBallPercept.covOnField = fixedOdometryRotation * lastBallPercept.covOnField * fixedOdometryRotation.transpose();
+    Covariance::fixCovariance(lastBallPercept.covOnField);
+    const Vector2f squaredOdometryRotationDeviationTranslation = (fixedOdometryRotationDeviationRotation * lastBallPercept.positionOnField - lastBallPercept.positionOnField).cwiseAbs2();
+    lastBallPercept.covOnField.diagonal() += odometryTranslationCov.head<2>() + squaredOdometryRotationDeviationTranslation;
   }
 
   // Check, if some of the rolling balls have stopped and move them to the buffer
@@ -245,43 +246,52 @@ void BallStateEstimator::motionUpdate(BallModel& ballModel)
 
 void BallStateEstimator::normalizeMeasurementLikelihoods()
 {
-  float highestLikelihoodOfMeasurements = 0;
+  float lowestNLLOfMeasurements = std::numeric_limits<float>::max();
   for(auto& state : rollingBalls)
   {
-    if(state.likelihoodOfMeasurements > highestLikelihoodOfMeasurements)
-      highestLikelihoodOfMeasurements = state.likelihoodOfMeasurements;
+    if(state.nllOfMeasurements < lowestNLLOfMeasurements)
+      lowestNLLOfMeasurements = state.nllOfMeasurements;
   }
   for(auto& state : stationaryBalls)
   {
-    if(state.likelihoodOfMeasurements > highestLikelihoodOfMeasurements)
-      highestLikelihoodOfMeasurements = state.likelihoodOfMeasurements;
+    if(state.nllOfMeasurements < lowestNLLOfMeasurements)
+      lowestNLLOfMeasurements = state.nllOfMeasurements;
   }
-  ASSERT(highestLikelihoodOfMeasurements > 0.f || (stationaryBalls.size() == 0 && rollingBalls.size() == 0));
+  ASSERT(lowestNLLOfMeasurements < std::numeric_limits<float>::max() || (stationaryBalls.empty() && rollingBalls.empty()));
   for(auto& state : stationaryBalls)
-    state.likelihoodOfMeasurements /= highestLikelihoodOfMeasurements;
+    state.nllOfMeasurements -= lowestNLLOfMeasurements;
   for(auto& state : rollingBalls)
-    state.likelihoodOfMeasurements /= highestLikelihoodOfMeasurements;
+    state.nllOfMeasurements -= lowestNLLOfMeasurements;
 }
 
 void BallStateEstimator::findBestState()
 {
   bestState = nullptr;
-  float bestWeighting = -1.f;
+  bestMovingState = nullptr;
+  float bestWeighting = std::numeric_limits<float>::max();
+  float bestMovingWeighting = std::numeric_limits<float>::max();
   for(auto& state : rollingBalls)
-    if(bestState == nullptr || state.weighting > bestWeighting)
+  {
+    if(bestState == nullptr || state.nllWeighting < bestWeighting)
     {
       bestState = &state;
-      bestWeighting = state.weighting;
+      bestWeighting = state.nllWeighting;
     }
+    if(bestMovingState == nullptr || state.nllWeighting < bestMovingWeighting)
+    {
+      bestMovingState = &state;
+      bestMovingWeighting = state.nllWeighting;
+    }
+  }
   for(auto& state : stationaryBalls)
-    if(bestState == nullptr || state.weighting > bestWeighting)
+    if(bestState == nullptr || state.nllWeighting < bestWeighting)
     {
       bestState = &state;
-      bestWeighting = state.weighting;
+      bestWeighting = state.nllWeighting;
     }
 }
 
-template <typename T> void BallStateEstimator::pruneBallBuffer(std::vector<T, Eigen::aligned_allocator<T>>& balls)
+template <typename T> void BallStateEstimator::pruneBallBuffer(std::vector<T>& balls)
 {
   if(balls.size() <= maxNumberOfHypotheses - 1)
     return;
@@ -294,7 +304,9 @@ void BallStateEstimator::createNewFilters(const Vector2f& ballPercept, const flo
 {
   // Create a new stationary state estimator
   StationaryBallKalmanFilter newStationaryBall;
-  newStationaryBall.likelihoodOfMeasurements = initialStateWeight;
+  // initialStateWeight is essentially a factor how much worse a new hypothesis is compared to the best one so far.
+  // For instance, initialStateWeight = 0.1 means that the hypothesis is 1/10 as likely as the best hypothesis.
+  newStationaryBall.nllOfMeasurements = -std::log(initialStateWeight);
   newStationaryBall.radius = ballPerceptRadius;
   newStationaryBall.x = ballPercept;
   newStationaryBall.P = ballPerceptCov;
@@ -312,14 +324,16 @@ void BallStateEstimator::createNewFilters(const Vector2f& ballPercept, const flo
     const float ballSpeed = ballVelocity.norm();
     if(ballSpeed > minSpeed && ballSpeed < theBallSpecification.ballSpeedUpperBound()) // Do not generate slow or very fast balls
     {
+      const Matrix2f positionVelocityCov = ballPerceptCov / deltaTime;
+      const Matrix2f velocityCov = (ballPerceptCov + lastBallPercept.covOnField) / (deltaTime*deltaTime);
       RollingBallKalmanFilter newRollingBall;
-      newRollingBall.likelihoodOfMeasurements = initialStateWeight;
+      newRollingBall.nllOfMeasurements = -std::log(initialStateWeight);
       newRollingBall.radius = ballPerceptRadius;
-      newRollingBall.numOfMeasurements = 2;
       newRollingBall.x << ballPercept, ballVelocity;
-      newRollingBall.P << ballPerceptCov, Matrix2f::Identity(),
-                       Matrix2f::Identity(), (ballPerceptCov + lastBallPercept.covOnField) / deltaTime;
+      newRollingBall.P << ballPerceptCov, positionVelocityCov,
+                          positionVelocityCov, velocityCov;
       newRollingBall.lastPosition = ballPercept;
+      newRollingBall.numOfMeasurements = 2;
       rollingBalls.push_back(newRollingBall);
     }
   }
@@ -331,19 +345,37 @@ void BallStateEstimator::generateModel(BallModel& ballModel)
   if(bestState != nullptr)
   {
     ballModel.estimate.position = bestState->getPosition();
+    if(bestState->timeOfLastCollision > ballModel.timeOfLastCollision)
+      ballModel.timeOfLastCollision = bestState->timeOfLastCollision;
     // <hack>
     if(bestState->numOfMeasurements < minNumberOfMeasurementsForRollingBalls)
       ballModel.estimate.velocity = Vector2f::Zero();
     else
       ballModel.estimate.velocity = bestState->getVelocity();
     // <hack-description>This seems to be the best temporary
-    // solution to avoid the generation of quiet high velocities due to noise between two measurements.
+    // solution to avoid the generation of quite high velocities due to noise between two measurements.
     // T.L.
     // </hack-description>
     // </hack>
     ballModel.estimate.covariance = bestState->getPositionCovariance();
     ballModel.estimate.radius = bestState->radius;
-    Covariance::fixCovariance(ballModel.estimate.covariance);
+    Covariance::fixCovariance<2>(ballModel.estimate.covariance);
+  }
+  if(bestMovingState != nullptr &&
+     bestMovingState != bestState &&
+     bestMovingState->numOfMeasurements >= minNumberOfMeasurementsForRollingBalls &&
+     bestMovingState->getVelocity().norm() > minSpeed)
+  {
+    ballModel.riskyMovingEstimateIsValid = true;
+    ballModel.riskyMovingEstimate.position = bestMovingState->getPosition();
+    ballModel.riskyMovingEstimate.velocity = bestMovingState->getVelocity();
+    ballModel.riskyMovingEstimate.covariance = bestMovingState->getPositionCovariance();
+    ballModel.riskyMovingEstimate.radius = bestMovingState->radius;
+    Covariance::fixCovariance<2>(ballModel.riskyMovingEstimate.covariance);
+  }
+  else
+  {
+    ballModel.riskyMovingEstimateIsValid = false;
   }
   if(ballWasSeenInThisFrame)
   {
@@ -360,17 +392,17 @@ void BallStateEstimator::generateModel(BallModel& ballModel)
     if(ballWasSeen)
     {
       timeWhenBallFirstDisappeared = theFrameInfo.time;
-      ballDisappeared = false;
+      ballNotSeenButShouldBeSeenCounter = 0;
     }
     else if(ballShouldBeVisible)
     {
-      ballDisappeared = true;
+      ++ballNotSeenButShouldBeSeenCounter;
     }
-    else if(!ballDisappeared)
+    else if(!ballNotSeenButShouldBeSeenCounter)
     {
       timeWhenBallFirstDisappeared = theFrameInfo.time;
     }
-    if(theFrameInfo.getTimeSince(timeWhenBallFirstDisappeared) > ballDisappearedTimeout)
+    if(ballNotSeenButShouldBeSeenCounter >= ballDisappearedThreshold)
       ballModel.timeWhenDisappeared = timeWhenBallFirstDisappeared;
     else
       ballModel.timeWhenDisappeared = theFrameInfo.time;
@@ -380,12 +412,12 @@ void BallStateEstimator::generateModel(BallModel& ballModel)
 bool BallStateEstimator::computeBallModelForPenaltyShootout(BallModel& ballModel)
 {
   if(!theFilteredBallPercepts.percepts.empty() &&
-     theGameInfo.state == STATE_PLAYING && !theGameInfo.isPenalized() &&
+     theGameState.isPlaying() && !theGameState.isPenalized() &&
      theMotionInfo.executedPhase == MotionPhase::keyframeMotion)
   {
     const Vector2f relativeBall        = theFilteredBallPercepts.percepts[0].positionOnField;
-    const Vector2f globalBall          = Transformation::robotToField(theWorldModelPrediction.robotPose, relativeBall);
-    const Vector2f relativePenaltyMark = Transformation::fieldToRobot(theWorldModelPrediction.robotPose, Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0.f));
+    const Vector2f globalBall          = theWorldModelPrediction.robotPose * relativeBall;
+    const Vector2f relativePenaltyMark = theWorldModelPrediction.robotPose.inverse() * Vector2f(theFieldDimensions.xPosOwnPenaltyMark, 0.f);
 
     if(penaltyBallModelingStartTime == 0)
       penaltyBallModelingStartTime = theFrameInfo.time;
@@ -415,7 +447,7 @@ bool BallStateEstimator::computeBallModelForPenaltyShootout(BallModel& ballModel
       return true;
     }
   }
-  else if(theGameInfo.state != STATE_PLAYING || theGameInfo.isPenalized())
+  else if(!theGameState.isPlaying() || theGameState.playerState != GameState::active)
   {
     penaltyBallPositions.clear();
     penaltyBallModelingStartTime = 0;
@@ -435,6 +467,7 @@ void BallStateEstimator::integrateCollisionWithFeet()
       state.x << contactInfo.newPosition, contactInfo.newVelocity;
       state.P(2, 2) += contactInfo.addVelocityCov.x();
       state.P(3, 3) += contactInfo.addVelocityCov.y();
+      state.timeOfLastCollision = theFrameInfo.time;
     }
   }
   auto sBall = stationaryBalls.begin();
@@ -445,11 +478,13 @@ void BallStateEstimator::integrateCollisionWithFeet()
       if(contactInfo.newVelocity.norm() < minSpeed) // Ball does not start moving
       {
         sBall->x = contactInfo.newPosition;
+        sBall->timeOfLastCollision = theFrameInfo.time;
         ++sBall;
       }
       else // Ball is rolling after collision -> Create a rolling ball and delete stationary ball
       {
-        rollingBalls.push_back(RollingBallKalmanFilter(*sBall, contactInfo.newPosition, contactInfo.newVelocity, contactInfo.addVelocityCov));
+        rollingBalls.emplace_back(*sBall, contactInfo.newPosition, contactInfo.newVelocity, contactInfo.addVelocityCov);
+        rollingBalls.back().timeOfLastCollision = theFrameInfo.time;
         sBall = stationaryBalls.erase(sBall);
         recomputeBestState = true;  // as pointer bestState might be incorrect after this operation
       }
@@ -465,4 +500,17 @@ void BallStateEstimator::plotAndDraw()
 {
   PLOT("module:BallStateEstimator:stationaryHypotheses", stationaryBalls.size());
   PLOT("module:BallStateEstimator:movingHypotheses", rollingBalls.size());
+
+  for(const auto& b : stationaryBalls)
+  {
+    COVARIANCE_ELLIPSES_2D("module:BallStateEstimator:drawHypotheses", b.P, b.x);
+    CIRCLE("module:BallStateEstimator:drawHypotheses", b.x.x(), b.x.y(), 80, 0, // pen width
+           Drawings::solidPen, ColorRGBA::black, Drawings::solidBrush, ColorRGBA::black);
+  }
+  for(const auto& b : rollingBalls)
+  {
+    COVARIANCE_ELLIPSES_2D("module:BallStateEstimator:drawHypotheses", b.P.topLeftCorner(2, 2), b.x);
+    CIRCLE("module:BallStateEstimator:drawHypotheses", b.x.x(), b.x.y(), 80, 0, // pen width
+           Drawings::solidPen, ColorRGBA::red, Drawings::solidBrush, ColorRGBA::red);
+  }
 }

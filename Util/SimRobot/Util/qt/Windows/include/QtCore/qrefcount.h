@@ -51,59 +51,34 @@ namespace QtPrivate
 class RefCount
 {
 public:
-    inline bool ref() Q_DECL_NOTHROW {
-        int count = atomic.load();
-#if !defined(QT_NO_UNSHARABLE_CONTAINERS)
-        if (count == 0) // !isSharable
-            return false;
-#endif
+    inline bool ref() noexcept {
+        int count = atomic.loadRelaxed();
         if (count != -1) // !isStatic
             atomic.ref();
         return true;
     }
 
-    inline bool deref() Q_DECL_NOTHROW {
-        int count = atomic.load();
-#if !defined(QT_NO_UNSHARABLE_CONTAINERS)
-        if (count == 0) // !isSharable
-            return false;
-#endif
+    inline bool deref() noexcept {
+        int count = atomic.loadRelaxed();
         if (count == -1) // isStatic
             return true;
         return atomic.deref();
     }
 
-#if !defined(QT_NO_UNSHARABLE_CONTAINERS)
-    bool setSharable(bool sharable) Q_DECL_NOTHROW
-    {
-        Q_ASSERT(!isShared());
-        if (sharable)
-            return atomic.testAndSetRelaxed(0, 1);
-        else
-            return atomic.testAndSetRelaxed(1, 0);
-    }
-
-    bool isSharable() const Q_DECL_NOTHROW
-    {
-        // Sharable === Shared ownership.
-        return atomic.load() != 0;
-    }
-#endif
-
-    bool isStatic() const Q_DECL_NOTHROW
+    bool isStatic() const noexcept
     {
         // Persistent object, never deleted
-        return atomic.load() == -1;
+        return atomic.loadRelaxed() == -1;
     }
 
-    bool isShared() const Q_DECL_NOTHROW
+    bool isShared() const noexcept
     {
-        int count = atomic.load();
+        int count = atomic.loadRelaxed();
         return (count != 1) && (count != 0);
     }
 
-    void initializeOwned() Q_DECL_NOTHROW { atomic.store(1); }
-    void initializeUnsharable() Q_DECL_NOTHROW { atomic.store(0); }
+    void initializeOwned() noexcept { atomic.storeRelaxed(1); }
+    void initializeUnsharable() noexcept { atomic.storeRelaxed(0); }
 
     QBasicAtomicInt atomic;
 };

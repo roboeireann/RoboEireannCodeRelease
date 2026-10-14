@@ -2,21 +2,30 @@
  * @file ECImageProvider.cpp
  * @author Felix Thielke
  * @author <a href="mailto:jesse@tzi.de">Jesse Richter-Klug</a>
+ * @author Rudi Villing (modifications)
  */
 
 #include "ECImageProvider.h"
-#include "Tools/Global.h"
+#include "Streaming/Global.h"
+#include "TextLogging/TextLogging.h"
+
 #include <asmjit/asmjit.h>
 
-MAKE_MODULE(ECImageProvider, perception);
+MAKE_MODULE(ECImageProvider);
 
-#ifndef __arm64__
+DECL_TLOGGER(tlogger, "ECImageProvider", TextLogging::INFO);
+
+
+#if !defined __arm64__ && !defined __aarch64__
+// x86 path...
 
 void ECImageProvider::update(ECImage& ecImage)
 {
   ecImage.grayscaled.setResolution(theCameraInfo.width, theCameraInfo.height);
   ecImage.saturated.setResolution(theCameraInfo.width, theCameraInfo.height);
   ecImage.hued.setResolution(theCameraInfo.width, theCameraInfo.height);
+  ecImage.blueChromaticity.setResolution(theCameraInfo.width / 2, theCameraInfo.height / 2);
+  ecImage.redChromaticity.setResolution(theCameraInfo.width / 2, theCameraInfo.height / 2);
 
   if(theCameraImage.timestamp > 10 && static_cast<int>(theCameraImage.width) == theCameraInfo.width / 2)
   {
@@ -33,6 +42,8 @@ void ECImageProvider::update(ECImage& ecImage)
 
       ecFunc(theCameraInfo.width * theCameraInfo.height / 16, theCameraImage[0], ecImage.grayscaled[0], ecImage.saturated[0], ecImage.hued[0]);
     }
+    if(extractChroma)
+      extractChromaticity(ecImage);
     ecImage.timestamp = theCameraImage.timestamp;
   }
 }
@@ -45,7 +56,7 @@ void ECImageProvider::compileE()
 
   // Initialize assembler
   CodeHolder code;
-  code.init(Global::getAsmjitRuntime().codeInfo());
+  code.init(Global::getAsmjitRuntime().environment());
   x86::Assembler a(&code);
 
   // Emit prolog
@@ -87,9 +98,9 @@ void ECImageProvider::compileE()
   a.ret();
 
   // Store constant
-  a.align(AlignMode::kAlignZero, 16);
+  a.align(AlignMode::kZero, 16);
   a.bind(loMask16);
-  for(size_t i = 0; i < 8; i++) a.dint16(0x00FF);
+  a.embedUInt16(0x00FF, 8);
 
   // Bind function
   const Error err = Global::getAsmjitRuntime().add<EFunc>(&eFunc, &code);
@@ -106,7 +117,7 @@ void ECImageProvider::compileEC()
 
   // Initialize assembler
   CodeHolder code;
-  code.init(Global::getAsmjitRuntime().codeInfo());
+  code.init(Global::getAsmjitRuntime().environment());
   x86::Assembler a(&code);
 
   // Define argument registers
@@ -289,17 +300,17 @@ void ECImageProvider::compileEC()
   a.ret();
 
   // Constants
-  a.align(AlignMode::kAlignZero, 16);
+  a.align(AlignMode::kZero, 16);
   a.bind(constants);
-  for(size_t i = 0; i < 8; i++) a.dint16(0x00FF);        // 0: loMask16
-  for(size_t i = 0; i < 16; i++) a.dint8(char(128));     // 1: c8_128
-  for(size_t i = 0; i < 4; i++) a.dint32(0x0000FFFF);    // 2: loMask32
-  for(size_t i = 0; i < 8; i++) a.dint16(1 << 5);        // 3: init for tally
-  for(size_t i = 0; i < 8; i++) a.dint16(64);            // 4: c16_64
-  for(size_t i = 0; i < 8; i++) a.dint16(128);           // 5: c16_128
-  for(size_t i = 0; i < 8; i++) a.dint16(short(0x8001)); // 6: c16_x8001
-  for(size_t i = 0; i < 8; i++) a.dint16(5695);          // 7: c16_5695
-  for(size_t i = 0; i < 8; i++) a.dint16(11039);         // 8: c16_11039
+  a.embedUInt16(0x00FF, 8);     // 0: loMask16
+  a.embedUInt8(128, 16);        // 1: c8_128
+  a.embedUInt32(0x0000FFFF, 4); // 2: loMask32
+  a.embedUInt16(1 << 5, 8);     // 3: init for tally
+  a.embedUInt16(64, 8);         // 4: c16_64
+  a.embedUInt16(128, 8);        // 5: c16_128
+  a.embedUInt16(0x8001, 8);     // 6: c16_x8001
+  a.embedUInt16(5695, 8);       // 7: c16_5695
+  a.embedUInt16(11039, 8);      // 8: c16_11039
 
   // Bind function
   const Error err = Global::getAsmjitRuntime().add<EcFunc>(&ecFunc, &code);
@@ -309,7 +320,6 @@ void ECImageProvider::compileEC()
     ecFunc = nullptr;
     return;
   }
-
 }
 
 ECImageProvider::~ECImageProvider()
@@ -321,15 +331,20 @@ ECImageProvider::~ECImageProvider()
 }
 
 #else
+// Arm - aarch64, using sse2neon behind the scenes
 
-#include "Tools/ImageProcessing/YHSColorConversion.h"
+#include "ImageProcessing/YHSColorConversion.h"
 
 template<bool aligned, bool avx>
 void updateSSE(const PixelTypes::YUYVPixel* const srcImage, const int srcWidth, const int srcHeight,
                Image<PixelTypes::GrayscaledPixel>& grayscaled,
                Image<PixelTypes::HuePixel>& hued, Image<PixelTypes::GrayscaledPixel>& saturated)
 {
-  ASSERT(srcWidth % 32 == 0);
+  const int requiredMultiple = avx ? 32 : 16;
+  if (srcWidth % requiredMultiple != 0)
+    TLOG_ABORT(tlogger, "srcWidth (image.width) was {}, but must be a multiple of {} (for {})",
+               srcWidth, requiredMultiple, avx ? "AVX" : "SSE/NEON");
+  // ASSERT(srcWidth % 32 == 0);
 
   __m_auto_i* grayscaledDest = reinterpret_cast<__m_auto_i*>(grayscaled[0]) - 1;
   __m_auto_i* saturatedDest = reinterpret_cast<__m_auto_i*>(saturated[0]) - 1;
@@ -388,6 +403,8 @@ void ECImageProvider::update(ECImage& ecImage)
   ecImage.grayscaled.setResolution(theCameraInfo.width, theCameraInfo.height);
   ecImage.saturated.setResolution(theCameraInfo.width, theCameraInfo.height);
   ecImage.hued.setResolution(theCameraInfo.width, theCameraInfo.height);
+  ecImage.blueChromaticity.setResolution(theCameraInfo.width / 2, theCameraInfo.height / 2);
+  ecImage.redChromaticity.setResolution(theCameraInfo.width / 2, theCameraInfo.height / 2);
 
   if(theCameraImage.timestamp > 10 && static_cast<int>(theCameraImage.width) == theCameraInfo.width / 2)
   {
@@ -396,6 +413,8 @@ void ECImageProvider::update(ECImage& ecImage)
       updateSSE<true, _supportsAVX2>(src, theCameraImage.width, theCameraImage.height, ecImage.grayscaled, ecImage.hued, ecImage.saturated);
     else
       updateSSE<false, _supportsAVX2>(src, theCameraImage.width, theCameraImage.height, ecImage.grayscaled, ecImage.hued, ecImage.saturated);
+    if(extractChroma)
+      extractChromaticity(ecImage);
     ecImage.timestamp = theCameraImage.timestamp;
   }
 }
@@ -403,3 +422,32 @@ void ECImageProvider::update(ECImage& ecImage)
 ECImageProvider::~ECImageProvider() {}
 
 #endif
+
+void ECImageProvider::extractChromaticity(ECImage& eCImage)
+{
+  ASSERT(theCameraImage.width == static_cast<unsigned int>(theCameraInfo.width / 2));
+  STOPWATCH("module:ECImageProvider:extractChromaticity")
+  {
+    PixelTypes::GrayscaledPixel* uPos = eCImage.blueChromaticity[0];
+    PixelTypes::GrayscaledPixel* vPos = eCImage.redChromaticity[0];
+    const PixelTypes::YUYVPixel* yuyvUpperRowPos = theCameraImage[0];
+    const PixelTypes::YUYVPixel* yuyvLowerRowPos = theCameraImage[0] + theCameraImage.width;
+    // += theCameraImage.width to alternate iterating and skipping rows
+    for(unsigned int yPos = 0; yPos < theCameraImage.height; yPos += 2, yuyvUpperRowPos += theCameraImage.width, yuyvLowerRowPos += theCameraImage.width)
+    {
+      for(unsigned int xPos = 0; xPos < theCameraImage.width; ++xPos, ++yuyvUpperRowPos, ++yuyvLowerRowPos, ++uPos, ++vPos)
+      {
+        *uPos = (yuyvUpperRowPos->u + yuyvLowerRowPos->u) >> 1;
+        *vPos = (yuyvUpperRowPos->v + yuyvLowerRowPos->v) >> 1;
+      }
+    }
+  }
+}
+
+void ECImageProvider::update(OptionalECImage& theOptionalECImage)
+{
+  if(theCalibrationRequest.targetState == CameraCalibrationStatus::State::recordSamples)
+    theOptionalECImage.image = theECImage;
+  else
+    theOptionalECImage.image.reset();
+}

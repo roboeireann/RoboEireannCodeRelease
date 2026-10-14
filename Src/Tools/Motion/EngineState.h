@@ -1,13 +1,13 @@
 /**
  * @file EngineState.h
- * Contains the List of all available states of the getUpEngine.h
+ * Contains the List of all available states of the KeyframeMotionEngine
  *
  * @author Philip Reichenberg
  */
 
 #pragma once
 
-#include "Tools/Streams/Enum.h"
+#include "Streaming/Enum.h"
 
 namespace EngineStates
 {
@@ -15,18 +15,13 @@ namespace EngineStates
   {, //all States defined in getUpEngine.cpp
     off,
     helpMeState,
-    pickUp,
     breakUp,
-    waiting,
     decideAction,
+    waiting,
     waitForRequest,
-    recoverFallen,
     working,
-    workingAction,
     finished,
-    finishedRecover,
     balanceOut,
-    calibrationState,
     retryState,
   });
 

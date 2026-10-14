@@ -49,10 +49,9 @@
 class tst_QAbstractItemView;
 class tst_QTreeView;
 
+QT_REQUIRE_CONFIG(itemviews);
+
 QT_BEGIN_NAMESPACE
-
-
-#ifndef QT_NO_ITEMVIEWS
 
 class QMenu;
 class QDrag;
@@ -66,7 +65,7 @@ class Q_WIDGETS_EXPORT QAbstractItemView : public QAbstractScrollArea
     Q_PROPERTY(int autoScrollMargin READ autoScrollMargin WRITE setAutoScrollMargin)
     Q_PROPERTY(EditTriggers editTriggers READ editTriggers WRITE setEditTriggers)
     Q_PROPERTY(bool tabKeyNavigation READ tabKeyNavigation WRITE setTabKeyNavigation)
-#ifndef QT_NO_DRAGANDDROP
+#if QT_CONFIG(draganddrop)
     Q_PROPERTY(bool showDropIndicator READ showDropIndicator WRITE setDropIndicatorShown)
     Q_PROPERTY(bool dragEnabled READ dragEnabled WRITE setDragEnabled)
     Q_PROPERTY(bool dragDropOverwriteMode READ dragDropOverwriteMode WRITE setDragDropOverwriteMode)
@@ -75,11 +74,14 @@ class Q_WIDGETS_EXPORT QAbstractItemView : public QAbstractScrollArea
 #endif
     Q_PROPERTY(bool alternatingRowColors READ alternatingRowColors WRITE setAlternatingRowColors)
     Q_PROPERTY(SelectionMode selectionMode READ selectionMode WRITE setSelectionMode)
-    Q_PROPERTY(SelectionBehavior selectionBehavior READ selectionBehavior WRITE setSelectionBehavior)
+    Q_PROPERTY(SelectionBehavior selectionBehavior READ selectionBehavior
+               WRITE setSelectionBehavior)
     Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize NOTIFY iconSizeChanged)
     Q_PROPERTY(Qt::TextElideMode textElideMode READ textElideMode WRITE setTextElideMode)
-    Q_PROPERTY(ScrollMode verticalScrollMode READ verticalScrollMode WRITE setVerticalScrollMode RESET resetVerticalScrollMode)
-    Q_PROPERTY(ScrollMode horizontalScrollMode READ horizontalScrollMode WRITE setHorizontalScrollMode RESET resetHorizontalScrollMode)
+    Q_PROPERTY(ScrollMode verticalScrollMode READ verticalScrollMode WRITE setVerticalScrollMode
+               RESET resetVerticalScrollMode)
+    Q_PROPERTY(ScrollMode horizontalScrollMode READ horizontalScrollMode
+               WRITE setHorizontalScrollMode RESET resetHorizontalScrollMode)
 
 public:
     enum SelectionMode {
@@ -125,7 +127,7 @@ public:
     };
     Q_ENUM(ScrollMode)
 
-    explicit QAbstractItemView(QWidget *parent = Q_NULLPTR);
+    explicit QAbstractItemView(QWidget *parent = nullptr);
     ~QAbstractItemView();
 
     virtual void setModel(QAbstractItemModel *model);
@@ -166,7 +168,7 @@ public:
     void setTabKeyNavigation(bool enable);
     bool tabKeyNavigation() const;
 
-#ifndef QT_NO_DRAGANDDROP
+#if QT_CONFIG(draganddrop)
     void setDropIndicatorShown(bool enable);
     bool showDropIndicator() const;
 
@@ -213,6 +215,7 @@ public:
 
     void openPersistentEditor(const QModelIndex &index);
     void closePersistentEditor(const QModelIndex &index);
+    bool isPersistentEditorOpen(const QModelIndex &index) const;
 
     void setIndexWidget(const QModelIndex &index, QWidget *widget);
     QWidget *indexWidget(const QModelIndex &index) const;
@@ -223,9 +226,14 @@ public:
     void setItemDelegateForColumn(int column, QAbstractItemDelegate *delegate);
     QAbstractItemDelegate *itemDelegateForColumn(int column) const;
 
-    QAbstractItemDelegate *itemDelegate(const QModelIndex &index) const;
+#if QT_DEPRECATED_SINCE(6, 0)
+    QT_DEPRECATED_VERSION_X_6_0("Use itemDelegateForIndex instead")
+    QAbstractItemDelegate *itemDelegate(const QModelIndex &index) const
+    { return itemDelegateForIndex(index); }
+#endif
+    virtual QAbstractItemDelegate *itemDelegateForIndex(const QModelIndex &index) const;
 
-    virtual QVariant inputMethodQuery(Qt::InputMethodQuery query) const Q_DECL_OVERRIDE;
+    virtual QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 
     using QAbstractScrollArea::update;
 
@@ -242,7 +250,8 @@ public Q_SLOTS:
     void update(const QModelIndex &index);
 
 protected Q_SLOTS:
-    virtual void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles = QVector<int>());
+    virtual void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight,
+                             const QList<int> &roles = QList<int>());
     virtual void rowsInserted(const QModelIndex &parent, int start, int end);
     virtual void rowsAboutToBeRemoved(const QModelIndex &parent, int start, int end);
     virtual void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
@@ -270,12 +279,7 @@ Q_SIGNALS:
     void iconSizeChanged(const QSize &size);
 
 protected:
-    QAbstractItemView(QAbstractItemViewPrivate &, QWidget *parent = Q_NULLPTR);
-
-    void setHorizontalStepsPerItem(int steps);
-    int horizontalStepsPerItem() const;
-    void setVerticalStepsPerItem(int steps);
-    int verticalStepsPerItem() const;
+    QAbstractItemView(QAbstractItemViewPrivate &, QWidget *parent = nullptr);
 
     enum CursorAction { MoveUp, MoveDown, MoveLeft, MoveRight,
                         MoveHome, MoveEnd, MovePageUp, MovePageDown,
@@ -295,13 +299,13 @@ protected:
     virtual bool edit(const QModelIndex &index, EditTrigger trigger, QEvent *event);
 
     virtual QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex &index,
-                                                                 const QEvent *event = Q_NULLPTR) const;
+                                                                 const QEvent *event = nullptr) const;
 
-#ifndef QT_NO_DRAGANDDROP
+#if QT_CONFIG(draganddrop)
     virtual void startDrag(Qt::DropActions supportedActions);
 #endif
 
-    virtual QStyleOptionViewItem viewOptions() const;
+    virtual void initViewItemOption(QStyleOptionViewItem *option) const;
 
     enum State {
         NoState,
@@ -327,32 +331,33 @@ protected:
     void stopAutoScroll();
     void doAutoScroll();
 
-    bool focusNextPrevChild(bool next) Q_DECL_OVERRIDE;
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
-    bool viewportEvent(QEvent *event) Q_DECL_OVERRIDE;
-    void mousePressEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
-    void mouseMoveEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
-    void mouseReleaseEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
-    void mouseDoubleClickEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
-#ifndef QT_NO_DRAGANDDROP
-    void dragEnterEvent(QDragEnterEvent *event) Q_DECL_OVERRIDE;
-    void dragMoveEvent(QDragMoveEvent *event) Q_DECL_OVERRIDE;
-    void dragLeaveEvent(QDragLeaveEvent *event) Q_DECL_OVERRIDE;
-    void dropEvent(QDropEvent *event) Q_DECL_OVERRIDE;
+    bool focusNextPrevChild(bool next) override;
+    bool event(QEvent *event) override;
+    bool viewportEvent(QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
+#if QT_CONFIG(draganddrop)
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dragLeaveEvent(QDragLeaveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 #endif
-    void focusInEvent(QFocusEvent *event) Q_DECL_OVERRIDE;
-    void focusOutEvent(QFocusEvent *event) Q_DECL_OVERRIDE;
-    void keyPressEvent(QKeyEvent *event) Q_DECL_OVERRIDE;
-    void resizeEvent(QResizeEvent *event) Q_DECL_OVERRIDE;
-    void timerEvent(QTimerEvent *event) Q_DECL_OVERRIDE;
-    void inputMethodEvent(QInputMethodEvent *event) Q_DECL_OVERRIDE;
+    void focusInEvent(QFocusEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    void timerEvent(QTimerEvent *event) override;
+    void inputMethodEvent(QInputMethodEvent *event) override;
+    bool eventFilter(QObject *object, QEvent *event) override;
 
-#ifndef QT_NO_DRAGANDDROP
+#if QT_CONFIG(draganddrop)
     enum DropIndicatorPosition { OnItem, AboveItem, BelowItem, OnViewport };
     DropIndicatorPosition dropIndicatorPosition() const;
 #endif
 
-    QSize viewportSizeHint() const Q_DECL_OVERRIDE;
+    QSize viewportSizeHint() const override;
 
 private:
     Q_DECLARE_PRIVATE(QAbstractItemView)
@@ -380,8 +385,6 @@ private:
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QAbstractItemView::EditTriggers)
-
-#endif // QT_NO_ITEMVIEWS
 
 QT_END_NAMESPACE
 

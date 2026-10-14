@@ -6,15 +6,15 @@
 
 #pragma once
 
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 #include "Representations/Infrastructure/CameraImage.h"
 #include "Representations/Infrastructure/FrameInfo.h"
 #include "Representations/Infrastructure/SensorData/JointSensorData.h"
 #include "Representations/Perception/ImagePreprocessing/CameraMatrix.h"
 #include "Representations/Perception/ImagePreprocessing/ImageCoordinateSystem.h"
-#include "Tools/Streams/EnumIndexedArray.h"
-#include "Tools/ImageProcessing/PixelTypes.h"
-#include "Tools/ImageProcessing/Image.h"
+#include "Streaming/EnumIndexedArray.h"
+#include "ImageProcessing/PixelTypes.h"
+#include "ImageProcessing/Image.h"
 
 namespace CoordinateSystemProviderModule
 {
@@ -37,7 +37,7 @@ MODULE(CoordinateSystemProvider,
   {
     using CameraTiming = CoordinateSystemProviderModule::CameraTiming,
 
-    (ENUM_INDEXED_ARRAY(CameraTiming, CameraInfo::Camera)) cameraTimings, /** The timings of both cameras. */
+    (ENUM_INDEXED_ARRAY(CameraTiming, CameraInfo::Camera)) cameraTimings, /**< The timings of both cameras. */
   }),
 });
 
@@ -58,7 +58,7 @@ class CoordinateSystemProvider : public CoordinateSystemProviderBase
   void calcOffset(const Pose3f& prevPose, const Pose3f& currentPose, Vector2f& prevOffset, Vector2f& offset);
 
   /**
-   * The method calculates the scaling factors for the distored image.
+   * The method calculates the scaling factors for the distorted image.
    * @param a The constant part of the equation for motion distortion will be returned here.
    * @param b The linear part of the equation for motion distortion will be returned here.
    */

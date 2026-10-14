@@ -4,7 +4,7 @@
 * Implementation of a struct that represents the combination of
 * a penalty mark and the line of the penalty area that is
 * closest to it (the line between penalty mark and the field's
-* center line):
+* halfway line):
 *
 *                  (goal)
 *-----------------------------------------
@@ -18,8 +18,8 @@
 #include "PenaltyMarkWithPenaltyAreaLine.h"
 #include "Representations/Configuration/FieldDimensions.h"
 #include "Representations/Infrastructure/CameraInfo.h"
-#include "Tools/Debugging/DebugDrawings.h"
-#include "Tools/Module/Blackboard.h"
+#include "Debugging/DebugDrawings.h"
+#include "Framework/Blackboard.h"
 
 // TODO: Drawing in image
 
@@ -28,11 +28,13 @@ void PenaltyMarkWithPenaltyAreaLine::draw() const
   FieldFeature::draw();
   if(Blackboard::getInstance().exists("CameraInfo"))
   {
-    std::string thread = static_cast<const CameraInfo&>(Blackboard::getInstance()["CameraInfo"]).camera == CameraInfo::upper ? "Upper" : "Lower";
+    const CameraInfo& theCameraInfo = static_cast<const CameraInfo&>(Blackboard::getInstance()["CameraInfo"]);
     DEBUG_DRAWING("representation:PenaltyMarkWithPenaltyAreaLine:field", "drawingOnField")
-      THREAD("representation:PenaltyMarkWithPenaltyAreaLine:field", thread);
+      THREAD("representation:PenaltyMarkWithPenaltyAreaLine:field", theCameraInfo.getThreadName());
+
     if(!isValid)
       return;
+
     static const float size = 1000.f;
     COMPLEX_DRAWING("representation:PenaltyMarkWithPenaltyAreaLine:field")
     {

@@ -8,23 +8,16 @@
  * @author <a href="mailto:jesse@tzi.de">Jesse Richter-Klug</a>
  */
 
-#include "Tools/Module/Module.h"
+#include "Framework/Module.h"
 #include "Representations/BehaviorControl/Libraries/LibPosition.h"
 #include "Representations/Configuration/FieldDimensions.h"
-#include "Representations/Modeling/ObstacleModel.h"
 #include "Representations/Modeling/RobotPose.h"
 
 MODULE(LibPositionProvider,
 {,
   REQUIRES(FieldDimensions),
-  REQUIRES(ObstacleModel),
   REQUIRES(RobotPose),
   PROVIDES(LibPosition),
-  LOADS_PARAMETERS(
-  {,
-    (float) positionOffsetIfOccupied, /**< The radius around an obstacle that occupies my target position. */
-    (Angle) deleteObstacleCircleRange, /**< A previous obstacle is only deleted if it is outside +- this angle. */
-  }),
 });
 
 class LibPositionProvider : public LibPositionProviderBase
@@ -106,11 +99,9 @@ private:
   bool isOutSideGoalFrame(const Vector2f& position, const float offset) const;
 
   /**
-   * Calculates the circle around an obstacle which occupies my target position.
-   * @param position The potential target position on the field
-   * @return The circle with the obstacle as center or radius 0 if none
+   * Calculates weather the goalkeeper is near a post or not.
+   * @param position The relative position of the robot
+   * @return A tuple of two booleans. The first one indicates if the robot is near the left post, the second one if the robot is near the right post.
    */
-  Geometry::Circle getObstacleAtMyPositionCircle(const Vector2f& position);
-
-  Geometry::Circle lastCircle;
+  std::tuple<bool, bool> isNearPost(const Pose2f& position) const;
 };

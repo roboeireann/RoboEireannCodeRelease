@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include "Tools/Math/Eigen.h"
-#include "Tools/Math/Pose2f.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Math/Eigen.h"
+#include "Math/Pose2f.h"
+#include "Streaming/AutoStreamable.h"
 #include <vector>
 
 /**
@@ -60,5 +60,5 @@ STREAMABLE(FilteredBallPercepts,
   /** Verifies that the filtered ball percepts contain valid values. */
   void verify() const;
   ,
-  (std::vector<FilteredBallPercept, Eigen::aligned_allocator<FilteredBallPercept>>) percepts, /**< List of ball perceptions. Empty, if no new ball was seen. Newest ball is at position 0, older balls follow */
+  (std::vector<FilteredBallPercept>) percepts, /**< List of ball perceptions. Empty, if no new ball was seen. Newest ball is at position 0, older balls follow */
 });

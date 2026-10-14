@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDECodeSnippetCompletionPrefix</key>
+	<string>option</string>
+	<key>IDECodeSnippetCompletionScopes</key>
+	<array>
+		<string>TopLevel</string>
+	</array>
+	<key>IDECodeSnippetContents</key>
+	<string>option(&lt;#name#&gt;)
+{
+  &lt;#states#&gt;
+}</string>
+	<key>IDECodeSnippetIdentifier</key>
+	<string>B-Human_option</string>
+	<key>IDECodeSnippetLanguage</key>
+	<string>Xcode.SourceCodeLanguage.C-Plus-Plus</string>
+	<key>IDECodeSnippetSummary</key>
+	<string>B-Human: Define an option in the behavior description language CABSL.</string>
+	<key>IDECodeSnippetTitle</key>
+	<string>CABSL Option</string>
+	<key>IDECodeSnippetUserSnippet</key>
+	<true/>
+	<key>IDECodeSnippetVersion</key>
+	<integer>2</integer>
+</dict>
+</plist>

@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "Tools/Streams/Enum.h"
-#include "Tools/Math/Angle.h"
-#include "Tools/Math/Eigen.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "Streaming/Enum.h"
+#include "Math/Angle.h"
+#include "Math/Eigen.h"
+#include "Streaming/AutoStreamable.h"
 
 /**
  * @struct HeadMotionRequest
@@ -24,7 +24,7 @@ STREAMABLE(HeadMotionRequest,
     panTiltMode,        /**< Use \c pan, \c tilt and \c speed. */
     targetMode,         /**< (A target relative to the center of hip.) Use \c target and \c speed. */
     targetOnGroundMode, /**< Use \c target and \c speed. */
-    calibrationMode,    /** Use \c pan, \c tilt and disable clipping to HeadLimits. */
+    calibrationMode,    /**< Use \c pan, \c tilt and disable clipping to HeadLimits. */
   });
 
   ENUM(CameraControlMode,
@@ -40,5 +40,5 @@ STREAMABLE(HeadMotionRequest,
   (Angle)(0) tilt,          /**< Head tilt target angle in radians. */
   (Angle)(1) speed,         /**< Maximum joint speed to reach target angles in radians/s. */
   (Vector3f)(Vector3f::Zero()) target,        /**< Look at target relative to the robot. */
-  (bool)(false) stopAndGoMode, /**< The Head will slow down and stop every HeadMotionEngine.stopAndGoModeFrequenzy milliseconds */
+  (bool)(false) stopAndGoMode, /**< The Head will slow down and stop every HeadMotionEngine.stopAndGoModeFrequency milliseconds */
 });

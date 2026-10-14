@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtWidgets module of the Qt Toolkit.
@@ -41,17 +41,28 @@
 #define QSTYLEOPTION_H
 
 #include <QtWidgets/qtwidgetsglobal.h>
+#include <QtCore/qlocale.h>
 #include <QtCore/qvariant.h>
+#if QT_CONFIG(spinbox)
 #include <QtWidgets/qabstractspinbox.h>
+#endif
 #include <QtGui/qicon.h>
-#include <QtGui/qmatrix.h>
+#include <QtGui/qtransform.h>
+#if QT_CONFIG(slider)
 #include <QtWidgets/qslider.h>
+#endif
 #include <QtWidgets/qstyle.h>
+#if QT_CONFIG(tabbar)
 #include <QtWidgets/qtabbar.h>
+#endif
+#if QT_CONFIG(tabwidget)
 #include <QtWidgets/qtabwidget.h>
+#endif
+#if QT_CONFIG(rubberband)
 #include <QtWidgets/qrubberband.h>
+#endif
 #include <QtWidgets/qframe.h>
-#ifndef QT_NO_ITEMVIEWS
+#if QT_CONFIG(itemviews)
 #   include <QtCore/qabstractitemmodel.h>
 #endif
 
@@ -92,8 +103,7 @@ public:
     QStyleOption(const QStyleOption &other);
     ~QStyleOption();
 
-    void init(const QWidget *w);
-    inline void initFrom(const QWidget *w) { init(w); }
+    void initFrom(const QWidget *w);
     QStyleOption &operator=(const QStyleOption &other);
 };
 
@@ -107,6 +117,7 @@ public:
 
     QStyleOptionFocusRect();
     QStyleOptionFocusRect(const QStyleOptionFocusRect &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionFocusRect &operator=(const QStyleOptionFocusRect &) = default;
 
 protected:
     QStyleOptionFocusRect(int version);
@@ -116,7 +127,7 @@ class Q_WIDGETS_EXPORT QStyleOptionFrame : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_Frame };
-    enum StyleOptionVersion { Version = 3 };
+    enum StyleOptionVersion { Version = 1 };
 
     int lineWidth;
     int midLineWidth;
@@ -131,6 +142,7 @@ public:
 
     QStyleOptionFrame();
     QStyleOptionFrame(const QStyleOptionFrame &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionFrame &operator=(const QStyleOptionFrame &) = default;
 
 protected:
     QStyleOptionFrame(int version);
@@ -138,15 +150,12 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionFrame::FrameFeatures)
 
-typedef Q_DECL_DEPRECATED QStyleOptionFrame QStyleOptionFrameV2;
-typedef Q_DECL_DEPRECATED QStyleOptionFrame QStyleOptionFrameV3;
-
-#ifndef QT_NO_TABWIDGET
+#if QT_CONFIG(tabwidget)
 class Q_WIDGETS_EXPORT QStyleOptionTabWidgetFrame : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_TabWidgetFrame };
-    enum StyleOptionVersion { Version = 2 };
+    enum StyleOptionVersion { Version = 1 };
 
     int lineWidth;
     int midLineWidth;
@@ -160,21 +169,21 @@ public:
     QStyleOptionTabWidgetFrame();
     inline QStyleOptionTabWidgetFrame(const QStyleOptionTabWidgetFrame &other)
         : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionTabWidgetFrame &operator=(const QStyleOptionTabWidgetFrame &) = default;
 
 protected:
     QStyleOptionTabWidgetFrame(int version);
 };
 
-typedef Q_DECL_DEPRECATED QStyleOptionTabWidgetFrame QStyleOptionTabWidgetFrameV2;
-#endif // QT_NO_TABWIDGET
+#endif // QT_CONFIG(tabwidget)
 
 
-#ifndef QT_NO_TABBAR
+#if QT_CONFIG(tabbar)
 class Q_WIDGETS_EXPORT QStyleOptionTabBarBase : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_TabBarBase };
-    enum StyleOptionVersion { Version = 2 };
+    enum StyleOptionVersion { Version = 1 };
 
     QTabBar::Shape shape;
     QRect tabBarRect;
@@ -183,13 +192,13 @@ public:
 
     QStyleOptionTabBarBase();
     QStyleOptionTabBarBase(const QStyleOptionTabBarBase &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionTabBarBase &operator=(const QStyleOptionTabBarBase &) = default;
 
 protected:
     QStyleOptionTabBarBase(int version);
 };
 
-typedef Q_DECL_DEPRECATED QStyleOptionTabBarBase QStyleOptionTabBarBaseV2;
-#endif // QT_NO_TABBAR
+#endif // QT_CONFIG(tabbar)
 
 class Q_WIDGETS_EXPORT QStyleOptionHeader : public QStyleOption
 {
@@ -214,9 +223,28 @@ public:
 
     QStyleOptionHeader();
     QStyleOptionHeader(const QStyleOptionHeader &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionHeader &operator=(const QStyleOptionHeader &) = default;
 
 protected:
     QStyleOptionHeader(int version);
+};
+
+class Q_WIDGETS_EXPORT QStyleOptionHeaderV2 : public QStyleOptionHeader
+{
+public:
+    enum StyleOptionType { Type = SO_Header };
+    enum StyleOptionVersion { Version = 2 };
+
+    QStyleOptionHeaderV2();
+    QStyleOptionHeaderV2(const QStyleOptionHeaderV2 &other) : QStyleOptionHeader(Version) { *this = other; }
+    QStyleOptionHeaderV2 &operator=(const QStyleOptionHeaderV2 &) = default;
+
+    Qt::TextElideMode textElideMode:2;
+    bool isSectionDragTarget:1;
+    int unused:29;
+
+protected:
+    QStyleOptionHeaderV2(int version);
 };
 
 class Q_WIDGETS_EXPORT QStyleOptionButton : public QStyleOption
@@ -236,6 +264,7 @@ public:
 
     QStyleOptionButton();
     QStyleOptionButton(const QStyleOptionButton &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionButton &operator=(const QStyleOptionButton &) = default;
 
 protected:
     QStyleOptionButton(int version);
@@ -243,12 +272,12 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionButton::ButtonFeatures)
 
-#ifndef QT_NO_TABBAR
+#if QT_CONFIG(tabbar)
 class Q_WIDGETS_EXPORT QStyleOptionTab : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_Tab };
-    enum StyleOptionVersion { Version = 3 };
+    enum StyleOptionVersion { Version = 1 };
 
     enum TabPosition { Beginning, Middle, End, OnlyOneTab };
     enum SelectedPosition { NotAdjacent, NextIsSelected, PreviousIsSelected };
@@ -270,9 +299,11 @@ public:
     QSize leftButtonSize;
     QSize rightButtonSize;
     TabFeatures features;
+    int tabIndex = -1;
 
     QStyleOptionTab();
     QStyleOptionTab(const QStyleOptionTab &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionTab &operator=(const QStyleOptionTab &) = default;
 
 protected:
     QStyleOptionTab(int version);
@@ -280,12 +311,10 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionTab::CornerWidgets)
 
-typedef Q_DECL_DEPRECATED QStyleOptionTab QStyleOptionTabV2;
-typedef Q_DECL_DEPRECATED QStyleOptionTab QStyleOptionTabV3;
-#endif // QT_NO_TABBAR
+#endif // QT_CONFIG(tabbar)
 
 
-#ifndef QT_NO_TOOLBAR
+#if QT_CONFIG(toolbar)
 
 class Q_WIDGETS_EXPORT QStyleOptionToolBar : public QStyleOption
 {
@@ -303,6 +332,7 @@ public:
     int midLineWidth;
     QStyleOptionToolBar();
     QStyleOptionToolBar(const QStyleOptionToolBar &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionToolBar &operator=(const QStyleOptionToolBar &) = default;
 
 protected:
     QStyleOptionToolBar(int version);
@@ -310,13 +340,13 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionToolBar::ToolBarFeatures)
 
-#endif // QT_NO_TOOLBAR
+#endif // QT_CONFIG(toolbar)
 
 class Q_WIDGETS_EXPORT QStyleOptionProgressBar : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_ProgressBar };
-    enum StyleOptionVersion { Version = 2 };
+    enum StyleOptionVersion { Version = 1 };
 
     int minimum;
     int maximum;
@@ -324,18 +354,16 @@ public:
     QString text;
     Qt::Alignment textAlignment;
     bool textVisible;
-    Qt::Orientation orientation; // ### Qt 6: remove
     bool invertedAppearance;
     bool bottomToTop;
 
     QStyleOptionProgressBar();
     QStyleOptionProgressBar(const QStyleOptionProgressBar &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionProgressBar &operator=(const QStyleOptionProgressBar &) = default;
 
 protected:
     QStyleOptionProgressBar(int version);
 };
-
-typedef Q_DECL_DEPRECATED QStyleOptionProgressBar QStyleOptionProgressBarV2;
 
 class Q_WIDGETS_EXPORT QStyleOptionMenuItem : public QStyleOption
 {
@@ -355,11 +383,12 @@ public:
     QString text;
     QIcon icon;
     int maxIconWidth;
-    int tabWidth;
+    int reservedShortcutWidth;
     QFont font;
 
     QStyleOptionMenuItem();
     QStyleOptionMenuItem(const QStyleOptionMenuItem &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionMenuItem &operator=(const QStyleOptionMenuItem &) = default;
 
 protected:
     QStyleOptionMenuItem(int version);
@@ -369,7 +398,7 @@ class Q_WIDGETS_EXPORT QStyleOptionDockWidget : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_DockWidget };
-    enum StyleOptionVersion { Version = 2 };
+    enum StyleOptionVersion { Version = 1 };
 
     QString title;
     bool closable;
@@ -379,20 +408,19 @@ public:
 
     QStyleOptionDockWidget();
     QStyleOptionDockWidget(const QStyleOptionDockWidget &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionDockWidget &operator=(const QStyleOptionDockWidget &) = default;
 
 protected:
     QStyleOptionDockWidget(int version);
 };
 
-typedef Q_DECL_DEPRECATED QStyleOptionDockWidget QStyleOptionDockWidgetV2;
-
-#ifndef QT_NO_ITEMVIEWS
+#if QT_CONFIG(itemviews)
 
 class Q_WIDGETS_EXPORT QStyleOptionViewItem : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_ViewItem };
-    enum StyleOptionVersion { Version = 4 };
+    enum StyleOptionVersion { Version = 1 };
 
     enum Position { Left, Right, Top, Bottom };
 
@@ -430,6 +458,7 @@ public:
 
     QStyleOptionViewItem();
     QStyleOptionViewItem(const QStyleOptionViewItem &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionViewItem &operator=(const QStyleOptionViewItem &) = default;
 
 protected:
     QStyleOptionViewItem(int version);
@@ -437,17 +466,13 @@ protected:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(QStyleOptionViewItem::ViewItemFeatures)
 
-typedef Q_DECL_DEPRECATED QStyleOptionViewItem QStyleOptionViewItemV2;
-typedef Q_DECL_DEPRECATED QStyleOptionViewItem QStyleOptionViewItemV3;
-typedef Q_DECL_DEPRECATED QStyleOptionViewItem QStyleOptionViewItemV4;
-
-#endif // QT_NO_ITEMVIEWS
+#endif // QT_CONFIG(itemviews)
 
 class Q_WIDGETS_EXPORT QStyleOptionToolBox : public QStyleOption
 {
 public:
     enum StyleOptionType { Type = SO_ToolBox };
-    enum StyleOptionVersion { Version = 2 };
+    enum StyleOptionVersion { Version = 1 };
 
     QString text;
     QIcon icon;
@@ -460,14 +485,13 @@ public:
 
     QStyleOptionToolBox();
     QStyleOptionToolBox(const QStyleOptionToolBox &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionToolBox &operator=(const QStyleOptionToolBox &) = default;
 
 protected:
     QStyleOptionToolBox(int version);
 };
 
-typedef Q_DECL_DEPRECATED QStyleOptionToolBox QStyleOptionToolBoxV2;
-
-#ifndef QT_NO_RUBBERBAND
+#if QT_CONFIG(rubberband)
 class Q_WIDGETS_EXPORT QStyleOptionRubberBand : public QStyleOption
 {
 public:
@@ -479,11 +503,12 @@ public:
 
     QStyleOptionRubberBand();
     QStyleOptionRubberBand(const QStyleOptionRubberBand &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionRubberBand &operator=(const QStyleOptionRubberBand &) = default;
 
 protected:
     QStyleOptionRubberBand(int version);
 };
-#endif // QT_NO_RUBBERBAND
+#endif // QT_CONFIG(rubberband)
 
 // -------------------------- Complex style options -------------------------------
 class Q_WIDGETS_EXPORT QStyleOptionComplex : public QStyleOption
@@ -497,9 +522,10 @@ public:
 
     QStyleOptionComplex(int version = QStyleOptionComplex::Version, int type = SO_Complex);
     QStyleOptionComplex(const QStyleOptionComplex &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionComplex &operator=(const QStyleOptionComplex &) = default;
 };
 
-#ifndef QT_NO_SLIDER
+#if QT_CONFIG(slider)
 class Q_WIDGETS_EXPORT QStyleOptionSlider : public QStyleOptionComplex
 {
 public:
@@ -518,16 +544,18 @@ public:
     int pageStep;
     qreal notchTarget;
     bool dialWrapping;
+    Qt::KeyboardModifiers keyboardModifiers;
 
     QStyleOptionSlider();
     QStyleOptionSlider(const QStyleOptionSlider &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionSlider &operator=(const QStyleOptionSlider &) = default;
 
 protected:
     QStyleOptionSlider(int version);
 };
-#endif // QT_NO_SLIDER
+#endif // QT_CONFIG(slider)
 
-#ifndef QT_NO_SPINBOX
+#if QT_CONFIG(spinbox)
 class Q_WIDGETS_EXPORT QStyleOptionSpinBox : public QStyleOptionComplex
 {
 public:
@@ -540,11 +568,12 @@ public:
 
     QStyleOptionSpinBox();
     QStyleOptionSpinBox(const QStyleOptionSpinBox &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionSpinBox &operator=(const QStyleOptionSpinBox &) = default;
 
 protected:
     QStyleOptionSpinBox(int version);
 };
-#endif // QT_NO_SPINBOX
+#endif // QT_CONFIG(spinbox)
 
 class Q_WIDGETS_EXPORT QStyleOptionToolButton : public QStyleOptionComplex
 {
@@ -567,6 +596,7 @@ public:
 
     QStyleOptionToolButton();
     QStyleOptionToolButton(const QStyleOptionToolButton &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionToolButton &operator=(const QStyleOptionToolButton &) = default;
 
 protected:
     QStyleOptionToolButton(int version);
@@ -586,9 +616,11 @@ public:
     QString currentText;
     QIcon currentIcon;
     QSize iconSize;
+    Qt::Alignment textAlignment = Qt::AlignLeft | Qt::AlignVCenter;
 
     QStyleOptionComboBox();
     QStyleOptionComboBox(const QStyleOptionComboBox &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionComboBox &operator=(const QStyleOptionComboBox &) = default;
 
 protected:
     QStyleOptionComboBox(int version);
@@ -607,6 +639,7 @@ public:
 
     QStyleOptionTitleBar();
     QStyleOptionTitleBar(const QStyleOptionTitleBar &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionTitleBar &operator=(const QStyleOptionTitleBar &) = default;
 
 protected:
     QStyleOptionTitleBar(int version);
@@ -627,6 +660,7 @@ public:
 
     QStyleOptionGroupBox();
     QStyleOptionGroupBox(const QStyleOptionGroupBox &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionGroupBox &operator=(const QStyleOptionGroupBox &) = default;
 protected:
     QStyleOptionGroupBox(int version);
 };
@@ -641,6 +675,7 @@ public:
 
     QStyleOptionSizeGrip();
     QStyleOptionSizeGrip(const QStyleOptionSizeGrip &other) : QStyleOptionComplex(Version, Type) { *this = other; }
+    QStyleOptionSizeGrip &operator=(const QStyleOptionSizeGrip &) = default;
 protected:
     QStyleOptionSizeGrip(int version);
 };
@@ -652,11 +687,10 @@ public:
     enum StyleOptionVersion { Version = 1 };
 
     QRectF exposedRect;
-    QMatrix matrix;
-    qreal levelOfDetail;
 
     QStyleOptionGraphicsItem();
     QStyleOptionGraphicsItem(const QStyleOptionGraphicsItem &other) : QStyleOption(Version, Type) { *this = other; }
+    QStyleOptionGraphicsItem &operator=(const QStyleOptionGraphicsItem &) = default;
     static qreal levelOfDetailFromTransform(const QTransform &worldTransform);
 protected:
     QStyleOptionGraphicsItem(int version);
@@ -671,7 +705,7 @@ T qstyleoption_cast(const QStyleOption *opt)
         || (int(Opt::Type) == QStyleOption::SO_Complex
             && opt->type > QStyleOption::SO_Complex)))
         return static_cast<T>(opt);
-    return Q_NULLPTR;
+    return nullptr;
 }
 
 template <typename T>
@@ -683,7 +717,7 @@ T qstyleoption_cast(QStyleOption *opt)
         || (int(Opt::Type) == QStyleOption::SO_Complex
             && opt->type > QStyleOption::SO_Complex)))
         return static_cast<T>(opt);
-    return Q_NULLPTR;
+    return nullptr;
 }
 
 // -------------------------- QStyleHintReturn -------------------------------
@@ -732,7 +766,7 @@ T qstyleoption_cast(const QStyleHintReturn *hint)
     if (hint && hint->version <= Opt::Version &&
         (hint->type == Opt::Type || int(Opt::Type) == QStyleHintReturn::SH_Default))
         return static_cast<T>(hint);
-    return Q_NULLPTR;
+    return nullptr;
 }
 
 template <typename T>
@@ -742,7 +776,7 @@ T qstyleoption_cast(QStyleHintReturn *hint)
     if (hint && hint->version <= Opt::Version &&
         (hint->type == Opt::Type || int(Opt::Type) == QStyleHintReturn::SH_Default))
         return static_cast<T>(hint);
-    return Q_NULLPTR;
+    return nullptr;
 }
 
 #if !defined(QT_NO_DEBUG_STREAM)

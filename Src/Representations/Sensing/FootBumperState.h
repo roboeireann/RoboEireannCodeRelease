@@ -2,7 +2,7 @@
  *
 *******************************************************************************************
 **                                                                                       **
-**  THE USE OF THIS REPRESENTATION IS DEPRICATED PLEASE USE EnhancedKeyStates INSTEAD !  **
+**  THE USE OF THIS REPRESENTATION IS DEPRECATED PLEASE USE EnhancedKeyStates INSTEAD !  **
 **                                                                (announced by Jesse)   **
 *******************************************************************************************
  * FootBumperState.h
@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "Tools/RobotParts/Legs.h"
-#include "Tools/Streams/AutoStreamable.h"
+#include "RobotParts/Legs.h"
+#include "Streaming/AutoStreamable.h"
 
 STREAMABLE(FootBumperState,
 {

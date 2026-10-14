@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the QtCore module of the Qt Toolkit.
@@ -77,21 +77,19 @@ public:
     // ### Hides open(flags)
     bool open() { return open(QIODevice::ReadWrite); }
 
-    QString fileName() const Q_DECL_OVERRIDE;
+    QString fileName() const override;
     QString fileTemplate() const;
     void setFileTemplate(const QString &name);
-#if QT_DEPRECATED_SINCE(5,1)
-    QT_DEPRECATED inline static QTemporaryFile *createLocalFile(const QString &fileName)
-        { return createNativeFile(fileName); }
-    QT_DEPRECATED inline static QTemporaryFile *createLocalFile(QFile &file)
-        { return createNativeFile(file); }
-#endif
+
+    // Hides QFile::rename
+    bool rename(const QString &newName);
+
     inline static QTemporaryFile *createNativeFile(const QString &fileName)
         { QFile file(fileName); return createNativeFile(file); }
     static QTemporaryFile *createNativeFile(QFile &file);
 
 protected:
-    bool open(OpenMode flags) Q_DECL_OVERRIDE;
+    bool open(OpenMode flags) override;
 
 private:
     friend class QFile;

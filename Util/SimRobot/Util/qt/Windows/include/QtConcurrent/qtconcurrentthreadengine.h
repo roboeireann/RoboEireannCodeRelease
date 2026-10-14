@@ -3,7 +3,7 @@
 ** Copyright (C) 2016 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
-** This file is part of the QtCore module of the Qt Toolkit.
+** This file is part of the QtConcurrent module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
@@ -42,7 +42,7 @@
 
 #include <QtConcurrent/qtconcurrent_global.h>
 
-#ifndef QT_NO_CONCURRENT
+#if !defined(QT_NO_CONCURRENT) ||defined(Q_CLANG_QDOC)
 
 #include <QtCore/qthreadpool.h>
 #include <QtCore/qfuture.h>
@@ -54,8 +54,6 @@
 
 QT_BEGIN_NAMESPACE
 
-
-#ifndef Q_QDOC
 
 namespace QtConcurrent {
 
@@ -90,10 +88,9 @@ class Q_CONCURRENT_EXPORT ThreadEngineBase: public QRunnable
 {
 public:
     // Public API:
-    ThreadEngineBase();
+    ThreadEngineBase(QThreadPool *pool);
     virtual ~ThreadEngineBase();
     void startSingleThreaded();
-    void startBlocking();
     void startThread();
     bool isCanceled();
     void waitForResume();
@@ -101,19 +98,25 @@ public:
     void setProgressValue(int progress);
     void setProgressRange(int minimum, int maximum);
     void acquireBarrierSemaphore();
+    void reportIfSuspensionDone() const;
 
 protected: // The user overrides these:
     virtual void start() {}
     virtual void finish() {}
     virtual ThreadFunctionResult threadFunction() { return ThreadFinished; }
-    virtual bool shouldStartThread() { return futureInterface ? !futureInterface->isPaused() : true; }
-    virtual bool shouldThrottleThread() { return futureInterface ? futureInterface->isPaused() : false; }
+    virtual bool shouldStartThread() { return !shouldThrottleThread(); }
+    virtual bool shouldThrottleThread()
+    {
+        return futureInterface ? (futureInterface->isSuspending() || futureInterface->isSuspended())
+                               : false;
+    }
+
 private:
     bool startThreadInternal();
     void startThreads();
     void threadExit();
     bool threadThrottleExit();
-    void run() Q_DECL_OVERRIDE;
+    void run() override;
     virtual void asynchronousFinish() = 0;
 #ifndef QT_NO_EXCEPTIONS
     void handleException(const QException &exception);
@@ -123,16 +126,19 @@ protected:
     QThreadPool *threadPool;
     ThreadEngineBarrier barrier;
     QtPrivate::ExceptionStore exceptionStore;
+    QBasicMutex mutex;
 };
 
 
 template <typename T>
-class ThreadEngine : public virtual ThreadEngineBase
+class ThreadEngine : public ThreadEngineBase
 {
 public:
     typedef T ResultType;
 
-    virtual T *result() { return Q_NULLPTR; }
+    ThreadEngine(QThreadPool *pool) : ThreadEngineBase(pool) {}
+
+    virtual T *result() { return nullptr; }
 
     QFutureInterface<T> *futureInterfaceTyped()
     {
@@ -143,15 +149,6 @@ public:
     T *startSingleThreaded()
     {
         ThreadEngineBase::startSingleThreaded();
-        return result();
-    }
-
-    // Runs the user algorithm using multiple threads.
-    // This function blocks until the algorithm is finished,
-    // and then returns the result.
-    T *startBlocking()
-    {
-        ThreadEngineBase::startBlocking();
         return result();
     }
 
@@ -173,7 +170,7 @@ public:
         return future;
     }
 
-    void asynchronousFinish() Q_DECL_OVERRIDE
+    void asynchronousFinish() override
     {
         finish();
         futureInterfaceTyped()->reportFinished(result());
@@ -188,7 +185,7 @@ public:
             futureInterfaceTyped()->reportResult(_result, index);
     }
 
-    void reportResults(const QVector<T> &_result, int index = -1, int count = -1)
+    void reportResults(const QList<T> &_result, int index = -1, int count = -1)
     {
         if (futureInterface)
             futureInterfaceTyped()->reportResults(_result, index, count);
@@ -235,13 +232,6 @@ class ThreadEngineStarter : public ThreadEngineStarterBase<T>
 public:
     ThreadEngineStarter(TypedThreadEngine *eng)
         : Base(eng) { }
-
-    T startBlocking()
-    {
-        T t = *this->threadEngine->startBlocking();
-        delete this->threadEngine;
-        return t;
-    }
 };
 
 // Full template specialization where T is void.
@@ -249,16 +239,11 @@ template <>
 class ThreadEngineStarter<void> : public ThreadEngineStarterBase<void>
 {
 public:
-    ThreadEngineStarter<void>(ThreadEngine<void> *_threadEngine)
-    :ThreadEngineStarterBase<void>(_threadEngine) {}
-
-    void startBlocking()
-    {
-        this->threadEngine->startBlocking();
-        delete this->threadEngine;
-    }
+    ThreadEngineStarter(ThreadEngine<void> *_threadEngine)
+        : ThreadEngineStarterBase<void>(_threadEngine) {}
 };
 
+//! [qtconcurrentthreadengine-1]
 template <typename ThreadEngine>
 inline ThreadEngineStarter<typename ThreadEngine::ResultType> startThreadEngine(ThreadEngine *threadEngine)
 {
@@ -267,7 +252,6 @@ inline ThreadEngineStarter<typename ThreadEngine::ResultType> startThreadEngine(
 
 } // namespace QtConcurrent
 
-#endif //Q_QDOC
 
 QT_END_NAMESPACE
 

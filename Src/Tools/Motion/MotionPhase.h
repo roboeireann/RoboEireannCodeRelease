@@ -9,8 +9,8 @@
 #pragma once
 
 #include "Representations/Infrastructure/JointRequest.h"
-#include "Tools/Math/Pose2f.h"
-#include "Tools/Streams/Enum.h"
+#include "Math/Pose2f.h"
+#include "Streaming/Enum.h"
 #include <memory>
 
 struct MotionInfo;
@@ -21,6 +21,7 @@ struct MotionPhase
   ENUM(Type,
   {,
     playDead,
+    prepare,
     stand,
     walk,
     kick,
@@ -28,6 +29,8 @@ struct MotionPhase
     getUp,
     keyframeMotion,
     replayWalk,
+    photoMode,
+    freeze,
   });
 
   ENUM(Limb,
@@ -83,6 +86,9 @@ struct MotionPhase
   {
     return 0;
   }
+
+  virtual void setLastPhase(std::unique_ptr<MotionPhase>&)
+  {}
 
   Type type; /**< The type of this phase. */
   unsigned kickType; /**< The type of kick in this phase (only valid if it sets \c motionInfo.isKicking()). Cannot be \c KickInfo::KickType due to circular include dependencies. */

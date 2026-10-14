@@ -1,0 +1,30 @@
+# Disable automatic referee
+ar off
+
+# Initialize teams for 5v5 (must be done while game is INITIAL)
+gc competitionTypeChallengeShield
+
+call ../../Includes/BoosterFast
+call ../../Includes/5vs5
+
+# Restore automatic head control for K1 robots
+
+dr representation:SetupPoses:place
+dr debugDrawing3d:representation:RobotPose
+dr debugDrawing3d:representation:GameState:playerNumber
+
+robot robot1
+
+echo -- choose one of the following scripts to test a set play behaviour
+echo -- (Scripts with bh suffix are somewhat based on scenes from BH2022 code release)
+echo
+echo call RE_K1/SetPlays-Field-S/setups/goal_kick
+echo call RE_K1/SetPlays-Field-S/setups/corner_kick_1_bh
+echo call RE_K1/SetPlays-Field-S/setups/corner_kick_2
+echo call RE_K1/SetPlays-Field-S/setups/kick_in_own_half_bh
+echo call RE_K1/SetPlays-Field-S/setups/kick_in_opponent_half_bh
+echo call RE_K1/SetPlays-Field-S/setups/kick_in_side
+echo call RE_K1/SetPlays-Field-S/setups/foul_pushing_free_kick
+echo call RE_K1/SetPlays-Field-S/setups/foul_pushing_penalty_kick
+echo
+echo call RE_K1/SetPlays-Field-S/setups/own_kick_off

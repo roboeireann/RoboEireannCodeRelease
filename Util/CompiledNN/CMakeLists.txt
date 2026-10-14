@@ -34,6 +34,8 @@ add_library(CompiledNN
     Src/CompiledNN/CompiledNN/Operations/BatchNormalization.h
     Src/CompiledNN/CompiledNN/Operations/Concatenate.cpp
     Src/CompiledNN/CompiledNN/Operations/Concatenate.h
+    Src/CompiledNN/CompiledNN/Operations/Conv1D.cpp
+    Src/CompiledNN/CompiledNN/Operations/Conv1D.h
     Src/CompiledNN/CompiledNN/Operations/Conv2D.cpp
     Src/CompiledNN/CompiledNN/Operations/Conv2D.h
     Src/CompiledNN/CompiledNN/Operations/Cropping2D.cpp
@@ -46,6 +48,8 @@ add_library(CompiledNN
     Src/CompiledNN/CompiledNN/Operations/GlobalPooling2D.h
     Src/CompiledNN/CompiledNN/Operations/Im2Col2D.cpp
     Src/CompiledNN/CompiledNN/Operations/Im2Col2D.h
+    Src/CompiledNN/CompiledNN/Operations/Pooling1D.cpp
+    Src/CompiledNN/CompiledNN/Operations/Pooling1D.h
     Src/CompiledNN/CompiledNN/Operations/Pooling2D.cpp
     Src/CompiledNN/CompiledNN/Operations/Pooling2D.h
     Src/CompiledNN/CompiledNN/Operations/Softmax.cpp
@@ -54,37 +58,87 @@ add_library(CompiledNN
     Src/CompiledNN/CompiledNN/Operations/UInt8Input.h
     Src/CompiledNN/CompiledNN/Operations/UpSampling2D.cpp
     Src/CompiledNN/CompiledNN/Operations/UpSampling2D.h
+    Src/CompiledNN/CompiledNN/Operations/ZeroPadding1D.cpp
+    Src/CompiledNN/CompiledNN/Operations/ZeroPadding1D.h
     Src/CompiledNN/CompiledNN/Operations/ZeroPadding2D.cpp
     Src/CompiledNN/CompiledNN/Operations/ZeroPadding2D.h
     Src/CompiledNN/CompiledNN/Util/ExpApprox.cpp
     Src/CompiledNN/CompiledNN/Util/ExpApprox.h
 
+    3rdParty/asmjit/src/asmjit/a64.h
+    3rdParty/asmjit/src/asmjit/arm.h
     3rdParty/asmjit/src/asmjit/asmjit.h
+    3rdParty/asmjit/src/asmjit/asmjit-scope-begin.h
+    3rdParty/asmjit/src/asmjit/asmjit-scope-end.h
     3rdParty/asmjit/src/asmjit/core.h
     3rdParty/asmjit/src/asmjit/x86.h
-    3rdParty/asmjit/src/asmjit/core/arch.cpp
-    3rdParty/asmjit/src/asmjit/core/arch.h
+    3rdParty/asmjit/src/asmjit/arm/a64archtraits_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64assembler.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64assembler.h
+    3rdParty/asmjit/src/asmjit/arm/a64builder.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64builder.h
+    3rdParty/asmjit/src/asmjit/arm/a64compiler.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64compiler.h
+    3rdParty/asmjit/src/asmjit/arm/a64emithelper.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64emithelper_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64emitter.h
+    3rdParty/asmjit/src/asmjit/arm/a64formatter.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64formatter_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64func.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64func_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64globals.h
+    3rdParty/asmjit/src/asmjit/arm/a64instapi.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64instapi_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64instdb.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64instdb.h
+    3rdParty/asmjit/src/asmjit/arm/a64instdb_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64operand.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64operand.h
+    3rdParty/asmjit/src/asmjit/arm/a64rapass.cpp
+    3rdParty/asmjit/src/asmjit/arm/a64rapass_p.h
+    3rdParty/asmjit/src/asmjit/arm/a64utils.h
+    3rdParty/asmjit/src/asmjit/arm/armformatter.cpp
+    3rdParty/asmjit/src/asmjit/arm/armformatter_p.h
+    3rdParty/asmjit/src/asmjit/arm/armglobals.h
+    3rdParty/asmjit/src/asmjit/arm/armoperand.h
+    3rdParty/asmjit/src/asmjit/core/api-build_p.h
+    3rdParty/asmjit/src/asmjit/core/api-config.h
+    3rdParty/asmjit/src/asmjit/core/archcommons.h
+    3rdParty/asmjit/src/asmjit/core/archtraits.cpp
+    3rdParty/asmjit/src/asmjit/core/archtraits.h
     3rdParty/asmjit/src/asmjit/core/assembler.cpp
     3rdParty/asmjit/src/asmjit/core/assembler.h
-    3rdParty/asmjit/src/asmjit/core/build.h
     3rdParty/asmjit/src/asmjit/core/builder.cpp
     3rdParty/asmjit/src/asmjit/core/builder.h
-    3rdParty/asmjit/src/asmjit/core/callconv.cpp
-    3rdParty/asmjit/src/asmjit/core/callconv.h
-    3rdParty/asmjit/src/asmjit/core/codebufferwriter_p.h
+    3rdParty/asmjit/src/asmjit/core/codebuffer.h
     3rdParty/asmjit/src/asmjit/core/codeholder.cpp
     3rdParty/asmjit/src/asmjit/core/codeholder.h
+    3rdParty/asmjit/src/asmjit/core/codewriter.cpp
+    3rdParty/asmjit/src/asmjit/core/codewriter_p.h
     3rdParty/asmjit/src/asmjit/core/compiler.cpp
     3rdParty/asmjit/src/asmjit/core/compiler.h
+    3rdParty/asmjit/src/asmjit/core/compilerdefs.h
     3rdParty/asmjit/src/asmjit/core/constpool.cpp
     3rdParty/asmjit/src/asmjit/core/constpool.h
     3rdParty/asmjit/src/asmjit/core/cpuinfo.cpp
     3rdParty/asmjit/src/asmjit/core/cpuinfo.h
+    3rdParty/asmjit/src/asmjit/core/emithelper.cpp
+    3rdParty/asmjit/src/asmjit/core/emithelper_p.h
     3rdParty/asmjit/src/asmjit/core/emitter.cpp
     3rdParty/asmjit/src/asmjit/core/emitter.h
-    3rdParty/asmjit/src/asmjit/core/features.h
+    3rdParty/asmjit/src/asmjit/core/emitterutils.cpp
+    3rdParty/asmjit/src/asmjit/core/emitterutils_p.h
+    3rdParty/asmjit/src/asmjit/core/environment.cpp
+    3rdParty/asmjit/src/asmjit/core/environment.h
+    3rdParty/asmjit/src/asmjit/core/errorhandler.cpp
+    3rdParty/asmjit/src/asmjit/core/errorhandler.h
+    3rdParty/asmjit/src/asmjit/core/formatter.cpp
+    3rdParty/asmjit/src/asmjit/core/formatter.h
+    3rdParty/asmjit/src/asmjit/core/formatter_p.h
     3rdParty/asmjit/src/asmjit/core/func.cpp
     3rdParty/asmjit/src/asmjit/core/func.h
+    3rdParty/asmjit/src/asmjit/core/funcargscontext.cpp
+    3rdParty/asmjit/src/asmjit/core/funcargscontext_p.h
     3rdParty/asmjit/src/asmjit/core/globals.cpp
     3rdParty/asmjit/src/asmjit/core/globals.h
     3rdParty/asmjit/src/asmjit/core/inst.cpp
@@ -93,13 +147,14 @@ add_library(CompiledNN
     3rdParty/asmjit/src/asmjit/core/jitallocator.h
     3rdParty/asmjit/src/asmjit/core/jitruntime.cpp
     3rdParty/asmjit/src/asmjit/core/jitruntime.h
-    3rdParty/asmjit/src/asmjit/core/logging.cpp
-    3rdParty/asmjit/src/asmjit/core/logging.h
+    3rdParty/asmjit/src/asmjit/core/logger.cpp
+    3rdParty/asmjit/src/asmjit/core/logger.h
     3rdParty/asmjit/src/asmjit/core/misc_p.h
     3rdParty/asmjit/src/asmjit/core/operand.cpp
     3rdParty/asmjit/src/asmjit/core/operand.h
     3rdParty/asmjit/src/asmjit/core/osutils.cpp
     3rdParty/asmjit/src/asmjit/core/osutils.h
+    3rdParty/asmjit/src/asmjit/core/osutils_p.h
     3rdParty/asmjit/src/asmjit/core/raassignment_p.h
     3rdParty/asmjit/src/asmjit/core/rabuilders_p.h
     3rdParty/asmjit/src/asmjit/core/radefs_p.h
@@ -127,47 +182,47 @@ add_library(CompiledNN
     3rdParty/asmjit/src/asmjit/core/zonelist.h
     3rdParty/asmjit/src/asmjit/core/zonestack.cpp
     3rdParty/asmjit/src/asmjit/core/zonestack.h
+    3rdParty/asmjit/src/asmjit/core/zonestring.h
     3rdParty/asmjit/src/asmjit/core/zonetree.cpp
     3rdParty/asmjit/src/asmjit/core/zonetree.h
     3rdParty/asmjit/src/asmjit/core/zonevector.cpp
     3rdParty/asmjit/src/asmjit/core/zonevector.h
+    3rdParty/asmjit/src/asmjit/x86/x86archtraits_p.h
     3rdParty/asmjit/src/asmjit/x86/x86assembler.cpp
     3rdParty/asmjit/src/asmjit/x86/x86assembler.h
     3rdParty/asmjit/src/asmjit/x86/x86builder.cpp
     3rdParty/asmjit/src/asmjit/x86/x86builder.h
-    3rdParty/asmjit/src/asmjit/x86/x86callconv.cpp
-    3rdParty/asmjit/src/asmjit/x86/x86callconv_p.h
     3rdParty/asmjit/src/asmjit/x86/x86compiler.cpp
     3rdParty/asmjit/src/asmjit/x86/x86compiler.h
+    3rdParty/asmjit/src/asmjit/x86/x86emithelper.cpp
+    3rdParty/asmjit/src/asmjit/x86/x86emithelper_p.h
     3rdParty/asmjit/src/asmjit/x86/x86emitter.h
-    3rdParty/asmjit/src/asmjit/x86/x86features.cpp
-    3rdParty/asmjit/src/asmjit/x86/x86features.h
+    3rdParty/asmjit/src/asmjit/x86/x86formatter.cpp
+    3rdParty/asmjit/src/asmjit/x86/x86formatter_p.h
+    3rdParty/asmjit/src/asmjit/x86/x86func.cpp
+    3rdParty/asmjit/src/asmjit/x86/x86func_p.h
     3rdParty/asmjit/src/asmjit/x86/x86globals.h
     3rdParty/asmjit/src/asmjit/x86/x86instapi.cpp
     3rdParty/asmjit/src/asmjit/x86/x86instapi_p.h
     3rdParty/asmjit/src/asmjit/x86/x86instdb.cpp
     3rdParty/asmjit/src/asmjit/x86/x86instdb.h
     3rdParty/asmjit/src/asmjit/x86/x86instdb_p.h
-    3rdParty/asmjit/src/asmjit/x86/x86internal.cpp
-    3rdParty/asmjit/src/asmjit/x86/x86internal_p.h
-    3rdParty/asmjit/src/asmjit/x86/x86logging.cpp
-    3rdParty/asmjit/src/asmjit/x86/x86logging_p.h
     3rdParty/asmjit/src/asmjit/x86/x86opcode_p.h
     3rdParty/asmjit/src/asmjit/x86/x86operand.cpp
     3rdParty/asmjit/src/asmjit/x86/x86operand.h
     3rdParty/asmjit/src/asmjit/x86/x86rapass.cpp
     3rdParty/asmjit/src/asmjit/x86/x86rapass_p.h
 
+    3rdParty/B-Human/MathBase/BHMath.h
+    3rdParty/B-Human/MathBase/NeumaierSum.h
     3rdParty/B-Human/Platform/BHAssert.cpp
     3rdParty/B-Human/Platform/BHAssert.h
-    3rdParty/B-Human/Tools/Math/BHMath.h
-    3rdParty/B-Human/Tools/Math/NeumaierSum.h
-    3rdParty/B-Human/Tools/Streams/InOut.cpp
-    3rdParty/B-Human/Tools/Streams/InOut.h
-    3rdParty/B-Human/Tools/Streams/InStreams.cpp
-    3rdParty/B-Human/Tools/Streams/InStreams.h
-    3rdParty/B-Human/Tools/Streams/SimpleMap.cpp
-    3rdParty/B-Human/Tools/Streams/SimpleMap.h
+    3rdParty/B-Human/Streaming/InOut.cpp
+    3rdParty/B-Human/Streaming/InOut.h
+    3rdParty/B-Human/Streaming/InStreams.cpp
+    3rdParty/B-Human/Streaming/InStreams.h
+    3rdParty/B-Human/Streaming/SimpleMap.cpp
+    3rdParty/B-Human/Streaming/SimpleMap.h
 )
 
 target_compile_options(CompiledNN PRIVATE
@@ -200,8 +255,8 @@ target_include_directories(CompiledNN SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/asmjit/src"
 )
 target_compile_definitions(CompiledNN PRIVATE
-    ASMJIT_STATIC ASMJIT_BUILD_X86 ASMJIT_NO_BUILDER ASMJIT_NO_COMPILER
-    ASMJIT_NO_LOGGING ASMJIT_NO_TEXT ASMJIT_NO_VALIDATION ASMJIT_NO_INTROSPECTION
+    ASMJIT_STATIC ASMJIT_NO_AARCH32 ASMJIT_NO_AARCH64 ASMJIT_NO_BUILDER ASMJIT_NO_COMPILER
+    ASMJIT_NO_DEPRECATED ASMJIT_NO_INTROSPECTION ASMJIT_NO_LOGGING ASMJIT_NO_TEXT ASMJIT_NO_VALIDATION
 )
 target_link_libraries(CompiledNN PUBLIC
     $<$<PLATFORM_ID:Linux>:pthread> $<$<PLATFORM_ID:Linux>:rt>
@@ -295,9 +350,9 @@ install(FILES
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/CompiledNN/Platform"
 )
 install(FILES
-    3rdParty/B-Human/Tools/Math/BHMath.h
-    3rdParty/B-Human/Tools/Math/NeumaierSum.h
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/CompiledNN/Tools/Math"
+    3rdParty/B-Human/MathBase/BHMath.h
+    3rdParty/B-Human/MathBase/NeumaierSum.h
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/CompiledNN/MathBase"
 )
 
 # install targets, configuration and version files

@@ -8,8 +8,8 @@
  */
 
 #include "UKFPose2D.h"
-#include "Tools/Math/BHMath.h"
-#include "Tools/Math/Covariance.h"
+#include "Math/BHMath.h"
+#include "Math/Covariance.h"
 
 void UKFPose2D::motionUpdate(const Pose2f& odometryOffset, const Pose2f& filterProcessDeviation,
                              const Pose2f& odometryDeviation, const Vector2f& odometryRotationDeviation)
@@ -39,7 +39,7 @@ void UKFPose2D::motionUpdate(const Pose2f& odometryOffset, const Pose2f& filterP
     cov += (Matrix3f() << d * d.x(), d * d.y(), d * d.z()).finished();
   }
   cov *= 0.5f;
-  Covariance::fixCovariance(cov);
+  Covariance::fixCovariance<3>(cov);
 
   // addProcessNoise
   cov(0, 0) += sqr(filterProcessDeviation.translation.x());
@@ -125,7 +125,7 @@ void UKFPose2D::landmarkSensorUpdate(const Vector2f& landmarkPosition, const Vec
   }
   landmarkReadingAndMeanCov *= 0.5f;
 
-  // computeCovOfLandmarkReadingsReadings
+  // computeCovOfLandmarkReadings
   const Vector2f d = landmarkReadings[0] - landmarkReadingMean;
   Matrix2f landmarkReadingCov = Matrix2f::Zero();
   landmarkReadingCov << d * d.x(), d * d.y();
@@ -142,16 +142,16 @@ void UKFPose2D::landmarkSensorUpdate(const Vector2f& landmarkPosition, const Vec
   mean += correction;
   mean.z() = Angle::normalize(mean.z());
   cov -= kalmanGain * landmarkReadingAndMeanCov;
-  Covariance::fixCovariance(cov);
+  Covariance::fixCovariance<3>(cov);
 }
 
-void UKFPose2D::lineSensorUpdate(bool vertical, const Vector2f& reading, const Matrix2f& readingCov)
+void UKFPose2D::lineSensorUpdate(bool lineIsParallelToWorldModelXAxis, const Vector2f& reading, const Matrix2f& readingCov)
 {
   generateSigmaPoints();
 
   // computeLineReadings
   Vector2f lineReadings[7];
-  if(vertical)
+  if(lineIsParallelToWorldModelXAxis)
     for(int i = 0; i < 7; ++i)
       lineReadings[i] = Vector2f(sigmaPoints[i].y(), sigmaPoints[i].z());
   else
@@ -193,7 +193,7 @@ void UKFPose2D::lineSensorUpdate(bool vertical, const Vector2f& reading, const M
   mean += correction;
   mean.z() = Angle::normalize(mean.z());
   cov -= kalmanGain * lineReadingAndMeanCov;
-  Covariance::fixCovariance(cov);
+  Covariance::fixCovariance<3>(cov);
 }
 
 void UKFPose2D::poseSensorUpdate(const Vector3f& reading, const Matrix3f& readingCov)
@@ -241,5 +241,5 @@ void UKFPose2D::poseSensorUpdate(const Vector3f& reading, const Matrix3f& readin
   mean += correction;
   mean.z() = Angle::normalize(mean.z());
   cov -= kalmanGain * poseReadingAndMeanCov;
-  Covariance::fixCovariance(cov);
+  Covariance::fixCovariance<3>(cov);
 }

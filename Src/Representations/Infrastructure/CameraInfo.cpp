@@ -4,10 +4,10 @@
  */
 
 #include "CameraInfo.h"
-#include "Tools/Math/BHMath.h"
-#include "Tools/Math/RotationMatrix.h"
-#include "Tools/Debugging/ColorRGBA.h"
-#include "Tools/Debugging/DebugDrawings3D.h"
+#include "Math/BHMath.h"
+#include "Math/RotationMatrix.h"
+#include "Debugging/ColorRGBA.h"
+#include "Debugging/DebugDrawings3D.h"
 
 void CameraInfo::updateFocalLength()
 {
@@ -17,6 +17,20 @@ void CameraInfo::updateFocalLength()
 
   focalLengthHeight = height / (2.f * std::tan(openingAngleHeight / 2.f));
   focalLengthHeightInv = 1.f / focalLengthHeight;
+}
+
+std::string CameraInfo::getThreadName() const
+{
+  if (camera == color || camera == upper)
+    return "Upper";
+  else if (camera == depth || camera == lower)
+    return "Lower";
+
+  // fall through to default behaviour if none of the above
+  
+  std::string name = TypeRegistry::getEnumName(camera);
+  name[0] &= ~0x20;
+  return name;
 }
 
 void CameraInfo::draw() const

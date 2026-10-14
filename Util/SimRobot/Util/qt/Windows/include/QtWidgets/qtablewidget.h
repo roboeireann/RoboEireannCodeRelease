@@ -40,34 +40,39 @@
 #ifndef QTABLEWIDGET_H
 #define QTABLEWIDGET_H
 
-#include <QtWidgets/qtwidgetsglobal.h>
 #include <QtWidgets/qtableview.h>
+#include <QtWidgets/qtwidgetsglobal.h>
+#include <QtCore/qlist.h>
 #include <QtCore/qvariant.h>
-#include <QtCore/qvector.h>
-//#include <QtWidgets/qitemselectionmodel.h>
+
+QT_REQUIRE_CONFIG(tablewidget);
 
 QT_BEGIN_NAMESPACE
 
-
-#ifndef QT_NO_TABLEWIDGET
-
-class Q_WIDGETS_EXPORT QTableWidgetSelectionRange
+class QTableWidgetSelectionRange
 {
 public:
-    QTableWidgetSelectionRange();
-    QTableWidgetSelectionRange(int top, int left, int bottom, int right);
-    QTableWidgetSelectionRange(const QTableWidgetSelectionRange &other);
-    ~QTableWidgetSelectionRange();
+    QTableWidgetSelectionRange() = default;
+    QTableWidgetSelectionRange(int top, int left, int bottom, int right)
+      : m_top(top), m_left(left), m_bottom(bottom), m_right(right)
+    {}
 
-    inline int topRow() const { return top; }
-    inline int bottomRow() const { return bottom; }
-    inline int leftColumn() const { return left; }
-    inline int rightColumn() const { return right; }
-    inline int rowCount() const { return bottom - top + 1; }
-    inline int columnCount() const { return right - left + 1; }
+    friend bool operator==(const QTableWidgetSelectionRange &lhs,
+                           const QTableWidgetSelectionRange &rhs) noexcept
+    { return lhs.m_top == rhs.m_top && lhs.m_left == rhs.m_left
+          && lhs.m_bottom == rhs.m_bottom && lhs.m_right == rhs.m_right; };
+    friend bool operator!=(const QTableWidgetSelectionRange &lhs,
+                           const QTableWidgetSelectionRange &rhs) noexcept
+    { return !(lhs == rhs); }
 
+    inline int topRow() const { return m_top; }
+    inline int bottomRow() const { return m_bottom; }
+    inline int leftColumn() const { return m_left; }
+    inline int rightColumn() const { return m_right; }
+    inline int rowCount() const { return m_bottom - m_top + 1; }
+    inline int columnCount() const { return m_right - m_left + 1; }
 private:
-    int top, left, bottom, right;
+    int m_top = -1, m_left = -1, m_bottom = -2, m_right = -2;
 };
 
 class QTableWidget;
@@ -94,8 +99,8 @@ public:
     inline int row() const;
     inline int column() const;
 
-    inline void setSelected(bool select);
-    inline bool isSelected() const;
+    void setSelected(bool select);
+    bool isSelected() const;
 
     inline Qt::ItemFlags flags() const { return itemFlags; }
     void setFlags(Qt::ItemFlags flags);
@@ -112,13 +117,13 @@ public:
         { return data(Qt::StatusTipRole).toString(); }
     inline void setStatusTip(const QString &statusTip);
 
-#ifndef QT_NO_TOOLTIP
+#if QT_CONFIG(tooltip)
     inline QString toolTip() const
         { return data(Qt::ToolTipRole).toString(); }
     inline void setToolTip(const QString &toolTip);
 #endif
 
-#ifndef QT_NO_WHATSTHIS
+#if QT_CONFIG(whatsthis)
     inline QString whatsThis() const
         { return data(Qt::WhatsThisRole).toString(); }
     inline void setWhatsThis(const QString &whatsThis);
@@ -133,25 +138,15 @@ public:
     inline void setTextAlignment(int alignment)
         { setData(Qt::TextAlignmentRole, alignment); }
 
-    inline QColor backgroundColor() const
-        { return qvariant_cast<QColor>(data(Qt::BackgroundColorRole)); }
-    inline void setBackgroundColor(const QColor &color)
-        { setData(Qt::BackgroundColorRole, color); }
-
     inline QBrush background() const
         { return qvariant_cast<QBrush>(data(Qt::BackgroundRole)); }
     inline void setBackground(const QBrush &brush)
-        { setData(Qt::BackgroundRole, brush); }
-
-    inline QColor textColor() const
-        { return qvariant_cast<QColor>(data(Qt::TextColorRole)); }
-    inline void setTextColor(const QColor &color)
-        { setData(Qt::TextColorRole, color); }
+        { setData(Qt::BackgroundRole, brush.style() != Qt::NoBrush ? QVariant(brush) : QVariant()); }
 
     inline QBrush foreground() const
         { return qvariant_cast<QBrush>(data(Qt::ForegroundRole)); }
     inline void setForeground(const QBrush &brush)
-        { setData(Qt::ForegroundRole, brush); }
+        { setData(Qt::ForegroundRole, brush.style() != Qt::NoBrush ? QVariant(brush) : QVariant()); }
 
     inline Qt::CheckState checkState() const
         { return static_cast<Qt::CheckState>(data(Qt::CheckStateRole).toInt()); }
@@ -161,7 +156,7 @@ public:
     inline QSize sizeHint() const
         { return qvariant_cast<QSize>(data(Qt::SizeHintRole)); }
     inline void setSizeHint(const QSize &size)
-        { setData(Qt::SizeHintRole, size); }
+        { setData(Qt::SizeHintRole, size.isValid() ? QVariant(size) : QVariant()); }
 
     virtual QVariant data(int role) const;
     virtual void setData(int role, const QVariant &value);
@@ -177,8 +172,11 @@ public:
     inline int type() const { return rtti; }
 
 private:
+    QTableModel *tableModel() const;
+
+private:
     int rtti;
-    QVector<QWidgetItemData> values;
+    QList<QWidgetItemData> values;
     QTableWidget *view;
     QTableWidgetItemPrivate *d;
     Qt::ItemFlags itemFlags;
@@ -193,12 +191,12 @@ inline void QTableWidgetItem::setIcon(const QIcon &aicon)
 inline void QTableWidgetItem::setStatusTip(const QString &astatusTip)
 { setData(Qt::StatusTipRole, astatusTip); }
 
-#ifndef QT_NO_TOOLTIP
+#if QT_CONFIG(tooltip)
 inline void QTableWidgetItem::setToolTip(const QString &atoolTip)
 { setData(Qt::ToolTipRole, atoolTip); }
 #endif
 
-#ifndef QT_NO_WHATSTHIS
+#if QT_CONFIG(whatsthis)
 inline void QTableWidgetItem::setWhatsThis(const QString &awhatsThis)
 { setData(Qt::WhatsThisRole, awhatsThis); }
 #endif
@@ -221,8 +219,8 @@ class Q_WIDGETS_EXPORT QTableWidget : public QTableView
 
     friend class QTableModel;
 public:
-    explicit QTableWidget(QWidget *parent = Q_NULLPTR);
-    QTableWidget(int rows, int columns, QWidget *parent = Q_NULLPTR);
+    explicit QTableWidget(QWidget *parent = nullptr);
+    QTableWidget(int rows, int columns, QWidget *parent = nullptr);
     ~QTableWidget();
 
     void setRowCount(int rows);
@@ -237,6 +235,9 @@ public:
     QTableWidgetItem *item(int row, int column) const;
     void setItem(int row, int column, QTableWidgetItem *item);
     QTableWidgetItem *takeItem(int row, int column);
+    QList<QTableWidgetItem*> items(const QMimeData *data) const;
+    QModelIndex indexFromItem(const QTableWidgetItem *item) const;
+    QTableWidgetItem *itemFromIndex(const QModelIndex &index) const;
 
     QTableWidgetItem *verticalHeaderItem(int row) const;
     void setVerticalHeaderItem(int row, QTableWidgetItem *item);
@@ -263,13 +264,13 @@ public:
     void editItem(QTableWidgetItem *item);
     void openPersistentEditor(QTableWidgetItem *item);
     void closePersistentEditor(QTableWidgetItem *item);
+    using QAbstractItemView::isPersistentEditorOpen;
+    bool isPersistentEditorOpen(QTableWidgetItem *item) const;
 
     QWidget *cellWidget(int row, int column) const;
     void setCellWidget(int row, int column, QWidget *widget);
     inline void removeCellWidget(int row, int column);
 
-    bool isItemSelected(const QTableWidgetItem *item) const;
-    void setItemSelected(const QTableWidgetItem *item, bool select);
     void setRangeSelected(const QTableWidgetSelectionRange &range, bool select);
 
     QList<QTableWidgetSelectionRange> selectedRanges() const;
@@ -318,24 +319,18 @@ Q_SIGNALS:
     void currentCellChanged(int currentRow, int currentColumn, int previousRow, int previousColumn);
 
 protected:
-    bool event(QEvent *e) Q_DECL_OVERRIDE;
+    bool event(QEvent *e) override;
     virtual QStringList mimeTypes() const;
-#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
     virtual QMimeData *mimeData(const QList<QTableWidgetItem *> &items) const;
-#else
-    virtual QMimeData *mimeData(const QList<QTableWidgetItem*> items) const;
-#endif
     virtual bool dropMimeData(int row, int column, const QMimeData *data, Qt::DropAction action);
     virtual Qt::DropActions supportedDropActions() const;
-    QList<QTableWidgetItem*> items(const QMimeData *data) const;
 
-    QModelIndex indexFromItem(QTableWidgetItem *item) const;
-    QTableWidgetItem *itemFromIndex(const QModelIndex &index) const;
+protected:
 #if QT_CONFIG(draganddrop)
-    void dropEvent(QDropEvent *event) Q_DECL_OVERRIDE;
+    void dropEvent(QDropEvent *event) override;
 #endif
 private:
-    void setModel(QAbstractItemModel *model) Q_DECL_OVERRIDE;
+    void setModel(QAbstractItemModel *model) override;
 
     Q_DECLARE_PRIVATE(QTableWidget)
     Q_DISABLE_COPY(QTableWidget)
@@ -352,7 +347,7 @@ private:
 };
 
 inline void QTableWidget::removeCellWidget(int arow, int acolumn)
-{ setCellWidget(arow, acolumn, Q_NULLPTR); }
+{ setCellWidget(arow, acolumn, nullptr); }
 
 inline QTableWidgetItem *QTableWidget::itemAt(int ax, int ay) const
 { return itemAt(QPoint(ax, ay)); }
@@ -362,14 +357,6 @@ inline int QTableWidgetItem::row() const
 
 inline int QTableWidgetItem::column() const
 { return (view ? view->column(this) : -1); }
-
-inline void QTableWidgetItem::setSelected(bool aselect)
-{ if (view) view->setItemSelected(this, aselect); }
-
-inline bool QTableWidgetItem::isSelected() const
-{ return (view ? view->isItemSelected(this) : false); }
-
-#endif // QT_NO_TABLEWIDGET
 
 QT_END_NAMESPACE
 

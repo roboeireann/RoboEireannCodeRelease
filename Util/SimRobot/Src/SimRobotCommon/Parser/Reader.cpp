@@ -24,12 +24,11 @@
  * @author Arne Hasselbring
  */
 
+#include "Reader.h"
+#include "Platform/Assert.h"
 #include <cctype>
 #include <fstream>
 #include <iostream>
-
-#include "Reader.h"
-#include "Platform/Assert.h"
 
 bool Reader::readFile(const std::string& fileName)
 {
@@ -370,7 +369,7 @@ Reader::Token Reader::readToken()
   const char c = static_cast<char>(reader.get());
   if(!reader.good())
     return endOfInput;
-  ASSERT(c != EOF);
+  ASSERT(c != static_cast<char>(EOF));
   if(c == '\n')
   {
     ++nextLocation.line;
